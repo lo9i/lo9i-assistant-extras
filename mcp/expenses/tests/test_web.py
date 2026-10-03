@@ -45,6 +45,7 @@ def test_the_first_visit_asks_for_the_currency_guessed_from_the_browser(tmp_path
     c = TestClient(create_app())
     first = c.get("/", headers={"X-Forwarded-Prefix": "/expenses"}, follow_redirects=False)
     assert (first.status_code, first.headers["location"]) == (303, "/expenses/settings")
+    assert c.get("/settings", headers={"X-Forwarded-Prefix": "/expenses"}).status_code == 200
     assert c.post("/bills", headers=HX).headers["HX-Redirect"] == "/settings"
     page = c.get("/settings", headers={"Accept-Language": "en-GB,en;q=0.8"}).text
     assert '<option value="GBP" selected>' in page and 'value="en_GB"' in page
@@ -67,6 +68,8 @@ def test_pages_link_under_the_prefix_the_daemon_gives(client):
     page = client.get("/assets", headers={"X-Forwarded-Prefix": "/expenses"}).text
     assert '<base href="/expenses/">' in page and 'href="static/app.css?v=' in page
     assert '<base href="/">' in client.get("/").text
+    styles = client.get("/static/app.css", headers={"X-Forwarded-Prefix": "/expenses"})
+    assert styles.status_code == 200 and "text/css" in styles.headers["content-type"]
     # Anything that isn't plain path segments is ignored.
     assert '<base href="/">' in client.get("/", headers={"X-Forwarded-Prefix": '/x"><script>'}).text
 

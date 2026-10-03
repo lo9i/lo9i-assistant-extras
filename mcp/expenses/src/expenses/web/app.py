@@ -65,7 +65,8 @@ async def get_conn(request: Request) -> AsyncIterator[sqlite3.Connection]:
     conn = db.connect()
     try:
         request.state.currency = currency.get(conn)
-        if request.state.currency is None and request.url.path != "/settings":
+        path = request.url.path.removeprefix(request.scope.get("root_path", ""))
+        if request.state.currency is None and path != "/settings":
             raise NoCurrency
         recurring.generate(conn)
         yield conn
@@ -479,7 +480,14 @@ class ForwardedPrefix:
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
         if scope["type"] == "http":
             prefix = dict(scope["headers"]).get(b"x-forwarded-prefix", b"").decode("latin-1")
-            scope = {**scope, "root_path": prefix if PREFIX.match(prefix) else ""}
+            if prefix and PREFIX.match(prefix):
+                # ASGI's path includes root_path; static files (and url_for) count on it.
+                scope = {
+                    **scope,
+                    "root_path": prefix,
+                    "path": prefix + scope["path"],
+                    "raw_path": prefix.encode() + scope.get("raw_path", scope["path"].encode()),
+                }
         await self.app(scope, receive, send)
 
 
