@@ -6,6 +6,12 @@ import sqlite3
 DEFAULT_CATEGORIES = ("utilities", "tax", "insurance", "transport", "housing", "other")
 
 SCHEMA = """
+-- One row per setting, such as the currency (currency.py).
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS assets (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

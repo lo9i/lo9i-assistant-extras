@@ -26,11 +26,12 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
 
-from .. import db, recurring, service
+from .. import currency, db, recurring, service
 from ..models import Bill, Obligation
 from ..service import ExpensesError, ValidationError
 
@@ -38,11 +39,6 @@ HERE = Path(__file__).parent
 # What the daemon may send as X-Forwarded-Prefix: path segments, like /expenses.
 PREFIX = re.compile(r"^(/[A-Za-z0-9_-]+)*$")
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-
-def format_ars(amount: float) -> str:
-    """Argentine style: dot for thousands, comma for decimals, e.g. 45.230,50."""
-    return f"{amount:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
 def asset_url(name: str) -> str:
@@ -54,16 +50,23 @@ def asset_url(name: str) -> str:
 
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.globals["asset"] = asset_url
-templates.env.filters["ars"] = format_ars
 templates.env.globals["MONTHS"] = MONTHS
 templates.env.globals["ASSET_KINDS"] = service.ASSET_KINDS
 templates.env.globals["EVERY_MONTHS"] = service.EVERY_MONTHS
 
 
-async def get_conn() -> AsyncIterator[sqlite3.Connection]:
-    """A connection per request, with this month's recurring bills in place."""
+class NoCurrency(Exception):
+    """No currency is chosen yet: the settings page asks for it first."""
+
+
+async def get_conn(request: Request) -> AsyncIterator[sqlite3.Connection]:
+    """A connection per request, with this month's recurring bills in place and the currency in
+    `request.state.currency`. Until one is chosen, only the settings page opens."""
     conn = db.connect()
     try:
+        request.state.currency = currency.get(conn)
+        if request.state.currency is None and request.url.path != "/settings":
+            raise NoCurrency
         recurring.generate(conn)
         yield conn
     finally:
@@ -84,17 +87,15 @@ def _opt(form: dict, key: str) -> str | None:
     return _text(form, key) or None
 
 
-def _amount(form: dict, key: str) -> float | None:
-    """Accepts 45230.50, 45230,50 and 45.230,50."""
+def _amount(form: dict, key: str, cur: currency.Currency) -> float | None:
+    """Written the way the currency's locale writes numbers: 45.230,50 or 45230,5 in es_AR."""
     v = _text(form, key)
     if not v:
         return None
-    if "," in v:
-        v = v.replace(".", "").replace(",", ".")
     try:
-        return float(v)
-    except ValueError:
-        raise ValidationError(f'{key} must be a number, got "{_text(form, key)}"') from None
+        return cur.parse(v)
+    except ValueError as e:
+        raise ValidationError(f'{key} must be a number, got "{v}": {e}') from None
 
 
 def _int(form: dict, key: str) -> int | None:
@@ -127,15 +128,23 @@ def metadata_text(metadata: dict[str, str]) -> str:
 templates.env.filters["metadata_text"] = metadata_text
 
 
-def input_number(value: Any) -> str:
-    """An amount as an input value: 1160000.0 -> "1160000". Typed text (a
-    failed form) passes through."""
+@pass_context
+def input_number(ctx: Any, value: Any) -> str:
+    """An amount as an input value, in the currency's locale: 45230.5 -> "45230,5" in es_AR. Typed
+    text (a failed form) passes through."""
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return f"{value:.2f}".rstrip("0").rstrip(".")
+        return ctx["request"].state.currency.plain(value)
     return "" if value is None or not isinstance(value, str) else value
 
 
+@pass_context
+def money(ctx: Any, amount: float) -> str:
+    """An amount with the currency's symbol, in its locale: "$ 45.230,50"."""
+    return ctx["request"].state.currency.format(amount)
+
+
 templates.env.filters["num"] = input_number
+templates.env.filters["money"] = money
 
 
 def _render(request: Request, template: str, **ctx: Any) -> HTMLResponse:
@@ -207,7 +216,7 @@ def _month_ctx(conn: sqlite3.Connection, filters: Filters, **extra: Any) -> dict
     }
 
 
-def _bill_args(form: dict) -> dict[str, Any]:
+def _bill_args(form: dict, cur: currency.Currency) -> dict[str, Any]:
     """add_bill/update_bill arguments from a bill form. An obligation bill
     takes its asset and category from the obligation."""
     obligation_id = _int(form, "obligation_id")
@@ -219,7 +228,7 @@ def _bill_args(form: dict) -> dict[str, Any]:
     if obligation_id is None:
         args["category"] = _opt(form, "category")
         args["asset_id"] = _opt(form, "asset_id")
-    amount = _amount(form, "amount")
+    amount = _amount(form, "amount", cur)
     if amount is None:
         raise ValidationError("amount is required")
     return {**args, "amount": amount, "due_date": _text(form, "due_date")}
@@ -236,7 +245,7 @@ def _month_routes(app: FastAPI) -> None:
         form = dict(await request.form())
         filters = Filters.read(form)
         try:
-            args = _bill_args(form)
+            args = _bill_args(form, request.state.currency)
             service.add_bill(conn, args.pop("amount"), args.pop("due_date"), **args)
         except ExpensesError as e:
             ctx = _month_ctx(conn, filters, add=form, add_error=str(e), add_open=True)
@@ -254,7 +263,7 @@ def _month_routes(app: FastAPI) -> None:
         form = dict(await request.form())
         filters = Filters.read(form)
         try:
-            args = _bill_args(form)
+            args = _bill_args(form, request.state.currency)
             if status := _text(form, "status"):
                 args["status"] = status
             service.update_bill(conn, id, **args)
@@ -305,7 +314,7 @@ def _asset_args(form: dict) -> dict[str, Any]:
     }
 
 
-def _obligation_args(form: dict) -> dict[str, Any]:
+def _obligation_args(form: dict, cur: currency.Currency) -> dict[str, Any]:
     return {
         "name": _text(form, "name"),
         "category": _text(form, "category"),
@@ -314,7 +323,7 @@ def _obligation_args(form: dict) -> dict[str, Any]:
         "due_day": _int(form, "due_day"),
         "every_months": _int(form, "every_months") or 1,
         "anchor_month": _int(form, "anchor_month"),
-        "expected_amount": _amount(form, "expected_amount"),
+        "expected_amount": _amount(form, "expected_amount", cur),
     }
 
 
@@ -364,7 +373,7 @@ def _asset_routes(app: FastAPI) -> None:
         form = dict(await request.form())
         group = _text(form, "asset_id") or NO_ASSET
         try:
-            args = _obligation_args(form)
+            args = _obligation_args(form, request.state.currency)
             asset_id = None if group == NO_ASSET else group
             service.add_obligation(conn, args.pop("name"), args.pop("category"), asset_id=asset_id, **args)
         except ExpensesError as e:
@@ -383,7 +392,7 @@ def _asset_routes(app: FastAPI) -> None:
     async def save_obligation(request: Request, id: int, conn: Conn) -> HTMLResponse:
         form = dict(await request.form())
         try:
-            service.update_obligation(conn, id, **_obligation_args(form))
+            service.update_obligation(conn, id, **_obligation_args(form, request.state.currency))
         except ExpensesError as e:
             ob = service.get_obligation(conn, id)
             ctx = {"ob": ob, "form": form, "error": str(e), "categories": service.list_categories(conn)}
@@ -429,6 +438,34 @@ def _category_routes(app: FastAPI) -> None:
         return _render(request, "_categories.html", **ctx(conn))
 
 
+# --- Settings ---
+
+
+def _settings_ctx(request: Request, conn: sqlite3.Connection, **extra: Any) -> dict[str, Any]:
+    """The current currency, or a guess from the browser's language for the first visit."""
+    chosen = request.state.currency or currency.guess(request.headers.get("accept-language", ""))
+    chosen = chosen or currency.Currency("USD", "en_US")
+    has_bills = conn.execute("SELECT 1 FROM bills LIMIT 1").fetchone() is not None
+    first = request.state.currency is None
+    return {"nav": "settings", "chosen": chosen, "choices": currency.choices(chosen.locale), "first": first,
+            "has_bills": has_bills, **extra}
+
+
+def _settings_routes(app: FastAPI) -> None:
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_page(request: Request, conn: Conn) -> HTMLResponse:
+        return _page(request, "settings.html", "_settings.html", **_settings_ctx(request, conn))
+
+    @app.post("/settings", response_class=HTMLResponse)
+    async def save_settings(request: Request, conn: Conn) -> HTMLResponse:
+        form = dict(await request.form())
+        try:
+            request.state.currency = currency.set(conn, _text(form, "currency"), _text(form, "locale"))
+        except ValidationError as e:
+            return _render(request, "_settings.html", **_settings_ctx(request, conn, banner=str(e)))
+        return _render(request, "_settings.html", **_settings_ctx(request, conn, saved=True))
+
+
 # --- Serving under lo9i ---
 
 
@@ -456,11 +493,20 @@ def create_app() -> FastAPI:
         status = 404 if isinstance(exc, service.NotFound) else 400
         return Response(str(exc), status_code=status, media_type="text/plain")
 
+    # Until a currency is chosen, every page sends the user to the settings page.
+    @app.exception_handler(NoCurrency)
+    async def no_currency(request: Request, exc: NoCurrency) -> Response:
+        target = f"{request.scope.get('root_path', '')}/settings"
+        if request.headers.get("HX-Request"):
+            return Response(status_code=200, headers={"HX-Redirect": target})
+        return RedirectResponse(target, status_code=303)
+
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.add_middleware(ForwardedPrefix)
     _month_routes(app)
     _asset_routes(app)
     _category_routes(app)
+    _settings_routes(app)
     return app
 
 

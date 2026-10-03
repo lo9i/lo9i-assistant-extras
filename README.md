@@ -13,7 +13,7 @@ page (web), with this repository's address. **Update** downloads a newer version
 
 ## What's here
 
-- **expenses** (`mcp/expenses`): assets, recurring obligations and bills, in Argentine pesos. Its
+- **expenses** (`mcp/expenses`): assets, recurring obligations and bills, in one currency you choose. Its
   tools, an **Expenses** page in the web app, and a skill that tells the assistant how to use them.
 
 ## Developing a server

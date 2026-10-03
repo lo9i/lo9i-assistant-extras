@@ -22,14 +22,14 @@
   </form>
 
   <div class="tiles">
-    <div class="tile"><span>Total</span><strong>$ {{ totals.total | ars }}</strong></div>
-    <div class="tile"><span>Paid</span><strong class="ok">$ {{ totals.paid | ars }}</strong></div>
-    <div class="tile"><span>Pending</span><strong class="warn">$ {{ totals.pending | ars }}</strong></div>
+    <div class="tile"><span>Total</span><strong>{{ totals.total | money }}</strong></div>
+    <div class="tile"><span>Paid</span><strong class="ok">{{ totals.paid | money }}</strong></div>
+    <div class="tile"><span>Pending</span><strong class="warn">{{ totals.pending | money }}</strong></div>
   </div>
   {% if bills %}
   <div class="breakdown">
-    <div>{% for c, v in totals.by_category.items() %}<span class="chip">{{ c }} <b>$ {{ v | ars }}</b></span>{% endfor %}</div>
-    <div>{% for a, v in totals.by_asset.items() %}<span class="chip">{{ assets.get(a, 'no asset') }} <b>$ {{ v | ars }}</b></span>{% endfor %}</div>
+    <div>{% for c, v in totals.by_category.items() %}<span class="chip">{{ c }} <b>{{ v | money }}</b></span>{% endfor %}</div>
+    <div>{% for a, v in totals.by_asset.items() %}<span class="chip">{{ assets.get(a, 'no asset') }} <b>{{ v | money }}</b></span>{% endfor %}</div>
   </div>
   {% endif %}
 
@@ -46,7 +46,7 @@
           Due {{ b.due_date }}{% if b.period %} · {{ b.period }}{% endif %} · {{ b.category }}{% if b.provider and b.obligation_id %} · {{ b.provider }}{% endif %}
         </div>
       </div>
-      <div class="amount">$ {{ b.amount | ars }}{% if b.estimated %}<span class="est" title="Estimated from the last real bill">est.</span>{% endif %}</div>
+      <div class="amount">{{ b.amount | money }}{% if b.estimated %}<span class="est" title="Estimated from the last real bill">est.</span>{% endif %}</div>
       <div class="actions">
         {% if b.status == 'pending' %}
         <button class="primary small" hx-post="bills/{{ b.id }}/status" hx-vals='{"status": "paid"}' hx-include="#filters" hx-target="#month" hx-swap="outerHTML">Mark paid</button>

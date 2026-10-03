@@ -16,11 +16,13 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import db, recurring, service
+from . import currency, db, recurring, service
 from .service import UNSET
 
 INSTRUCTIONS = """\
-Tracks expenses in Argentine pesos.
+Tracks expenses, all in one currency the user chose. month_summary says
+which (currency and locale) and amounts are plain numbers in it. If it says
+none is chosen yet, ask the user and call set_currency.
 
 - Assets are things owned that generate expenses: houses, cars (kind house,
   car or other). Ids are slugs, e.g. "boni".
@@ -82,11 +84,32 @@ def month_summary() -> dict:
     overall, by category and by asset."""
     with _db() as conn:
         bills = service.month_bills(conn)
+        chosen = currency.get(conn)
     return {
         "month": date.today().strftime("%Y-%m"),
+        **_currency(chosen),
         **service.totals(bills),
         "bills": _bills(bills),
     }
+
+
+def _currency(chosen: currency.Currency | None) -> dict:
+    if chosen is None:
+        return {"currency": None, "note": "No currency chosen yet: ask the user, then call set_currency."}
+    return {"currency": chosen.code, "locale": chosen.locale, "example": chosen.format(45230.5)}
+
+
+@mcp.tool()
+def set_currency(
+    currency_code: Annotated[str, Field(description="ISO 4217, like ARS, USD or EUR")],
+    locale: Annotated[
+        str | None, Field(description="How numbers are written, like es_AR or en_US; absent keeps the current one")
+    ] = None,
+) -> dict:
+    """Choose the one currency every amount is in. Changing it relabels
+    existing amounts; nothing is converted."""
+    with _db() as conn:
+        return _currency(currency.set(conn, currency_code, locale))
 
 
 # --- Assets ---

@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from expenses import db, service
-from expenses.web.app import create_app, format_ars, listen
+from expenses import currency, db, service
+from expenses.web.app import create_app, listen
 
 HX = {"HX-Request": "true"}
 
@@ -17,6 +17,7 @@ def path(tmp_path, monkeypatch):
     conn = db.connect(p)
     service.add_asset(conn, "Boni", "house")
     service.add_obligation(conn, "Luz", "utilities", asset_id="boni")
+    currency.set(conn, "ARS", "es_AR")
     conn.close()
     return p
 
@@ -34,10 +35,32 @@ def bills(path):
         conn.close()
 
 
-def test_format_ars():
-    assert format_ars(45230.5) == "45.230,50"
-    assert format_ars(0) == "0,00"
-    assert format_ars(1160000) == "1.160.000,00"
+def test_amounts_show_in_the_currency_and_its_locale(client):
+    client.post("/bills", headers=HX, data={"amount": "1.160.000", "due_date": "2026-10-10", "category": "tax"})
+    assert "$1.160.000,00" in client.get("/").text
+
+
+def test_the_first_visit_asks_for_the_currency_guessed_from_the_browser(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPENSES_DB", str(tmp_path / "new.db"))
+    c = TestClient(create_app())
+    first = c.get("/", headers={"X-Forwarded-Prefix": "/expenses"}, follow_redirects=False)
+    assert (first.status_code, first.headers["location"]) == (303, "/expenses/settings")
+    assert c.post("/bills", headers=HX).headers["HX-Redirect"] == "/settings"
+    page = c.get("/settings", headers={"Accept-Language": "en-GB,en;q=0.8"}).text
+    assert '<option value="GBP" selected>' in page and 'value="en_GB"' in page
+    assert "Saved" in c.post("/settings", headers=HX, data={"currency": "gbp", "locale": "en_GB"}).text
+    c.post("/bills", headers=HX, data={"amount": "45,230.50", "due_date": "2026-10-10", "category": "tax"})
+    assert "£45,230.50" in c.get("/").text
+
+
+def test_amounts_are_read_the_way_the_locale_writes_them(client):
+    r = client.post("/bills", headers=HX, data={"amount": "45230.50", "due_date": "2026-10-10", "category": "tax"})
+    assert "write it like 45230,5" in r.text
+
+
+def test_a_wrong_currency_or_locale_is_refused(client):
+    assert "an ISO 4217 currency code" in client.post("/settings", headers=HX, data={"currency": "XYZ", "locale": "es_AR"}).text
+    assert "a locale, like es_AR" in client.post("/settings", headers=HX, data={"currency": "ARS", "locale": "nope_ZZ"}).text
 
 
 def test_pages_link_under_the_prefix_the_daemon_gives(client):

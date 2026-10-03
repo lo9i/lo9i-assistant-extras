@@ -27,7 +27,7 @@
       <div class="row" id="ob-{{ o.id }}">
         <div class="main">
           <div class="title">{{ o.name }} <span class="tag">{{ o.category }}</span></div>
-          <div class="muted small">{{ schedule(o) }} · {% if o.expected_amount is not none %}fixed $ {{ o.expected_amount | ars }}{% else %}estimated{% endif %}</div>
+          <div class="muted small">{{ schedule(o) }} · {% if o.expected_amount is not none %}fixed {{ o.expected_amount | money }}{% else %}estimated{% endif %}</div>
           {% for k, v in o.metadata.items() %}<div class="muted small">{{ k }}: {{ v }}</div>{% endfor %}
         </div>
         <div class="actions">

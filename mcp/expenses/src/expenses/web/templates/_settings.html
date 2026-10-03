@@ -1,0 +1,23 @@
+<section id="settings">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  {% if first %}
+  <p class="card">Pick the currency everything is in. There's one currency for all assets, obligations and bills.</p>
+  {% endif %}
+  <form class="card stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML">
+    <label>Currency
+      <select name="currency">
+        {% for code, name in choices %}
+        <option value="{{ code }}" {{ 'selected' if code == chosen.code }}>{{ name }} ({{ code }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label><span>Number format <span class="hint">a locale, like es_AR (45.230,50) or en_US (45,230.50)</span></span>
+      <input name="locale" value="{{ chosen.locale }}" required>
+    </label>
+    {% if has_bills %}<p class="muted small">Changing the currency relabels every amount; nothing is converted.</p>{% endif %}
+    <div class="actions">
+      <button class="primary">Save</button>
+      {% if saved %}<span class="muted small">Saved: amounts look like {{ 45230.5 | money }}. <a href="./">Back to bills</a></span>{% endif %}
+    </div>
+  </form>
+</section>

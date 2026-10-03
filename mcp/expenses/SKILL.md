@@ -3,7 +3,7 @@ name: expenses
 description: Tracking the user's expenses (houses, cars, taxes, bills, what's due or paid this month) with the expenses MCP server. Use it for anything about bills, payments, obligations or monthly spending.
 ---
 
-The data lives in the `expenses` MCP server; its tools are named `mcp__expenses__<tool>`. Amounts are Argentine pesos. If those tools aren't there, the server is turned off: the user turns it on in MCP servers.
+The data lives in the `expenses` MCP server; its tools are named `mcp__expenses__<tool>`. Everything is in one currency the user chose; `month_summary` says which, with its locale and an example amount. If those tools aren't there, the server is turned off: the user turns it on in MCP servers.
 
 ## The model
 
@@ -18,7 +18,8 @@ The data lives in the `expenses` MCP server; its tools are named `mcp__expenses_
 2. A bill the user sends (a photo, a PDF, an email, or just "paid the luz, 61.000"): find its obligation with `list_obligations`, then `add_bill` with that `obligation_id`, the amount and the due date. Mark it paid with `update_bill` (`status: paid`) when the user says it's paid.
 3. A new recurring expense: `add_obligation` with its `due_day`, how often (`every_months`) and, if the amount is fixed, `expected_amount`.
 4. Tool errors list the valid choices; correct the call instead of asking the user.
-5. Write amounts the Argentine way: dot for thousands, comma for decimals (45.230,50).
+5. Write amounts in the chosen currency the way its locale writes them, like the `example` in `month_summary` (es_AR: $ 45.230,50; en_US: $45,230.50). Tools take and return plain numbers.
+6. If `month_summary` says no currency is chosen, ask the user which one (suggest the one of their country) and call `set_currency`. Changing it later relabels every amount; nothing is converted, so confirm with the user first.
 
 Changes ask the user for approval unless they trust the server. For browsing and editing many bills at once, the user has the **Expenses** page in the web app's sidebar.
 

@@ -86,3 +86,16 @@ def test_only_read_tools_are_read_only():
         "list_bills",
         "get_bill",
     }
+
+
+def test_the_currency_is_chosen_once_and_reported():
+    before, chosen, bad, after = call(
+        ("month_summary", {}),
+        ("set_currency", {"currency_code": "eur", "locale": "de_DE"}),
+        ("set_currency", {"currency_code": "pesos"}),
+        ("month_summary", {}),
+    )
+    assert payload(before)["currency"] is None and "set_currency" in payload(before)["note"]
+    assert payload(chosen) == {"currency": "EUR", "locale": "de_DE", "example": "45.230,50\xa0€"}
+    assert bad.is_error and "ISO 4217" in bad.content[0].text
+    assert payload(after)["currency"] == "EUR"

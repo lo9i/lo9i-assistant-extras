@@ -2,7 +2,7 @@
 # core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that
 # updates leave alone, {uv} the uv lo9i found, {socket} where the web page listens.
 name: expenses
-description: Assets, recurring obligations and bills, in Argentine pesos
+description: Assets, recurring obligations and bills, in the currency you choose
 command: "{uv}"
 # uv builds its own environment from uv.lock on the first start, so that start is slow.
 args: [run, --quiet, --project, "{dir}", --frozen, expenses-mcp]
