@@ -16,6 +16,10 @@ page (web), with this repository's address. **Update** downloads a newer version
 - **expenses** (`mcp/expenses`): assets, recurring obligations and bills, in one currency you choose. Its
   tools, an **Expenses** page in the web app, and a skill that tells the assistant how to use them.
 
+## Versions
+
+Each plugin declares `version:` in its `server.yaml` (or a standalone skill in its `SKILL.md` header). The Plugins page shows the installed version and the newer one when there is one. Raise it with every change worth updating to.
+
 ## Developing a server
 
 Each server folder is its own uv project:
