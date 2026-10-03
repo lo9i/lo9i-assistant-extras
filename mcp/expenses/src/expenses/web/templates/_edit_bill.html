@@ -1,0 +1,19 @@
+<div class="row editing" id="bill-{{ bill.id }}">
+  <form class="stack" hx-post="bills/{{ bill.id }}" hx-include="#filters" hx-target="#month" hx-swap="outerHTML">
+    {% if form %}{% set v = form %}{% else %}{% set v = bill %}{% endif %}
+    {% include "_bill_fields.html" %}
+    <label>Status
+      <select name="status">
+        <option value="pending" {{ 'selected' if v.status == 'pending' }}>Pending</option>
+        <option value="paid" {{ 'selected' if v.status == 'paid' }}>Paid</option>
+      </select>
+    </label>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons">
+      <button type="button" class="ghost danger" hx-post="bills/{{ bill.id }}/delete" hx-include="#filters" hx-target="#month" hx-swap="outerHTML" hx-confirm="Delete this bill?">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="ghost" hx-get="./" hx-include="#filters" hx-target="#month" hx-swap="outerHTML">Cancel</button>
+      <button class="primary">Save</button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,10 @@
+<details id="add-ob-{{ group }}" class="sub" {{ 'open' if open }}>
+  <summary>+ Add obligation</summary>
+  <form class="stack" hx-post="obligations" hx-target="#assets" hx-swap="outerHTML">
+    <input type="hidden" name="asset_id" value="{{ group }}">
+    {% set v = form or {} %}
+    {% include "_obligation_fields.html" %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons"><button class="primary">Add</button></div>
+  </form>
+</details>

@@ -1,0 +1,10 @@
+<div class="grid">
+  <label>Name <input name="name" value="{{ v.name or '' }}" required></label>
+  <label>Kind
+    <select name="kind">{% for k in ASSET_KINDS %}<option value="{{ k }}" {{ 'selected' if v.kind == k }}>{{ k }}</option>{% endfor %}</select>
+  </label>
+  <label class="wide"><span>Details <span class="hint">one per line, "key: value"</span></span>
+    <textarea name="metadata" rows="2" placeholder="address: Guayaquil 172">{{ v.metadata if v.metadata is string else (v.metadata or {}) | metadata_text }}</textarea>
+  </label>
+  <label class="wide">Notes <input name="notes" value="{{ v.notes or '' }}"></label>
+</div>

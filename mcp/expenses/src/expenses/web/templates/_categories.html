@@ -1,0 +1,18 @@
+<section id="categories">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  <form class="card inline" hx-post="categories" hx-target="#categories" hx-swap="outerHTML">
+    <input name="name" placeholder="New category" value="{{ name or '' }}" required>
+    <button class="primary">Add</button>
+  </form>
+  <div class="card list">
+    {% for c in categories %}
+    <div class="row">
+      <div class="main"><div class="title">{{ c }}</div></div>
+      <div class="actions">
+        <button class="ghost small danger" hx-post="categories/delete" hx-vals='{"name": {{ c | tojson }}}' hx-target="#categories" hx-swap="outerHTML" hx-confirm="Delete {{ c }}?">Delete</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted small">Categories are also created when you type a new one on a bill or obligation. A category in use can't be deleted.</p>
+</section>

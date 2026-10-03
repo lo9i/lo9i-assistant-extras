@@ -1,0 +1,45 @@
+{% from "_macros.html" import schedule %}
+<section id="assets">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  {% include "_add_asset.html" %}
+
+  {% for g in groups %}
+  <div class="card group">
+    {% if g.asset %}
+    {% set a = g.asset %}
+    <div class="group-head" id="asset-{{ a.id }}">
+      <div class="main">
+        <div class="title">{{ a.name }} <span class="tag">{{ a.kind }}</span></div>
+        {% for k, v in a.metadata.items() %}<div class="muted small">{{ k }}: {{ v }}</div>{% endfor %}
+        {% if a.notes %}<div class="muted small">{{ a.notes }}</div>{% endif %}
+      </div>
+      <div class="actions">
+        <button class="ghost small" hx-get="assets/{{ a.id }}/edit" hx-target="#asset-{{ a.id }}" hx-swap="outerHTML">Edit</button>
+        <button class="ghost small danger" hx-post="assets/{{ a.id }}/delete" hx-target="#assets" hx-swap="outerHTML" hx-confirm="Delete {{ a.name }} and its obligations?">Delete</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="group-head"><div class="title">No asset <span class="muted small">taxes and other standalone obligations</span></div></div>
+    {% endif %}
+
+    <div class="list">
+      {% for o in g.obligations %}
+      <div class="row" id="ob-{{ o.id }}">
+        <div class="main">
+          <div class="title">{{ o.name }} <span class="tag">{{ o.category }}</span></div>
+          <div class="muted small">{{ schedule(o) }} · {% if o.expected_amount is not none %}fixed $ {{ o.expected_amount | ars }}{% else %}estimated{% endif %}</div>
+          {% for k, v in o.metadata.items() %}<div class="muted small">{{ k }}: {{ v }}</div>{% endfor %}
+        </div>
+        <div class="actions">
+          <button class="ghost small" hx-get="obligations/{{ o.id }}/edit" hx-target="#ob-{{ o.id }}" hx-swap="outerHTML">Edit</button>
+          <button class="ghost small danger" hx-post="obligations/{{ o.id }}/delete" hx-target="#assets" hx-swap="outerHTML" hx-confirm="Delete {{ o.name }}?">Delete</button>
+        </div>
+      </div>
+      {% else %}
+      <p class="empty">No obligations.</p>
+      {% endfor %}
+    </div>
+    {% with group = g.key, form = none, error = none, open = false %}{% include "_add_obligation.html" %}{% endwith %}
+  </div>
+  {% endfor %}
+</section>

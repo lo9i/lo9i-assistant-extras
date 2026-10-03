@@ -1,0 +1,9 @@
+<details id="add-bill" class="card" {{ 'open' if add_open }}>
+  <summary>+ Add bill</summary>
+  <form class="stack" hx-post="bills" hx-include="#filters" hx-target="#month" hx-swap="outerHTML">
+    {% set v = add %}
+    {% include "_bill_fields.html" %}
+    {% if add_error %}<p class="error">{{ add_error }}</p>{% endif %}
+    <div class="buttons"><button class="primary">Add</button></div>
+  </form>
+</details>

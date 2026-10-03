@@ -1,0 +1,12 @@
+<div class="row editing" id="ob-{{ ob.id }}">
+  <form class="stack" hx-post="obligations/{{ ob.id }}" hx-target="#assets" hx-swap="outerHTML">
+    {% set v = form or ob %}
+    {% include "_obligation_fields.html" %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons">
+      <span class="spacer"></span>
+      <button type="button" class="ghost" hx-get="assets" hx-target="#assets" hx-swap="outerHTML">Cancel</button>
+      <button class="primary">Save</button>
+    </div>
+  </form>
+</div>

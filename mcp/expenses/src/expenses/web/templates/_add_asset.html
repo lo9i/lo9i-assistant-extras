@@ -1,0 +1,9 @@
+<details id="add-asset" class="card" {{ 'open' if open }}>
+  <summary>+ Add asset</summary>
+  <form class="stack" hx-post="assets" hx-target="#assets" hx-swap="outerHTML">
+    {% set v = form or {} %}
+    {% include "_asset_fields.html" %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons"><button class="primary">Add</button></div>
+  </form>
+</details>

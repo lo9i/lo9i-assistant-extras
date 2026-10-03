@@ -1,0 +1,26 @@
+{# Shared by the add and edit bill forms. `v` holds the values to show. #}
+{% from "_macros.html" import obligation_label %}
+<div class="grid">
+  <label class="wide">Obligation
+    <select name="obligation_id">
+      <option value="">— One-off (no obligation) —</option>
+      {% for o in obligations.values() %}
+      <option value="{{ o.id }}" {{ 'selected' if v.obligation_id | string == o.id | string }}>{{ obligation_label(o, assets) }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Amount <input name="amount" inputmode="decimal" value="{{ v.amount | num }}" required></label>
+  <label>Due date <input type="date" name="due_date" value="{{ v.due_date or '' }}" required></label>
+  <label><span>Category <span class="hint">one-offs</span></span>
+    <input name="category" list="category-list" value="{{ v.category or '' }}">
+  </label>
+  <label><span>Asset <span class="hint">one-offs</span></span>
+    <select name="asset_id">
+      <option value="">None</option>
+      {% for id, name in assets.items() %}<option value="{{ id }}" {{ 'selected' if v.asset_id == id }}>{{ name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Provider <input name="provider" value="{{ v.provider or '' }}"></label>
+  <label>Notes <input name="notes" value="{{ v.notes or '' }}"></label>
+</div>
+<datalist id="category-list">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>

@@ -1,0 +1,26 @@
+<div class="grid">
+  <label>Name <input name="name" value="{{ v.name or '' }}" required></label>
+  <label>Category <input name="category" list="category-list" value="{{ v.category or '' }}" required></label>
+  <label><span>Due day <span class="hint">empty = no schedule</span></span>
+    <input name="due_day" inputmode="numeric" value="{{ v.due_day if v.due_day is not none else '' }}">
+  </label>
+  <label>Repeats
+    <select name="every_months">
+      {% for n in EVERY_MONTHS %}<option value="{{ n }}" {{ 'selected' if (v.every_months or 1) | string == n | string }}>{{ 'Monthly' if n == 1 else 'Every ' ~ n ~ ' months' }}</option>{% endfor %}
+    </select>
+  </label>
+  <label><span>Starting month <span class="hint">if not monthly</span></span>
+    <select name="anchor_month">
+      <option value="">—</option>
+      {% for m in MONTHS %}<option value="{{ loop.index }}" {{ 'selected' if v.anchor_month | string == loop.index | string }}>{{ m }}</option>{% endfor %}
+    </select>
+  </label>
+  <label><span>Fixed amount <span class="hint">empty = estimate</span></span>
+    <input name="expected_amount" inputmode="decimal" value="{{ v.expected_amount | num }}">
+  </label>
+  <label class="wide"><span>Details <span class="hint">one per line, "key: value"</span></span>
+    <textarea name="metadata" rows="2" placeholder="client_number: 0012345">{{ v.metadata if v.metadata is string else (v.metadata or {}) | metadata_text }}</textarea>
+  </label>
+  <label class="wide">Notes <input name="notes" value="{{ v.notes or '' }}"></label>
+</div>
+<datalist id="category-list">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>

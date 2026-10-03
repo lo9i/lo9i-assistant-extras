@@ -1,0 +1,16 @@
+{% macro bill_label(b, obligations) -%}
+  {%- if b.obligation_id and b.obligation_id in obligations -%}{{ obligations[b.obligation_id].name }}
+  {%- else -%}{{ b.provider or b.notes or b.category }}{%- endif -%}
+{%- endmacro %}
+
+{% macro obligation_label(o, assets) -%}
+  {%- if o.asset_id %}{{ assets.get(o.asset_id, o.asset_id) }} · {% endif %}{{ o.name }}
+{%- endmacro %}
+
+{% macro schedule(o) -%}
+  {%- if o.due_day -%}
+    Day {{ o.due_day }}, {% if o.every_months == 1 %}monthly{% else %}every {{ o.every_months }} months from {{ MONTHS[(o.anchor_month or 1) - 1] }}{% endif %}
+  {%- else -%}No schedule{%- endif -%}
+{%- endmacro %}
+
+{% macro filter_fields() -%}hx-include="#filters"{%- endmacro %}
