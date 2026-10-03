@@ -3,7 +3,7 @@ name: expenses
 description: Tracking the user's expenses (houses, cars, taxes, bills, what's due or paid this month) with the expenses MCP server. Use it for anything about bills, payments, obligations or monthly spending.
 ---
 
-The data lives in the `expenses` MCP server; its tools are named `mcp__expenses__<tool>`. Amounts are Argentine pesos. If those tools aren't there, the server isn't installed or is turned off: point the user to the assistant-setup skill (installing from a repository).
+The data lives in the `expenses` MCP server; its tools are named `mcp__expenses__<tool>`. Amounts are Argentine pesos. If those tools aren't there, the server is turned off: the user turns it on in MCP servers.
 
 ## The model
 
