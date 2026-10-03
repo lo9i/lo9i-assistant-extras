@@ -12,6 +12,6 @@ trusted: false
 
 # The page lo9i shows as Expenses in its web app. It gets the env above and listens on {socket};
 # lo9i signs the user in and serves it under /expenses/ (X-Forwarded-Prefix).
-web:
+page:
   command: "{uv}"
   args: [run, --quiet, --project, "{dir}", --frozen, expenses-web, --socket, "{socket}"]
