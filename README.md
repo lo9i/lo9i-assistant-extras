@@ -6,6 +6,7 @@ server that the assistant installs from this repository, so its core stays small
 | Folder | What |
 |---|---|
 | `mcp/<name>/` | An MCP server (`server.yaml`): its tools, the values it asks for, optionally a web page, and optionally its skill (`SKILL.md`, how to use its tools), which comes and goes with it |
+| `plugins/<name>/` | A plugin that runs nothing (`server.yaml` without a command), such as a mail provider: its `email:` section gives lo9i the provider's servers |
 | `skills/<name>/` | A skill on its own (`SKILL.md`, optionally `scripts/`), for features that need no server |
 | `lib/<name>/` | A shared library plugins use, named in their `server.yaml` under `libraries:` and installed with them. `lib/lo9i-chat` is what the chat channels share: the assistant's channel API, how a run looks in a chat, approval and question buttons |
 
@@ -22,7 +23,7 @@ page (web), with this repository's address. **Update** downloads a newer version
 - **slack** (`mcp/slack`): chat with the assistant in a Slack DM, and tools to search, read and post in
   your workspace as you (every post asks you first). Create the Slack app from
   [`manifest.json`](mcp/slack/manifest.json) and enter its three tokens.
-- **gmail**, **microsoft**, **icloud**, **yahoo**, **aol**, **fastmail** (`mcp/<name>`): mail providers.
+- **gmail**, **microsoft**, **icloud**, **yahoo**, **aol**, **fastmail** (`plugins/<name>`): mail providers.
   Each one runs nothing: its `email:` section gives lo9i the provider's servers and how to get the
   password or sign in. Once one is installed, its accounts are added in its details in Plugins.
 
