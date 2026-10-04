@@ -1,0 +1,16 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
+# lo9i's core/mcp/install.py. An email provider runs nothing: lo9i connects its accounts with these
+# servers, and they're added in this plugin's details once it's installed.
+name: fastmail
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Send and read Fastmail
+category: communications
+email:
+  - id: fastmail
+    name: Fastmail
+    host: smtp.fastmail.com
+    port: 465
+    imap_host: imap.fastmail.com
+    password_help: "Fastmail needs an app password: Settings → Privacy & Security → App passwords."
+    password_url: https://app.fastmail.com/settings/security/apps

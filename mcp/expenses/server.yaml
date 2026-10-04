@@ -5,6 +5,8 @@ name: expenses
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 0.2.1
 description: Assets, recurring obligations and bills, in the currency you choose
+# Groups it in the apps' Plugins list.
+category: finance
 command: "{uv}"
 # uv builds its own environment from uv.lock on the first start, so that start is slow.
 args: [run, --quiet, --project, "{dir}", --frozen, expenses-mcp]

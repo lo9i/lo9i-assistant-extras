@@ -1,0 +1,20 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
+# lo9i's core/mcp/install.py. An email provider runs nothing: lo9i connects its accounts with these
+# servers, and they're added in this plugin's details once it's installed.
+name: microsoft
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Send and read Outlook.com and Microsoft 365 mail
+category: communications
+email:
+  - id: microsoft
+    name: Outlook.com / Microsoft 365
+    host: smtp.office365.com
+    port: 587
+    imap_host: outlook.office365.com
+    oauth: microsoft
+    password_help: >-
+      Microsoft only allows signing in, which needs an app registration of your own: in Microsoft
+      Entra, register an app for personal and work accounts, add the redirect URI shown here as a
+      Web redirect, create a client secret, and paste the app's client ID and the secret.
+    password_url: https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade

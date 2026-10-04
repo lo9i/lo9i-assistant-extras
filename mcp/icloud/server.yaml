@@ -1,0 +1,16 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
+# lo9i's core/mcp/install.py. An email provider runs nothing: lo9i connects its accounts with these
+# servers, and they're added in this plugin's details once it's installed.
+name: icloud
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Send and read iCloud Mail
+category: communications
+email:
+  - id: icloud
+    name: iCloud Mail
+    host: smtp.mail.me.com
+    port: 587
+    imap_host: imap.mail.me.com
+    password_help: "iCloud needs an app-specific password: Sign-In and Security → App-Specific Passwords."
+    password_url: https://account.apple.com
