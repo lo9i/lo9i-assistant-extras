@@ -15,6 +15,13 @@ fields:
     help: https://github.com/lo9i/lo9i-assistant-extras/blob/main/mcp/slack/manifest.json
   - {key: SLACK_BOT_TOKEN, label: Bot token (xoxb-), secret: true}
   - {key: SLACK_USER_TOKEN, label: User token (xoxp-), secret: true}
+# Shown above the fields when installing.
+steps:
+  - "Open api.slack.com/apps, choose Create New App → From a manifest, and pick your workspace."
+  - "Paste the manifest from the App token field's link (manifest.json in the extras), then Next → Create."
+  - "In Basic Information → App-Level Tokens, choose Generate Token and Scopes, add the scope connections:write, and generate: that's the app token (xapp-)."
+  - "In OAuth & Permissions, choose Install to your workspace, then Allow. The same page shows the Bot User OAuth Token (xoxb-) and the User OAuth Token (xoxp-)."
+  - "Paste the three tokens below. Only you, the person who installed the app, can talk to the assistant: open the app under Apps in Slack's sidebar and send it a message."
 trusted: false
 
 # The workspace tools: search, read and post as the user. Posting isn't marked read-only, so lo9i

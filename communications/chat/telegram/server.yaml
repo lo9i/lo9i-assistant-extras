@@ -9,6 +9,12 @@ description: Chat with the assistant on Telegram, and get its messages and remin
 libraries: [lo9i-chat]
 fields:
   - {key: TELEGRAM_TOKEN, label: Bot token, secret: true, help: https://t.me/BotFather}
+# Shown above the field when installing.
+steps:
+  - "The assistant talks to you through a Telegram bot of your own. To create it, open Telegram and start a chat with @BotFather (t.me/BotFather), Telegram's official bot for making bots."
+  - "Send /newbot. BotFather asks for a name, which is what the chat shows (for example: My Assistant), then a username, which must be unique and end in bot (for example: my_assistant_42_bot)."
+  - "BotFather answers with a token that looks like 123456789:AAH…. Copy the whole token and paste it below. Keep it private: anyone with it can control the bot."
+  - "After installing, the setup shows a pairing code. Open your new bot in Telegram (BotFather links it), press Start, and send it the code. Only accounts paired this way can talk to the assistant."
 env:
   # telegram.json (the paired accounts) lives here.
   TELEGRAM_DATA: "{data}"
