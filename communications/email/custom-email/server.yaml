@@ -1,0 +1,14 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
+# lo9i's core/mcp/install.py. An email provider runs nothing: lo9i connects its accounts, and they're
+# added in this plugin's details once it's installed.
+name: custom-email
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Send and read mail on any other server, such as your own domain or a work account, by entering its servers
+email:
+  # No servers: you enter the SMTP host and port, and the IMAP host for reading mail. Installing this
+  # plugin also takes the accounts connected by hand before it existed.
+  - id: custom
+    name: Other server
+    custom: true
+    password_help: Most providers need an app password here, not your account password.
