@@ -40,18 +40,32 @@ def test_amounts_show_in_the_currency_and_its_locale(client):
     assert "$1.160.000,00" in client.get("/").text
 
 
-def test_the_first_visit_asks_for_the_currency_guessed_from_the_browser(tmp_path, monkeypatch):
+def test_the_first_visit_uses_the_currency_of_the_users_country(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPENSES_DB", str(tmp_path / "new.db"))
+    monkeypatch.setenv("TZ", "America/Argentina/Buenos_Aires")
+    c = TestClient(create_app())
+    c.post("/bills", headers=HX | {"Accept-Language": "en-US"}, data={"amount": "45.230,50", "due_date": "2026-10-10", "category": "tax"})
+    assert "$45.230,50" in c.get("/").text
+    assert '<option value="ARS" selected>' in c.get("/settings").text
+
+
+def test_without_a_country_the_first_visit_uses_the_browsers_region(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPENSES_DB", str(tmp_path / "new.db"))
+    c = TestClient(create_app())
+    page = c.get("/settings", headers={"Accept-Language": "en-GB,en;q=0.8"}).text
+    assert '<option value="GBP" selected>' in page and 'value="en_GB"' in page
+    c.post("/bills", headers=HX, data={"amount": "45,230.50", "due_date": "2026-10-10", "category": "tax"})
+    assert "£45,230.50" in c.get("/").text
+
+
+def test_with_nothing_to_guess_from_the_first_visit_asks_for_the_currency(tmp_path, monkeypatch):
     monkeypatch.setenv("EXPENSES_DB", str(tmp_path / "new.db"))
     c = TestClient(create_app())
     first = c.get("/", headers={"X-Forwarded-Prefix": "/expenses"}, follow_redirects=False)
     assert (first.status_code, first.headers["location"]) == (303, "/expenses/settings")
-    assert c.get("/settings", headers={"X-Forwarded-Prefix": "/expenses"}).status_code == 200
     assert c.post("/bills", headers=HX).headers["HX-Redirect"] == "/settings"
-    page = c.get("/settings", headers={"Accept-Language": "en-GB,en;q=0.8"}).text
-    assert '<option value="GBP" selected>' in page and 'value="en_GB"' in page
     assert "Saved" in c.post("/settings", headers=HX, data={"currency": "gbp", "locale": "en_GB"}).text
-    c.post("/bills", headers=HX, data={"amount": "45,230.50", "due_date": "2026-10-10", "category": "tax"})
-    assert "£45,230.50" in c.get("/").text
+    assert c.get("/", follow_redirects=False).status_code == 200
 
 
 def test_amounts_are_read_the_way_the_locale_writes_them(client):

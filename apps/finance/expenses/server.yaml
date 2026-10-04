@@ -3,8 +3,8 @@
 # updates leave alone, {uv} the uv lo9i found, {socket} where the web page listens.
 name: expenses
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.2.1
-description: Assets, recurring obligations and bills, in the currency you choose
+version: 0.2.2
+description: Assets, recurring obligations and bills, in your country's currency
 command: "{uv}"
 # uv builds its own environment from uv.lock on the first start, so that start is slow.
 args: [run, --quiet, --project, "{dir}", --frozen, expenses-mcp]

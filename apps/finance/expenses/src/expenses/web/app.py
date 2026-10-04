@@ -56,15 +56,17 @@ templates.env.globals["EVERY_MONTHS"] = service.EVERY_MONTHS
 
 
 class NoCurrency(Exception):
-    """No currency is chosen yet: the settings page asks for it first."""
+    """No currency is chosen and none could be guessed: the settings page asks for it first."""
 
 
 async def get_conn(request: Request) -> AsyncIterator[sqlite3.Connection]:
     """A connection per request, with this month's recurring bills in place and the currency in
-    `request.state.currency`. Until one is chosen, only the settings page opens."""
+    `request.state.currency`: the country's one the first time (see currency.ensure). When none
+    can be guessed, only the settings page opens until the user picks one."""
     conn = db.connect()
     try:
-        request.state.currency = currency.get(conn)
+        browser = currency.guess(request.headers.get("accept-language", ""))
+        request.state.currency = currency.ensure(conn, browser)
         path = request.url.path.removeprefix(request.scope.get("root_path", ""))
         if request.state.currency is None and path != "/settings":
             raise NoCurrency
@@ -443,9 +445,8 @@ def _category_routes(app: FastAPI) -> None:
 
 
 def _settings_ctx(request: Request, conn: sqlite3.Connection, **extra: Any) -> dict[str, Any]:
-    """The current currency, or a guess from the browser's language for the first visit."""
-    chosen = request.state.currency or currency.guess(request.headers.get("accept-language", ""))
-    chosen = chosen or currency.Currency("USD", "en_US")
+    """The current currency, or US dollars to start from when none could be guessed."""
+    chosen = request.state.currency or currency.Currency("USD", "en_US")
     has_bills = conn.execute("SELECT 1 FROM bills LIMIT 1").fetchone() is not None
     first = request.state.currency is None
     return {"nav": "settings", "chosen": chosen, "choices": currency.choices(chosen.locale), "first": first,
@@ -501,7 +502,7 @@ def create_app() -> FastAPI:
         status = 404 if isinstance(exc, service.NotFound) else 400
         return Response(str(exc), status_code=status, media_type="text/plain")
 
-    # Until a currency is chosen, every page sends the user to the settings page.
+    # Until a currency is chosen or guessed, every page sends the user to the settings page.
     @app.exception_handler(NoCurrency)
     async def no_currency(request: Request, exc: NoCurrency) -> Response:
         target = f"{request.scope.get('root_path', '')}/settings"
