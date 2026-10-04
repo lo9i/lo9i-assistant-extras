@@ -1,16 +1,15 @@
 # Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
 # lo9i's core/mcp/install.py. An email provider runs nothing: lo9i connects its accounts with these
 # servers, and they're added in this plugin's details once it's installed.
-name: yahoo
+name: aol
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 1.0.0
-description: Send and read Yahoo Mail
-category: communications
+description: Send and read AOL Mail
 email:
-  - id: yahoo
-    name: Yahoo Mail
-    host: smtp.mail.yahoo.com
+  - id: aol
+    name: AOL Mail
+    host: smtp.aol.com
     port: 465
-    imap_host: imap.mail.yahoo.com
-    password_help: "Yahoo needs an app password: Account security → Generate app password."
-    password_url: https://login.yahoo.com/account/security
+    imap_host: imap.aol.com
+    password_help: "AOL needs an app password: Account security → Generate app password."
+    password_url: https://login.aol.com/account/security

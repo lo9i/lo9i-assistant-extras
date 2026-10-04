@@ -5,7 +5,6 @@ name: gmail
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 1.0.0
 description: Send and read Gmail
-category: communications
 email:
   - id: gmail
     name: Gmail (app password)

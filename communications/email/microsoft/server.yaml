@@ -5,7 +5,6 @@ name: microsoft
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 1.0.0
 description: Send and read Outlook.com and Microsoft 365 mail
-category: communications
 email:
   - id: microsoft
     name: Outlook.com / Microsoft 365
