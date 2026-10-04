@@ -4,7 +4,7 @@
 name: slack
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 1.0.0
-description: Chat with the assistant in Slack, and let it search, read and post in your workspace
+description: Chat with the assistant in Slack and get its messages there, and let it search, read and post in your workspace
 # lib/lo9i-chat is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [lo9i-chat]
 # One Slack app, created from manifest.json, gives the three tokens.

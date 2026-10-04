@@ -4,7 +4,7 @@
 name: telegram
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 1.0.0
-description: Chat with the assistant on Telegram
+description: Chat with the assistant on Telegram, and get its messages and reminders there
 # lib/lo9i-chat is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [lo9i-chat]
 fields:
