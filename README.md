@@ -36,6 +36,9 @@ newer version later.
   mail providers. Each one runs nothing: its `email:` section gives lo9i the provider's servers and how
   to get the password or sign in. Once one is installed, its accounts are added in its details in
   Plugins.
+- **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
+  domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
+  Installing it also takes the accounts that were connected by hand before it existed.
 
 ## Versions
 
