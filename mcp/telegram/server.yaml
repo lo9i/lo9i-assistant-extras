@@ -1,0 +1,23 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
+# lo9i's core/mcp/install.py and docs/channel-plugins.md. {dir} is this folder once installed, {data}
+# a folder for its data that updates leave alone, {uv} the uv lo9i found.
+name: telegram
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Chat with the assistant on Telegram
+# lib/lo9i-chat is installed next to this folder, so the path dependency in pyproject.toml works.
+libraries: [lo9i-chat]
+fields:
+  - {key: TELEGRAM_TOKEN, label: Bot token, secret: true, help: https://t.me/BotFather}
+env:
+  # telegram.json (the paired accounts) lives here.
+  TELEGRAM_DATA: "{data}"
+trusted: false
+
+# The bot, with long polling, so Telegram needs no public URL. lo9i keeps it running while the plugin
+# is on; it talks to lo9i over HTTP (LO9I_URL, LO9I_CHANNEL, LO9I_CHANNEL_TOKEN).
+channel:
+  command: "{uv}"
+  # uv builds its own environment from uv.lock on the first start, so that start is slow.
+  args: [run, --quiet, --project, "{dir}", --frozen, lo9i-telegram]
+  style: A phone chat. Short messages. Simple Markdown only (bold, italics, code); no tables or headings.
