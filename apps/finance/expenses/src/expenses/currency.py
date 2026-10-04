@@ -1,13 +1,16 @@
 """The one currency everything is in, and how amounts are written.
 
-Chosen by the user (the web page asks on the first visit, guessing from the browser's language and
-region; the assistant can set it with set_currency) and kept in the settings table. Changing it
-relabels every amount: nothing is converted.
+The first time it's needed, it's the one of the country the user lives in, found from the time zone
+lo9i runs the plugin with (TZ), or from the browser's region when the zone names no country. It's
+kept in the settings table; the user changes it on the settings page or through set_currency.
+Changing it relabels every amount: nothing is converted.
 """
 
+import os
 import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 
 from babel import Locale, UnknownLocaleError
 from babel.core import get_global
@@ -67,6 +70,27 @@ def set(conn: sqlite3.Connection, code: str, locale: str | None = None) -> Curre
     return chosen
 
 
+def ensure(conn: sqlite3.Connection, fallback: Currency | None = None) -> Currency | None:
+    """The chosen currency. When none is chosen yet, the local one (or `fallback`) is saved and
+    returned, so it stays the same if the time zone changes later. None when neither is known."""
+    if chosen := get(conn):
+        return chosen
+    found = local() or fallback
+    return set(conn, found.code, found.locale) if found else None
+
+
+def local(zone: str | None = None) -> Currency | None:
+    """The currency of the country the time zone is in (America/Argentina/Buenos_Aires → ARS in
+    es_AR). Without a zone, the one in TZ, else the system's. None for zones in no country (UTC)."""
+    zone = zone or _system_zone()
+    zone = get_global("zone_aliases").get(zone, zone)
+    territory = get_global("zone_territories").get(zone)
+    codes = get_territory_currencies(territory) if territory else []
+    if not codes:
+        return None
+    return Currency(codes[0], _territory_locale(territory) or locale_for(codes[0]))
+
+
 def guess(accept_language: str) -> Currency | None:
     """The currency of the region in a browser's Accept-Language (es-AR → ARS in es_AR), or None
     when it names no region."""
@@ -92,12 +116,25 @@ def locale_for(code: str) -> str:
     letters (ARS → AR → es_AR), else the first region that uses it (EUR → de_AT), else en_US."""
     users = [t for t, history in get_global("territory_currencies").items() if _uses(history, code)]
     for territory in sorted(users, key=lambda t: t != code[:2]):
-        # No entry means the default language (und → en_Latn_US), as for the US itself.
-        subtags = get_global("likely_subtags")
-        language = subtags.get(f"und_{territory}", subtags["und"]).split("_")[0]
-        if language and _exists(f"{language}_{territory}"):
-            return f"{language}_{territory}"
+        if found := _territory_locale(territory):
+            return found
     return "en_US"
+
+
+def _territory_locale(territory: str) -> str | None:
+    """How numbers are written in a region: its most used language there (AR → es_AR)."""
+    # No entry means the default language (und → en_Latn_US), as for the US itself.
+    subtags = get_global("likely_subtags")
+    language = subtags.get(f"und_{territory}", subtags["und"]).split("_")[0]
+    return f"{language}_{territory}" if language and _exists(f"{language}_{territory}") else None
+
+
+def _system_zone() -> str:
+    """TZ as lo9i sets it, else the zone /etc/localtime links to (…/zoneinfo/Europe/Madrid)."""
+    if zone := os.environ.get("TZ", "").removeprefix(":"):
+        return zone.split("zoneinfo/")[-1]
+    target = str(Path("/etc/localtime").resolve())
+    return target.split("zoneinfo/")[-1] if "zoneinfo/" in target else ""
 
 
 def _uses(history: tuple, code: str) -> bool:

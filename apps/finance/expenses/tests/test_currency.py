@@ -17,6 +17,28 @@ def test_the_browsers_region_picks_the_currency():
     assert currency.guess("en") is None and currency.guess("") is None
 
 
+def test_the_time_zone_picks_the_country_and_its_currency(monkeypatch):
+    assert currency.local("America/Argentina/Buenos_Aires") == currency.Currency("ARS", "es_AR")
+    assert currency.local("America/Buenos_Aires") == currency.Currency("ARS", "es_AR")
+    assert currency.local("Europe/Madrid") == currency.Currency("EUR", "es_ES")
+    assert currency.local("UTC") is None and currency.local("Etc/UTC") is None
+    monkeypatch.setenv("TZ", ":America/Sao_Paulo")
+    assert currency.local() == currency.Currency("BRL", "pt_BR")
+
+
+def test_the_countrys_currency_is_saved_the_first_time(conn, monkeypatch):
+    browser = currency.Currency("GBP", "en_GB")
+    monkeypatch.setenv("TZ", "America/Argentina/Buenos_Aires")
+    assert currency.ensure(conn, browser) == currency.get(conn) == currency.Currency("ARS", "es_AR")
+    monkeypatch.setenv("TZ", "Europe/Madrid")
+    assert currency.ensure(conn) == currency.Currency("ARS", "es_AR")
+
+
+def test_without_a_country_the_browsers_region_is_used(conn):
+    assert currency.ensure(conn) is None and currency.get(conn) is None
+    assert currency.ensure(conn, currency.Currency("GBP", "en_GB")) == currency.get(conn) == currency.Currency("GBP", "en_GB")
+
+
 def test_a_currency_alone_gets_the_locale_of_its_country():
     assert [currency.locale_for(c) for c in ("ARS", "USD", "JPY", "GBP")] == ["es_AR", "en_US", "ja_JP", "en_GB"]
 

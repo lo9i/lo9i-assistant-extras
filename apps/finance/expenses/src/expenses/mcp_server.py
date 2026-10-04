@@ -20,9 +20,10 @@ from . import currency, db, recurring, service
 from .service import UNSET
 
 INSTRUCTIONS = """\
-Tracks expenses, all in one currency the user chose. month_summary says
-which (currency and locale) and amounts are plain numbers in it. If it says
-none is chosen yet, ask the user and call set_currency.
+Tracks expenses, all in one currency: the one of the user's country unless
+they chose another. month_summary says which (currency and locale) and
+amounts are plain numbers in it. If it says none is known, ask the user and
+call set_currency.
 
 - Assets are things owned that generate expenses: houses, cars (kind house,
   car or other). Ids are slugs, e.g. "boni".
@@ -84,7 +85,7 @@ def month_summary() -> dict:
     overall, by category and by asset."""
     with _db() as conn:
         bills = service.month_bills(conn)
-        chosen = currency.get(conn)
+        chosen = currency.ensure(conn)
     return {
         "month": date.today().strftime("%Y-%m"),
         **_currency(chosen),
@@ -95,7 +96,7 @@ def month_summary() -> dict:
 
 def _currency(chosen: currency.Currency | None) -> dict:
     if chosen is None:
-        return {"currency": None, "note": "No currency chosen yet: ask the user, then call set_currency."}
+        return {"currency": None, "note": "No currency known for the user's country: ask the user, then call set_currency."}
     return {"currency": chosen.code, "locale": chosen.locale, "example": chosen.format(45230.5)}
 
 

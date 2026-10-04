@@ -88,6 +88,12 @@ def test_only_read_tools_are_read_only():
     }
 
 
+def test_the_currency_is_the_one_of_the_users_country(monkeypatch):
+    monkeypatch.setenv("TZ", "America/Argentina/Buenos_Aires")
+    (summary,) = call(("month_summary", {}))
+    assert {k: payload(summary)[k] for k in ("currency", "locale")} == {"currency": "ARS", "locale": "es_AR"}
+
+
 def test_the_currency_is_chosen_once_and_reported():
     before, chosen, bad, after = call(
         ("month_summary", {}),
