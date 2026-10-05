@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email` and `other/general`.
+`apps/finance`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email`, `communications/phone` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -13,6 +13,9 @@ A plugin folder holds one of:
   a chat channel (`channel:`), mail provider presets (`email:`, runs nothing), a web page (`page:`).
   A `SKILL.md` next to it (how to use its tools) comes and goes with it.
 - `SKILL.md` alone (optionally `scripts/`): a skill, for features that need no server.
+
+A plugin that works only on some systems says so with `platforms:` (`linux`, `macos`) in its `server.yaml` or
+`SKILL.md` header; lo9i doesn't list it anywhere else.
 
 `<group>/lib/<name>/` is a library the group's plugins share, named in their `server.yaml` under
 `libraries:` and installed with them. `communications/lib/lo9i-chat` is what the chat channels share:
@@ -41,6 +44,9 @@ newer version later.
 - **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
   domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
   Installing it also takes the accounts that were connected by hand before it existed.
+- **phone** (`communications/phone/phone`): the assistant calls people with the Phone app on your Mac,
+  through your iPhone, finding their numbers in Contacts. macOS asks you to confirm each call, and you
+  do the talking. Mac only, while the assistant runs in your login session.
 - **claude-code** (`assistant/agents/claude-code`): hand coding tasks to Claude Code, which works on
   them on its own in the repository you name and reports back. It asks for a Claude token (from a Pro or
   Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
