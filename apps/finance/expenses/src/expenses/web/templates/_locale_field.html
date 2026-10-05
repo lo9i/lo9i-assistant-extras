@@ -1,0 +1,7 @@
+<label id="locale-field">Number format
+  <select name="locale">
+    {% for f in formats %}
+    <option value="{{ f.locale }}" {{ 'selected' if f.locale == selected }}>{{ f.example }} · {{ f.name }}</option>
+    {% endfor %}
+  </select>
+</label>

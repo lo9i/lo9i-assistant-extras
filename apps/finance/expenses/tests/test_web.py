@@ -73,6 +73,16 @@ def test_amounts_are_read_the_way_the_locale_writes_them(client):
     assert "write it like 45230,5" in r.text
 
 
+def test_the_number_format_is_picked_from_the_currencys_formats(client):
+    page = client.get("/settings").text
+    assert '<select name="locale">' in page and 'hx-get="settings/formats"' in page
+    swiss = client.get("/settings/formats", params={"currency": "chf"}).text
+    assert 'value="de_CH"' in swiss and "German (Switzerland)" in swiss and "CHF" in swiss
+    assert client.get("/settings/formats", params={"currency": "XYZ"}).status_code == 400
+    assert "Saved" in client.post("/settings", headers=HX, data={"currency": "CHF", "locale": "fr_CH"}).text
+    assert '<option value="fr_CH" selected>' in client.get("/settings").text
+
+
 def test_a_wrong_currency_or_locale_is_refused(client):
     assert "an ISO 4217 currency code" in client.post("/settings", headers=HX, data={"currency": "XYZ", "locale": "es_AR"}).text
     assert "a locale, like es_AR" in client.post("/settings", headers=HX, data={"currency": "ARS", "locale": "nope_ZZ"}).text
