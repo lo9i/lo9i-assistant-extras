@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `assistant/modes`, `communications/chat`, `communications/email` and `other/general`.
+`apps/finance`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -17,6 +17,8 @@ A plugin folder holds one of:
 `<group>/lib/<name>/` is a library the group's plugins share, named in their `server.yaml` under
 `libraries:` and installed with them. `communications/lib/lo9i-chat` is what the chat channels share:
 the assistant's channel API, how a run looks in a chat, approval and question buttons.
+`assistant/lib/agent-tasks` is what the coding agents share: each task runs in a detached worker that
+outlives the MCP server, its records in the plugin's data folder, and the tools to start and follow it.
 
 Install from the app: Plugins in the web app, `/plugins` in the terminal app. **Update** downloads a
 newer version later.
@@ -39,6 +41,11 @@ newer version later.
 - **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
   domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
   Installing it also takes the accounts that were connected by hand before it existed.
+- **claude-code** (`assistant/agents/claude-code`): hand coding tasks to Claude Code, which works on
+  them on its own in the repository you name and reports back. It asks for a Claude token (from a Pro or
+  Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
+- **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
+  GitHub token with the Copilot Requests permission, and downloads the Copilot CLI on its first task.
 - **programmer** (`assistant/modes/programmer`): a skill for coding in your repositories: read the
   project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
   was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and
