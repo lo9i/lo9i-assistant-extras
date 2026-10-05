@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `communications/chat`, `communications/email` and `other/general`.
+`apps/finance`, `assistant/modes`, `communications/chat`, `communications/email` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -39,7 +39,7 @@ newer version later.
 - **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
   domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
   Installing it also takes the accounts that were connected by hand before it existed.
-- **programmer** (`other/general/programmer`): a skill for coding in your repositories: read the
+- **programmer** (`assistant/modes/programmer`): a skill for coding in your repositories: read the
   project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
   was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and
   review steps (adapted from Hermes Agent's skills) are in `references/`, read when needed.
