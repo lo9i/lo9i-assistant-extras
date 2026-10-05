@@ -10,9 +10,10 @@ import os
 import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import cache
 from pathlib import Path
 
-from babel import Locale, UnknownLocaleError
+from babel import Locale, UnknownLocaleError, localedata
 from babel.core import get_global
 from babel.numbers import (
     NumberFormatError,
@@ -49,6 +50,32 @@ class Currency:
             raise ValueError(f"write it like {self.plain(45230.5)} or {format_decimal(Decimal('45230.5'), locale=self.locale)}") from None
 
 
+@dataclass(frozen=True)
+class Format:
+    """One way of writing amounts in a currency, for the settings page's list."""
+
+    locale: str
+    # 45230.5 written this way, like "$ 45.230,50".
+    example: str
+    # The locale's name in English, like "Spanish (Argentina)".
+    name: str
+
+
+EXAMPLE_AMOUNT = 45230.5
+
+
+def formats(code: str, keep: str | None = None) -> list[Format]:
+    """How amounts in `code` are written where it's used, one entry per distinct way, each under one locale
+    that writes it so: `keep` (the format chosen before, listed even where the currency isn't used), else the
+    currency's usual one (locale_for), else a region's main language. The usual one comes first."""
+    usual = locale_for(code)
+    groups: dict[str, list[str]] = {}
+    for locale in dict.fromkeys([*filter(None, [keep]), usual, *_locales_using(code)]):
+        groups.setdefault(Currency(code, locale).format(EXAMPLE_AMOUNT), []).append(locale)
+    found = [_format(code, _representative(locales, keep, usual)) for locales in groups.values()]
+    return sorted(found, key=lambda f: (f.example != Currency(code, usual).format(EXAMPLE_AMOUNT), f.name))
+
+
 def get(conn: sqlite3.Connection) -> Currency | None:
     rows = dict(conn.execute("SELECT key, value FROM settings WHERE key IN ('currency', 'locale')").fetchall())
     return Currency(rows["currency"], rows["locale"]) if "currency" in rows and "locale" in rows else None
@@ -58,7 +85,7 @@ def set(conn: sqlite3.Connection, code: str, locale: str | None = None) -> Curre
     """Raises ValidationError for an unknown currency or locale. Without a locale, the current one is
     kept, or the one most used with the currency."""
     code = code.strip().upper()
-    if code not in list_currencies():
+    if not known(code):
         raise ValidationError(f"{code} isn't an ISO 4217 currency code, like ARS, USD or EUR")
     current = get(conn)
     chosen = Currency(code, _locale(locale) if locale else (current.locale if current else locale_for(code)))
@@ -68,6 +95,11 @@ def set(conn: sqlite3.Connection, code: str, locale: str | None = None) -> Curre
             [("currency", chosen.code), ("locale", chosen.locale)],
         )
     return chosen
+
+
+def known(code: str) -> bool:
+    """An ISO 4217 code, like ARS or USD."""
+    return code in list_currencies()
 
 
 def ensure(conn: sqlite3.Connection, fallback: Currency | None = None) -> Currency | None:
@@ -119,6 +151,38 @@ def locale_for(code: str) -> str:
         if found := _territory_locale(territory):
             return found
     return "en_US"
+
+
+@cache
+def _locales_using(code: str) -> list[str]:
+    """Every locale of a region where the currency is legal tender now (EUR → de_DE, fr_FR, nl_BE…)."""
+    users = {t for t, history in get_global("territory_currencies").items() if _uses(history, code)}
+    return [locale for territory, locales in _locales_by_territory().items() if territory in users for locale in locales]
+
+
+@cache
+def _locales_by_territory() -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for identifier in localedata.locale_identifiers():
+        locale = Locale.parse(identifier)
+        # Variants (en_US_POSIX, ca_ES_VALENCIA) aren't number formats people pick.
+        if locale.territory and not locale.variant:
+            found.setdefault(locale.territory, []).append(identifier)
+    return found
+
+
+def _representative(locales: list[str], keep: str | None, usual: str) -> str:
+    """The locale a way of writing is listed under: the chosen one, the usual one, else the main language
+    of a region that writes it so, else the first."""
+    for preferred in (keep, usual):
+        if preferred in locales:
+            return preferred
+    main = [loc for loc in locales if _territory_locale(Locale.parse(loc).territory or "") == loc]
+    return min(main) if main else locales[0]
+
+
+def _format(code: str, locale: str) -> Format:
+    return Format(locale, Currency(code, locale).format(EXAMPLE_AMOUNT), Locale.parse(locale).get_display_name("en"))
 
 
 def _territory_locale(territory: str) -> str | None:

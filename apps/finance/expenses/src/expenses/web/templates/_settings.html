@@ -5,15 +5,13 @@
   {% endif %}
   <form class="card stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML">
     <label>Currency
-      <select name="currency">
+      <select name="currency" hx-get="settings/formats" hx-target="#locale-field" hx-swap="outerHTML">
         {% for code, name in choices %}
         <option value="{{ code }}" {{ 'selected' if code == chosen.code }}>{{ name }} ({{ code }})</option>
         {% endfor %}
       </select>
     </label>
-    <label><span>Number format <span class="hint">a locale, like es_AR (45.230,50) or en_US (45,230.50)</span></span>
-      <input name="locale" value="{{ chosen.locale }}" required>
-    </label>
+    {% include "_locale_field.html" %}
     {% if has_bills %}<p class="muted small">Changing the currency relabels every amount; nothing is converted.</p>{% endif %}
     <div class="actions">
       <button class="primary">Save</button>

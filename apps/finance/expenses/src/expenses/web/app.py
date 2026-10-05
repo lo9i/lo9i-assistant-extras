@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -450,13 +450,33 @@ def _settings_ctx(request: Request, conn: sqlite3.Connection, **extra: Any) -> d
     has_bills = conn.execute("SELECT 1 FROM bills LIMIT 1").fetchone() is not None
     first = request.state.currency is None
     return {"nav": "settings", "chosen": chosen, "choices": currency.choices(chosen.locale), "first": first,
-            "has_bills": has_bills, **extra}
+            "has_bills": has_bills, **_formats_ctx(chosen.code, chosen.locale), **extra}
+
+
+def _formats_ctx(code: str, current: str) -> dict[str, Any]:
+    """The ways amounts in `code` are written, with the current one picked when it's among them, else the
+    currency's usual one (listed first)."""
+    found = currency.formats(code, keep=current)
+    selected = current if any(f.locale == current for f in found) else found[0].locale
+    return {"formats": found, "selected": selected}
 
 
 def _settings_routes(app: FastAPI) -> None:
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_page(request: Request, conn: Conn) -> HTMLResponse:
         return _page(request, "settings.html", "_settings.html", **_settings_ctx(request, conn))
+
+    @app.get("/settings/formats", response_class=HTMLResponse)
+    async def number_formats(
+        request: Request, conn: Conn, currency_code: Annotated[str, Query(alias="currency")]
+    ) -> HTMLResponse:
+        """The number formats for the currency picked in the form, before it's saved. `conn` sets the
+        current currency on the request."""
+        code = currency_code.strip().upper()
+        if not currency.known(code):
+            raise HTTPException(400, f"{code} isn't an ISO 4217 currency code")
+        current = request.state.currency.locale if request.state.currency else None
+        return _render(request, "_locale_field.html", **_formats_ctx(code, current or currency.locale_for(code)))
 
     @app.post("/settings", response_class=HTMLResponse)
     async def save_settings(request: Request, conn: Conn) -> HTMLResponse:

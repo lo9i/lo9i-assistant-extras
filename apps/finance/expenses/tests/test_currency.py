@@ -58,3 +58,19 @@ def test_amounts_are_written_and_read_in_the_locale():
     assert (usd.format(45230.5), usd.plain(1160000.0), usd.parse("45,230.50")) == ("$45,230.50", "1160000", 45230.5)
     with pytest.raises(ValueError, match="write it like"):
         ars.parse("45230.50")
+
+
+def test_formats_list_each_way_a_currency_is_written_once_the_usual_one_first():
+    found = currency.formats("CHF")
+    examples = [f.example for f in found]
+    assert len(examples) == len(set(examples)) >= 3
+    assert found[0].locale == currency.locale_for("CHF")
+    assert {"de_CH", "fr_CH"} <= {f.locale for f in found}
+    assert all("POSIX" not in f.locale and "Computer" not in f.name for f in currency.formats("USD"))
+
+
+def test_a_format_chosen_before_stays_listed_even_where_the_currency_isnt_used():
+    found = currency.formats("ARS", keep="en_US")
+    assert [f.locale for f in found] == ["es_AR", "en_US"]
+    assert found[1].example == currency.Currency("ARS", "en_US").format(45230.5)
+    assert found[0].name == "Spanish (Argentina)"
