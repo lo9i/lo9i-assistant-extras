@@ -39,6 +39,10 @@ newer version later.
 - **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
   domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
   Installing it also takes the accounts that were connected by hand before it existed.
+- **programmer** (`other/general/programmer`): a skill for coding in your repositories: read the
+  project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
+  was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and
+  review steps (adapted from Hermes Agent's skills) are in `references/`, read when needed.
 
 ## Versions
 
