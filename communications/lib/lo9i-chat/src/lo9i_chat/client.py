@@ -62,8 +62,12 @@ class ChannelClient:
         await self._request("POST", f"/deliveries/{delivery_id}", json={"error": error})
 
     async def new_conversation(self) -> str:
-        """Starts a new conversation (the channel's /new) and returns its thread id."""
+        """Starts a side conversation (the channel's /new) and returns its thread id."""
         return str((await self._request("POST", "/conversation")).json()["thread_id"])
+
+    async def go_home(self) -> str:
+        """Moves the channel back to the home conversation (its /home) and returns its thread id."""
+        return str((await self._request("DELETE", "/conversation")).json()["thread_id"])
 
     async def send_message(self, text: str, files: Sequence[Attachment] = ()) -> str:
         """Sends a user message in the channel's conversation and returns the run's id."""

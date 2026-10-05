@@ -20,9 +20,11 @@ from lo9i_chat.events import (
     ToolStarted,
     Transcribed,
     is_question,
+    is_side_conversation,
 )
 from lo9i_chat.port import ChatPort
 from lo9i_chat.questions import question_buttons, question_text
+from lo9i_chat.side import side_buttons, side_text
 from lo9i_chat.split import split_text
 
 _TYPING_INTERVAL = 4.0
@@ -74,6 +76,9 @@ class ChatTurn[M]:
                 await self._status.started(name, args)
             case ToolFinished(name, _):
                 await self._status.finished(name)
+            case ApprovalRequired(interrupt_id, request) if is_side_conversation(request):
+                await self._after_reply()
+                await self._chat.send(side_text(request), buttons=side_buttons(interrupt_id))
             case ApprovalRequired(interrupt_id, request) if is_question(request):
                 await self._after_reply()
                 await self._chat.send(question_text(request), buttons=question_buttons(interrupt_id, request))

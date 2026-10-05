@@ -63,7 +63,10 @@ def manifest(name: str) -> str:
                 "messages_tab_read_only_enabled": False,
             },
             "bot_user": {"display_name": name, "always_online": True},
-            "slash_commands": [{"command": "/new", "description": "Start a new conversation", "should_escape": False}],
+            "slash_commands": [
+                {"command": "/new", "description": "Start a side conversation", "should_escape": False},
+                {"command": "/home", "description": "Go back to the home conversation", "should_escape": False},
+            ],
         },
         "oauth_config": {"scopes": {"bot": _BOT_SCOPES, "user": _USER_SCOPES}},
         "settings": {

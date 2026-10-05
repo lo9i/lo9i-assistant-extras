@@ -1,5 +1,5 @@
 """The channel answers only the owner's DMs, turns buttons into approval decisions and job answers,
-and handles /new."""
+and handles /new and /home."""
 
 from unittest.mock import create_autospec
 
@@ -15,6 +15,7 @@ class FakeClient:
         self.sent, self.answers, self.job_answers, self.new_conversations = [], [], [], 0
         self.waiting = []
         self.down = False
+        self.homes = 0
 
     def message(self, text, files=()):
         self.sent.append((text, files))
@@ -33,6 +34,10 @@ class FakeClient:
             raise DaemonUnavailableError("The assistant isn't reachable")
         self.new_conversations += 1
         return "t2"
+
+    async def go_home(self):
+        self.homes += 1
+        return "home"
 
     async def pending_approvals(self):
         return self.waiting
@@ -101,9 +106,10 @@ async def test_a_job_button_answers_the_daemon():
     assert web.chat_postMessage.call_args.kwargs["text"] == "Approved. The job goes on."
 
 
-async def test_new_starts_a_conversation_for_the_owner_only():
+async def test_new_starts_a_side_conversation_for_the_owner_only():
     handlers, client, _ = _handlers()
-    assert (await handlers.command({"user_id": "U1", "command": "/new"}))["text"] == "Started a new conversation."
+    started = "Started a side conversation. /home goes back."
+    assert (await handlers.command({"user_id": "U1", "command": "/new"}))["text"] == started
     assert "only answers" in (await handlers.command({"user_id": "U2", "command": "/new"}))["text"]
     assert client.new_conversations == 1
     client.down = True
@@ -130,3 +136,18 @@ async def test_a_question_no_longer_waiting_is_said_so():
     await handlers.button(_press("qp:q1:0"))
     assert client.answers == []
     assert "isn't waiting" in web.chat_postMessage.call_args.kwargs["text"]
+
+
+async def test_home_goes_back_home():
+    handlers, client, _ = _handlers()
+    assert (await handlers.command({"user_id": "U1", "command": "/home"}))["text"] == "Back home."
+    assert client.homes == 1
+
+
+async def test_moving_answers_then_continues_in_a_side_conversation():
+    handlers, client, _ = _handlers()
+    side = {"kind": "side_conversation", "title": "Taxes", "brief": "Do them.", "first_message": "Carried over"}
+    client.waiting = [ApprovalRequired("s1", side)]
+    await handlers.button(_press("sm:s1", text="Move to a side conversation?"))
+    assert client.answers == [{"s1": {"moved": True}}]
+    assert client.new_conversations == 1 and client.sent == [("Carried over", ())]
