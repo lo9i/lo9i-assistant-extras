@@ -1,8 +1,8 @@
-"""What the Slack channel does with each request from Slack: DMs, buttons and /new. Only the owner
-(the user who installed the app) is answered; everyone else is ignored."""
+"""What the Slack channel does with each request from Slack: DMs, buttons, /new and /home. Only the
+owner (the user who installed the app) is answered; everyone else is ignored."""
 
 import html
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any, Protocol
 
 import httpx
@@ -11,8 +11,10 @@ from slack_sdk.web.async_client import AsyncWebClient
 from lo9i_chat.approvals import parse_decision, parse_job_decision
 from lo9i_chat.attachments import Attachment
 from lo9i_chat.errors import DaemonError
-from lo9i_chat.events import ApprovalRequired, Event, is_question
+from lo9i_chat.events import ApprovalRequired, Event, is_question, is_side_conversation
+from lo9i_chat.moving import move_to_side
 from lo9i_chat.questions import Press, answered_text, choices, parse_press, question_buttons, question_text
+from lo9i_chat.side import parse_side, side_text
 from lo9i_chat.turn import ChatTurn
 from lo9i_slack.media import UnsupportedMediaError, attachments_from
 from lo9i_slack.port import LIMITS, SlackChat
@@ -28,6 +30,7 @@ class Conversation(Protocol):
     def message(self, text: str, files: Sequence[Attachment] = ()) -> AsyncIterator[Event]: ...
     def answer(self, decisions: dict[str, Any]) -> AsyncIterator[Event]: ...
     async def new_conversation(self) -> str: ...
+    async def go_home(self) -> str: ...
     async def pending_approvals(self) -> list[ApprovalRequired]: ...
     async def answer_job(self, interrupt_id: str, decision: dict[str, Any]) -> bool: ...
 
@@ -62,17 +65,23 @@ class Handlers:
         """Slash commands. The reply is sent with the acknowledgement, visible only to the owner."""
         if payload.get("user_id") != self._owner_id:
             return {"text": "This assistant only answers the person who set it up."}
-        if payload.get("command") != "/new":
-            return {"text": f"Unknown command {payload.get('command')}."}
+        command = payload.get("command")
+        if command not in ("/new", "/home"):
+            return {"text": f"Unknown command {command}."}
         try:
-            await self._client.new_conversation()
+            if command == "/new":
+                await self._client.new_conversation()
+                return {"text": "Started a side conversation. /home goes back."}
+            await self._client.go_home()
         except DaemonError as e:
             return {"text": f"⚠️ {e}"}
-        return {"text": "Started a new conversation."}
+        return {"text": "Back home."}
 
     async def _press(self, payload: dict[str, Any], data: str, chat: SlackChat) -> None:
         if job_decision := parse_job_decision(data, _PLACE):
             await self._answer_job(payload, chat, *job_decision)
+        elif side := parse_side(data):
+            await self._answer_side(payload, chat, *side)
         elif press := parse_press(data):
             await self._answer_question(payload, chat, press)
         elif decision := parse_decision(data, _PLACE):
@@ -103,9 +112,24 @@ class Handlers:
         await chat.send(answered_text(picked))
         await ChatTurn(chat, LIMITS).render(self._client.answer({press.interrupt_id: {"choices": picked}}))
 
+    async def _answer_side(self, payload: dict[str, Any], chat: SlackChat, interrupt_id: str, moved: bool) -> None:
+        """The run is answered first; on Move, the task then goes on in a side conversation."""
+        request = await self._waiting(interrupt_id, is_side_conversation)
+        if request is None:
+            await chat.edit(payload["message"]["ts"], payload["message"].get("text", ""))
+            await chat.send("This suggestion isn't waiting for an answer any more.")
+            return
+        await chat.edit(payload["message"]["ts"], side_text(request))
+        await ChatTurn(chat, LIMITS).render(self._client.answer({interrupt_id: {"moved": moved}}))
+        if moved:
+            await move_to_side(self._client, chat, LIMITS, str(request.get("first_message", "")))
+
     async def _waiting_question(self, interrupt_id: str) -> dict[str, Any] | None:
+        return await self._waiting(interrupt_id, is_question)
+
+    async def _waiting(self, interrupt_id: str, kind: Callable[[dict[str, Any]], bool]) -> dict[str, Any] | None:
         waiting = await self._client.pending_approvals()
-        return next((a.request for a in waiting if a.interrupt_id == interrupt_id and is_question(a.request)), None)
+        return next((a.request for a in waiting if a.interrupt_id == interrupt_id and kind(a.request)), None)
 
     async def _answer_job(
         self, payload: dict[str, Any], chat: SlackChat, interrupt_id: str, answer: dict[str, Any]

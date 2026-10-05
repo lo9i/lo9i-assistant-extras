@@ -26,7 +26,9 @@ class ToolFinished:
 class ApprovalRequired:
     """The run waits for the user. Usually an approval, answered with {"approved", "reason"}; a
     request whose `kind` is QUESTION is a question with options, with `question`, `options` and
-    `multiple`, answered with {"choices": [picked options]}."""
+    `multiple`, answered with {"choices": [picked options]}; one whose `kind` is SIDE_CONVERSATION
+    suggests moving the task out of home, with `title`, `brief` and `first_message`, answered with
+    {"moved": bool}."""
 
     interrupt_id: str
     request: dict[str, Any]
@@ -37,6 +39,13 @@ QUESTION = "question"
 
 def is_question(request: dict[str, Any]) -> bool:
     return request.get("kind") == QUESTION
+
+
+SIDE_CONVERSATION = "side_conversation"
+
+
+def is_side_conversation(request: dict[str, Any]) -> bool:
+    return request.get("kind") == SIDE_CONVERSATION
 
 
 @dataclass

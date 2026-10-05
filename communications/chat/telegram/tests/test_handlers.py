@@ -12,11 +12,13 @@ from lo9i_telegram.handlers import Handlers
 from lo9i_telegram.pairing import FILE, Pairing
 
 _SOURCES = {"kind": "question", "question": "Which sources?", "options": ["Google", "GitHub", "X"], "multiple": True}
+_SIDE = {"kind": "side_conversation", "title": "Taxes", "brief": "Do them.", "first_message": "Carried over: Taxes"}
 
 
 class FakeClient:
     def __init__(self, waiting=True):
         self.answers, self.job_answers, self.messages, self.waiting = [], [], [], waiting
+        self.moves: list[str] = []
 
     def message(self, text, files=()):
         self.messages.append((text, files))
@@ -31,10 +33,15 @@ class FakeClient:
         yield Done()
 
     async def new_conversation(self):
+        self.moves.append("new")
         return "t2"
 
+    async def go_home(self):
+        self.moves.append("home")
+        return "home"
+
     async def pending_approvals(self):
-        return [ApprovalRequired("q1", _SOURCES)]
+        return [ApprovalRequired("q1", _SOURCES), ApprovalRequired("s1", _SIDE)]
 
     async def answer_job(self, interrupt_id, decision):
         self.job_answers.append((interrupt_id, decision))
@@ -94,6 +101,28 @@ async def test_a_question_toggle_redraws_and_done_answers(tmp_path, bot):
     update, _ = _press("qd:q1:5")
     await handlers.button(update, _context(bot))
     assert client.answers == [{"q1": {"choices": ["Google", "X"]}}]
+
+
+async def test_moving_answers_then_continues_in_a_side_conversation(tmp_path, bot):
+    client = FakeClient()
+    handlers = await _handlers(tmp_path, client)
+    update, _ = _press("sm:s1")
+    await handlers.button(update, _context(bot))
+    assert client.answers == [{"s1": {"moved": True}}]
+    assert client.moves == ["new"] and client.messages == [("Carried over: Taxes", ())]
+    update, _ = _press("sk:s1")
+    await handlers.button(update, _context(bot))
+    assert client.answers[-1] == {"s1": {"moved": False}} and client.moves == ["new"]
+
+
+async def test_home_goes_back_to_the_home_conversation(tmp_path, bot):
+    client = FakeClient()
+    handlers = await _handlers(tmp_path, client)
+    message = create_autospec(Message, instance=True)
+    update = MagicMock(spec=Update, effective_message=message)
+    update.effective_user.id = update.effective_chat.id = 222
+    await handlers.home(update, _context(bot))
+    assert client.moves == ["home"] and message.reply_text.call_args.args[0] == "Back home."
 
 
 async def test_strangers_are_not_heard(tmp_path, bot):

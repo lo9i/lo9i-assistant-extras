@@ -80,6 +80,7 @@ async def test_conversation_approvals_and_job_answers():
         _json({"run_id": "r2"}),
         _json({"waiting": False}),
         _json({}),
+        _json({"thread_id": "home"}),
     )
     client = _client(daemon)
     assert await client.new_conversation() == "t2"
@@ -87,8 +88,17 @@ async def test_conversation_approvals_and_job_answers():
     assert await client.resume({"q1": {"choices": ["a"]}}) == "r2"
     assert await client.answer_job("i1", {"approved": True, "reason": ""}) is False
     await client.ack("d1", "No account is paired.")
+    assert await client.go_home() == "home"
     paths = [r.url.path.removeprefix("/channels/telegram") for r in daemon.requests]
-    assert paths == ["/conversation", "/approvals", "/approvals", "/job-approvals/i1", "/deliveries/d1"]
+    assert paths == [
+        "/conversation",
+        "/approvals",
+        "/approvals",
+        "/job-approvals/i1",
+        "/deliveries/d1",
+        "/conversation",
+    ]
+    assert daemon.requests[-1].method == "DELETE"
     assert json.loads(daemon.requests[2].content) == {"decisions": {"q1": {"choices": ["a"]}}}
     assert json.loads(daemon.requests[4].content) == {"error": "No account is paired."}
 
