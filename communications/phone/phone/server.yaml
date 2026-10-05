@@ -1,0 +1,19 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format
+# is in lo9i's core/mcp/install.py. {dir} is this folder once installed, {uv} the uv lo9i found.
+name: phone
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Call people with the Phone app on your Mac, through your iPhone
+# The Phone app and Contacts are macOS's: lo9i doesn't list the plugin on other systems.
+platforms: [macos]
+# Shown when installing.
+steps:
+  - "This works on a Mac whose Phone app can call through your iPhone: on the iPhone, Settings → Apps → Phone → Calls on Other Devices, with this Mac on."
+  - "The first time the assistant looks someone up, macOS asks to allow access to Contacts."
+  - "Every call asks you to confirm on the Mac, and you do the talking. Calls work while the assistant runs in your login session, not when it was started at boot."
+trusted: false
+
+# find_contact is read-only; call isn't, so lo9i asks the user before it dials unless they trust the plugin.
+command: "{uv}"
+# uv builds its own environment from uv.lock on the first start, so that start is slow.
+args: [run, --quiet, --project, "{dir}", --frozen, phone-mcp]
