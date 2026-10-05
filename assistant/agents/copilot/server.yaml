@@ -1,0 +1,30 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format
+# is in lo9i's core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that
+# updates leave alone, {uv} the uv lo9i found.
+name: copilot
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Hand coding tasks to GitHub Copilot, which works on them on its own in your repositories
+# lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
+libraries: [agent-tasks]
+fields:
+  - key: COPILOT_GITHUB_TOKEN
+    label: GitHub token with Copilot Requests
+    secret: true
+    help: https://github.com/settings/personal-access-tokens/new
+# Shown above the field when installing.
+steps:
+  - "You need a GitHub Copilot plan on your account."
+  - "Open the field's link to create a fine-grained personal access token. Under Permissions, add Copilot Requests, then generate it."
+  - "Paste it below. A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts. The first task downloads the Copilot CLI (about 150 MB)."
+trusted: false
+
+# Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker
+# process of its own that outlives this server; their records are under {data}/tasks, the downloaded
+# CLI under {data}/cli.
+command: "{uv}"
+# uv builds its own environment from uv.lock on the first start, so that start is slow.
+args: [run, --quiet, --project, "{dir}", --frozen, copilot-tasks]
+env:
+  AGENT_TASKS_DIR: "{data}/tasks"
+  COPILOT_CLI_DIR: "{data}/cli"

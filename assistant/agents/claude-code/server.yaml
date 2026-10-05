@@ -1,0 +1,28 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format
+# is in lo9i's core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that
+# updates leave alone, {uv} the uv lo9i found.
+name: claude-code
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+description: Hand coding tasks to Claude Code, which works on them on its own in your repositories
+# lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
+libraries: [agent-tasks]
+fields:
+  - key: CLAUDE_TOKEN
+    label: Claude token or Anthropic API key
+    secret: true
+    help: https://console.anthropic.com/settings/keys
+# Shown above the field when installing.
+steps:
+  - "With a Claude Pro or Max plan: on a computer with Claude Code, run claude setup-token and sign in. It prints a token that starts with sk-ant-oat."
+  - "Or with API billing: create a key in the Anthropic Console under API keys. It starts with sk-ant-api."
+  - "Paste it below. A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts."
+trusted: false
+
+# Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker
+# process of its own that outlives this server; their records are under {data}/tasks.
+command: "{uv}"
+# uv builds its own environment from uv.lock on the first start, so that start is slow.
+args: [run, --quiet, --project, "{dir}", --frozen, claude-code-tasks]
+env:
+  AGENT_TASKS_DIR: "{data}/tasks"
