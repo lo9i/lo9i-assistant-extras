@@ -20,6 +20,16 @@ _OAUTH_PREFIX = "sk-ant-oat"
 # Tool inputs that say what a step is about, in the order they're looked for.
 _DETAILS = ("command", "file_path", "path", "pattern", "url", "query", "description")
 _LINE = 200
+# Claude Code runs under lo9i's daemon: a conversation handed to it (/claude) waits inside a daemon run for
+# its reply, and stopping the daemon cancels that run, which stops this task with everything it started.
+_UNDER_LO9I = (
+    "lo9i, the user's assistant, started this session, and its daemon waits for your reply. Never stop or "
+    "kill the daemon's process (`assistant.daemon`, `stop_daemon` in lo9i's scripts): that ends this session "
+    "before you reply, and any daemon you start from it. To restart it, for example so lo9i code changes "
+    "take effect, run `curl -s -X POST --unix-socket ~/.lo9i/daemon.sock -H 'X-Lo9i-Client: claude-code' "
+    "http://lo9i/system/restart`: it restarts once your reply is in, so tell the user the change applies "
+    "from their next message."
+)
 
 
 async def run(task: Task, progress: Progress) -> Outcome:
@@ -56,7 +66,7 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
     return ClaudeAgentOptions(
         cwd=task.repository,
         permission_mode="bypassPermissions",
-        system_prompt={"type": "preset", "preset": "claude_code"},
+        system_prompt={"type": "preset", "preset": "claude_code", "append": _UNDER_LO9I},
         setting_sources=["user", "project", "local"],
         env=env,
         resume=task.session if follow_up else None,
