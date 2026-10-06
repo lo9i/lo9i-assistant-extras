@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email`, `communications/phone` and `other/general`.
+`apps/finance`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email`, `communications/phone`, `media/video` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -53,6 +53,11 @@ newer version later.
   Pro or Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
 - **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
   GitHub token with the Copilot Requests permission, and downloads the Copilot CLI on its first task.
+- **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
+  for more), its audio as an MP3 with tags and cover, or its transcript as a text file; or let the
+  assistant read the transcript to summarize or answer questions about the video. Files go to the
+  folder you enter, your Downloads folder by default. ffmpeg and the JavaScript runtime yt-dlp needs
+  come with the plugin.
 - **programmer** (`assistant/modes/programmer`): a skill for coding in your repositories: read the
   project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
   was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and

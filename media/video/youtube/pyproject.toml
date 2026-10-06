@@ -1,0 +1,41 @@
+[project]
+name = "lo9i-youtube"
+version = "1.0.0"
+description = "YouTube videos, their audio as MP3 and their transcripts, for lo9i"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp>=2.2.0",
+    # deno: the JavaScript runtime yt-dlp needs to read YouTube's pages.
+    "yt-dlp[default,deno]>=2026.8.19",
+    # An ffmpeg for systems that don't have one (downloads.ffmpeg).
+    "imageio-ffmpeg>=0.6.0",
+    "youtube-transcript-api>=1.2.4",
+]
+
+[project.scripts]
+youtube-mcp = "lo9i_youtube.mcp_server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=1.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lo9i_youtube"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N"]
