@@ -117,6 +117,10 @@ class TaskStore:
     def write_pid(self, task_id: str, pid: int) -> None:
         (self.folder(task_id) / _PID).write_text(str(pid))
 
+    def progress_after(self, task_id: str, seen: int) -> list[str]:
+        """The task's progress lines after the first `seen`, for following it as it goes."""
+        return _tail(self.folder(task_id) / _PROGRESS, None)[seen:]
+
     def append_progress(self, task_id: str, line: str) -> None:
         with (self.folder(task_id) / _PROGRESS).open("a", encoding="utf-8") as log:
             log.write(" ".join(line.split()) + "\n")
@@ -156,10 +160,12 @@ def _read_outcome(path: Path) -> Outcome | None:
     return Outcome(**json.loads(path.read_text())) if path.is_file() else None
 
 
-def _tail(path: Path, lines: int) -> list[str]:
+def _tail(path: Path, lines: int | None) -> list[str]:
+    """The last `lines` lines, or all of them for None."""
     if not path.is_file():
         return []
-    return path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
+    every = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return every if lines is None else every[-lines:]
 
 
 def _write_json(path: Path, data: dict) -> None:
