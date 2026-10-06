@@ -25,7 +25,8 @@ def _result(is_error=False, text="Fixed 2 tests."):
 
 
 def test_a_new_task_starts_its_session_and_a_follow_up_resumes_it():
-    new, follow = runner.options(_task(), "sk-ant-api-x"), runner.options(_task("t0"), "sk-ant-api-x")
+    env = runner.auth_env("sk-ant-api-x")
+    new, follow = runner.options(_task(), env), runner.options(_task("t0"), env)
     assert new.session_id == _task().session and new.resume is None
     assert follow.resume == _task().session and follow.session_id is None
     assert new.cwd == "/repo" and new.permission_mode == "bypassPermissions"
@@ -81,5 +82,42 @@ async def test_an_error_result_fails_the_task_and_no_token_is_refused(monkeypatc
     monkeypatch.setenv(runner.TOKEN_ENV, "sk-ant-api03-x")
     outcome = await runner.run(_task(), lambda _: None)
     assert not outcome.ok and outcome.text == "Claude Code ended with error_during_execution."
-    with pytest.raises(RuntimeError, match="No Claude token"):
+    with pytest.raises(RuntimeError, match="No login for Claude Code"):
         await runner.run(_task(), lambda _: None)
+
+
+async def test_without_a_claude_token_it_runs_on_copilot_through_the_relay(monkeypatch):
+    seen = {}
+
+    class FakeRelay:
+        def __init__(self, github_token):
+            seen["github_token"] = github_token
+
+        def running(self):
+            relay = self
+
+            class _Running:
+                async def __aenter__(self):
+                    return relay
+
+                async def __aexit__(self, *exc):
+                    return False
+
+            return _Running()
+
+        def claude_env(self):
+            return {"ANTHROPIC_BASE_URL": "http://127.0.0.1:1"}
+
+    async def query(prompt, options):
+        seen["env"] = options.env
+        yield _result()
+
+    monkeypatch.setattr(runner, "Relay", FakeRelay)
+    monkeypatch.setattr(runner, "query", query)
+    monkeypatch.setenv(runner.COPILOT_ENV, "ghu_x")
+    monkeypatch.delenv(runner.TOKEN_ENV, raising=False)
+    steps = []
+    outcome = await runner.run(_task(), steps.append)
+    assert outcome.ok and outcome.cost_usd is None  # Anthropic's prices aren't what Copilot charges
+    assert seen == {"github_token": "ghu_x", "env": {"ANTHROPIC_BASE_URL": "http://127.0.0.1:1"}}
+    assert steps == ["Using Claude on your GitHub Copilot plan"] and runner.COPILOT_ENV not in os.environ
