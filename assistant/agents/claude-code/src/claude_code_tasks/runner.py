@@ -20,6 +20,9 @@ _OAUTH_PREFIX = "sk-ant-oat"
 # Tool inputs that say what a step is about, in the order they're looked for.
 _DETAILS = ("command", "file_path", "path", "pattern", "url", "query", "description")
 _LINE = 200
+# Each message from Claude Code is one JSON line, and a file it reads comes whole in one: a screenshot
+# the user sent is a few MB as base64, past the SDK's default of 1 MB.
+_MESSAGE_BYTES = 64 * 1024 * 1024
 # Claude Code runs under lo9i's daemon: a conversation handed to it (/claude) waits inside a daemon run for
 # its reply, and stopping the daemon cancels that run, which stops this task with everything it started.
 _UNDER_LO9I = (
@@ -71,6 +74,7 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
         env=env,
         resume=task.session if follow_up else None,
         session_id=None if follow_up else task.session,
+        max_buffer_size=_MESSAGE_BYTES,
     )
 
 
