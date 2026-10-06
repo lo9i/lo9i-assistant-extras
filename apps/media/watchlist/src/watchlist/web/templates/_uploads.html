@@ -1,0 +1,14 @@
+<div class="uploads">
+  {% for name, why in failed.items() %}<p class="error small">{{ name }}: {{ why }}</p>{% endfor %}
+  <div class="videos">
+    {% for v in videos %}
+    <a class="video" href="{{ v.url }}" target="_blank" rel="noopener">
+      {% if v.thumbnail %}<img src="{{ v.thumbnail }}" alt="" loading="lazy">{% endif %}
+      <span class="title clamp">{{ v.title }}</span>
+      <span class="muted small">{{ v.channel }} · {{ v.published | ago }}</span>
+    </a>
+    {% else %}
+    <p class="empty">Nothing new in the last {{ days }} days.</p>
+    {% endfor %}
+  </div>
+</div>

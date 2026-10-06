@@ -1,0 +1,40 @@
+{% from "_macros.html" import poster, facts, status_select %}
+<section id="titles">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  <details id="add-title" class="card" {{ 'open' if empty }}>
+    <summary>+ Add a {{ kind }}</summary>
+    <form class="inline" hx-get="search" hx-target="#results" hx-swap="innerHTML">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <input name="q" placeholder="Title" required>
+      <button class="primary">Search</button>
+    </form>
+    <div id="results"></div>
+  </details>
+
+  {% for g in groups if g.titles %}
+  <details class="card group" {{ 'open' if not g.folded }}>
+    <summary>{{ g.label }} <span class="muted">{{ g.titles | length }}</span></summary>
+    <div class="list">
+      {% for t in g.titles %}
+      <div class="row" id="title-{{ t.id }}">
+        {{ poster(t.poster) }}
+        <div class="main">
+          <div class="title">{{ t.name }}{% if t.year %} <span class="muted">({{ t.year }})</span>{% endif %}</div>
+          <div class="muted small">{{ facts(t, today) }}</div>
+          {% if t.notes %}<div class="muted small">{{ t.notes }}</div>{% endif %}
+        </div>
+        <div class="actions">
+          {% set code = next_up(t) %}
+          {% if code and t.status != 'dropped' %}
+          <button class="primary small" title="Mark {{ code }} as watched" hx-post="titles/{{ t.id }}/next" hx-target="#titles" hx-swap="outerHTML">Watched {{ code }}</button>
+          {% endif %}
+          {{ status_select(t) }}
+          <button class="ghost small" hx-get="titles/{{ t.id }}/edit" hx-target="#title-{{ t.id }}" hx-swap="outerHTML">Edit</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+  {% if empty %}<p class="empty">Nothing here yet. Search for a {{ kind }} to add it.</p>{% endif %}
+</section>

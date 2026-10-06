@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email`, `communications/phone`, `media/video` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email`, `communications/phone`, `media/video` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -31,6 +31,12 @@ newer version later.
 - **expenses** (`apps/finance/expenses`): assets, recurring obligations and bills, in one currency
   you choose. Its tools, an **Expenses** page in the web app, and a skill that tells the assistant how
   to use them.
+- **watchlist** (`apps/media/watchlist`): the movies and TV shows you want to watch or are watching,
+  and the YouTube channels you follow. Movies and shows come from TMDB, with posters, release dates
+  and episodes; for each show it keeps the last episode you watched and counts the ones aired since.
+  Channels are added from an @handle or a link, and their latest uploads are read from YouTube when
+  asked. Its tools, a **Watchlist** page in the web app, and a skill. It asks for a free
+  [TMDB](https://www.themoviedb.org/settings/api) API key.
 - **telegram** (`communications/chat/telegram`): chat with the assistant on Telegram, with voice
   notes, photos and documents. It asks for a bot token from [@BotFather](https://t.me/BotFather); pair
   your account by sending the bot the code the app shows.
