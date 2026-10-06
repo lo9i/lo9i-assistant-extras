@@ -1,0 +1,25 @@
+{% macro poster(url) -%}
+  {%- if url %}<img class="poster" src="{{ url }}" alt="" loading="lazy">{% else %}<div class="poster"></div>{% endif -%}
+{%- endmacro %}
+
+{# What to know about a title at a glance: progress and next episode for a show, release for a movie. #}
+{% macro facts(t, today) -%}
+  {%- set parts = [] -%}
+  {%- if t.kind == 'show' -%}
+    {%- if t.watched_up_to %}{% set _ = parts.append('Watched up to ' ~ t.watched_up_to.code) %}{% elif t.status != 'to_watch' %}{% set _ = parts.append('Not started') %}{% endif -%}
+    {%- if t.unwatched and t.status != 'dropped' %}{% set _ = parts.append(t.unwatched ~ ' to watch') %}{% endif -%}
+    {%- if t.next_airing and t.next_airing.air_date %}{% set _ = parts.append(t.next_airing.code ~ ' airs ' ~ t.next_airing.air_date) %}{% endif -%}
+    {%- if t.tmdb_status in ('Ended', 'Canceled') %}{% set _ = parts.append(t.tmdb_status) %}{% elif t.seasons %}{% set _ = parts.append(t.seasons | length ~ (' season' if t.seasons | length == 1 else ' seasons')) %}{% endif -%}
+  {%- else -%}
+    {%- if t.released and t.released > today %}{% set _ = parts.append('Out ' ~ t.released) %}{% elif not t.released %}{% set _ = parts.append('No release date') %}{% endif -%}
+    {%- if t.runtime %}{% set _ = parts.append(t.runtime | runtime) %}{% endif -%}
+  {%- endif -%}
+  {%- if t.genres %}{% set _ = parts.append(t.genres[:2] | join(', ')) %}{% endif -%}
+  {{ parts | join(' · ') }}
+{%- endmacro %}
+
+{% macro status_select(t) -%}
+<select name="status" class="status" hx-post="titles/{{ t.id }}/status" hx-trigger="change" hx-target="#titles" hx-swap="outerHTML" aria-label="Status">
+  {% for s in (MOVIE_STATUSES if t.kind == 'movie' else STATUSES) %}<option value="{{ s }}" {{ 'selected' if t.status == s }}>{{ STATUS_LABELS[s] }}</option>{% endfor %}
+</select>
+{%- endmacro %}

@@ -20,7 +20,6 @@ from pydantic import Field
 
 from . import db, service
 from .models import Title
-from .service import UNSET
 from .tmdb import Tmdb
 
 INSTRUCTIONS = """\

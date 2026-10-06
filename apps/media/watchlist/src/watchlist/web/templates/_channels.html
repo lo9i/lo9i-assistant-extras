@@ -1,0 +1,28 @@
+<section id="channels">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  {% with channel = '', error = none %}{% include "_add_channel.html" %}{% endwith %}
+
+  {% if channels %}
+  <div class="card">
+    <div class="card-head">Uploads, last {{ days }} days</div>
+    <div hx-get="uploads" hx-trigger="load" hx-swap="outerHTML"><p class="muted small">Reading the channels' feeds…</p></div>
+  </div>
+  {% endif %}
+
+  <div class="card list">
+    {% for c in channels %}
+    <div class="row" id="channel-{{ c.id }}">
+      {% if c.thumbnail %}<img class="avatar" src="{{ c.thumbnail }}" alt="" loading="lazy">{% else %}<div class="avatar"></div>{% endif %}
+      <div class="main">
+        <div class="title"><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.name }}</a></div>
+        {% if c.handle %}<div class="muted small">{{ c.handle }}</div>{% endif %}
+      </div>
+      <div class="actions">
+        <button class="ghost small danger" hx-post="channels/{{ c.id }}/delete" hx-target="#channels" hx-swap="outerHTML" hx-confirm="Stop following {{ c.name }}?">Unfollow</button>
+      </div>
+    </div>
+    {% else %}
+    <p class="empty">No channels yet. Add one with its @handle or a link to one of its videos.</p>
+    {% endfor %}
+  </div>
+</section>

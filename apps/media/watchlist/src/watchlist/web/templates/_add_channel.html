@@ -1,0 +1,7 @@
+<form id="add-channel" class="card stack" hx-post="channels" hx-target="#channels" hx-swap="outerHTML">
+  <div class="inline">
+    <input name="channel" placeholder="@handle, or a link to the channel or one of its videos" value="{{ channel or '' }}" required>
+    <button class="primary">Follow</button>
+  </div>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+</form>

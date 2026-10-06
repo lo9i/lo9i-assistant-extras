@@ -19,9 +19,9 @@ NS = {
     "yt": "http://www.youtube.com/xml/schemas/2015",
     "media": "http://search.yahoo.com/mrss/",
 }
-# Skips the cookie consent page YouTube shows some countries first.
-COOKIES = {"SOCS": "CAI"}
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Accept-Language": "en"}
+# The cookie skips the consent page YouTube shows some countries first.
+PAGE_HEADERS = {**HEADERS, "Cookie": "SOCS=CAI"}
 
 
 class YoutubeError(Exception):
@@ -62,7 +62,7 @@ def _first(patterns: list[str], page: str) -> str | None:
 
 def _fetch(http: httpx.Client, url: str) -> str:
     try:
-        r = http.get(url, headers=HEADERS, cookies=COOKIES, follow_redirects=True, timeout=15)
+        r = http.get(url, headers=PAGE_HEADERS, follow_redirects=True, timeout=15)
     except httpx.HTTPError as e:
         raise YoutubeError(f"couldn't reach YouTube: {e}") from None
     if r.status_code == 404:

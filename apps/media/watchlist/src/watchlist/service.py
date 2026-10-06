@@ -85,7 +85,7 @@ def _parallel(fn: Callable[[Any], Any], items: Iterable[Any]) -> list[tuple[Any,
     def run(item: Any) -> tuple[Any, Any]:
         try:
             return item, fn(item)
-        except Exception as e:  # noqa: BLE001  # reported to the caller, item by item
+        except Exception as e:  # reported to the caller, item by item
             return item, e
 
     items = list(items)
@@ -138,7 +138,13 @@ def add_title(
         raise RemoteError(str(e)) from None
     with conn:
         id = repo.insert_title(
-            conn, kind=kind, tmdb_id=tmdb_id, name=name or f"TMDB {tmdb_id}", status=status, notes=notes.strip(), info=info
+            conn,
+            kind=kind,
+            tmdb_id=tmdb_id,
+            name=name or f"TMDB {tmdb_id}",
+            status=status,
+            notes=notes.strip(),
+            info=info,
         )
     return get_title(conn, id)
 
@@ -277,9 +283,8 @@ def summary(conn: sqlite3.Connection, days: int = 30) -> dict:
         if t.kind == "show" and t.next_airing and t.next_airing.air_date:
             n = t.next_airing
             if today.isoformat() <= n.air_date <= until:
-                coming.append(
-                    {"date": n.air_date, "id": t.id, "name": t.name, "kind": "show", "episode": n.code, "episode_name": n.name}
-                )
+                show = {"id": t.id, "name": t.name, "kind": "show"}
+                coming.append({"date": n.air_date, **show, "episode": n.code, "episode_name": n.name})
         if t.kind == "movie" and t.released and today.isoformat() <= t.released <= until:
             coming.append({"date": t.released, "id": t.id, "name": t.name, "kind": "movie"})
     counts: dict[str, dict[str, int]] = {k: {} for k in KINDS}
@@ -288,7 +293,7 @@ def summary(conn: sqlite3.Connection, days: int = 30) -> dict:
     return {
         "today": today.isoformat(),
         "catch_up": catch_up,
-        "coming": sorted(coming, key=lambda c: c["date"]),
+        "coming": sorted(coming, key=lambda c: (c["date"], c["name"])),
         "counts": counts,
         "channels": len(repo.list_channels(conn)),
     }

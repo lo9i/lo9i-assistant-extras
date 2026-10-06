@@ -1,0 +1,19 @@
+{% from "_macros.html" import poster %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<div class="list results">
+  {% for f in found %}
+  <div class="row">
+    {{ poster(f.poster) }}
+    <div class="main">
+      <div class="title">{{ f.name }}{% if f.year %} <span class="muted">({{ f.year }})</span>{% endif %}</div>
+      {% if f.overview %}<div class="muted small clamp">{{ f.overview }}</div>{% endif %}
+    </div>
+    <div class="actions">
+      {% if f.tmdb_id in added %}<span class="tag">On the list</span>
+      {% else %}<button class="primary small" hx-post="titles" hx-vals='{"tmdb_id": {{ f.tmdb_id }}, "kind": {{ f.kind | tojson }}}' hx-target="#titles" hx-swap="outerHTML">Add</button>{% endif %}
+    </div>
+  </div>
+  {% else %}
+  {% if not error %}<p class="empty">Nothing found on TMDB.</p>{% endif %}
+  {% endfor %}
+</div>

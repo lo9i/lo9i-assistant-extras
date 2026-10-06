@@ -149,7 +149,8 @@ def _titles_ctx(conn: sqlite3.Connection, kind: str, **extra: Any) -> dict[str, 
         {"status": s, "label": STATUS_LABELS[s], "folded": s in FOLDED, "titles": [t for t in titles if t.status == s]}
         for s in GROUPS[kind]
     ]
-    return {"nav": kind, "kind": kind, "groups": groups, "empty": not titles, "today": date.today().isoformat(), **extra}
+    today = date.today().isoformat()
+    return {"nav": kind, "kind": kind, "groups": groups, "empty": not titles, "today": today, **extra}
 
 
 def _title_routes(app: FastAPI) -> None:
@@ -238,7 +239,8 @@ def _channel_routes(app: FastAPI) -> None:
         try:
             await run_in_threadpool(service.add_channel, conn, _http(request), _text(form, "channel"))
         except WatchlistError as e:
-            return _form_error(request, "_add_channel.html", "#add-channel", channel=_text(form, "channel"), error=str(e))
+            typed = _text(form, "channel")
+            return _form_error(request, "_add_channel.html", "#add-channel", channel=typed, error=str(e))
         return _render(request, "_channels.html", **ctx(conn))
 
     @app.post("/channels/{id}/delete", response_class=HTMLResponse)
