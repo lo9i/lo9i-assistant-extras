@@ -3,20 +3,24 @@
 # updates leave alone, {uv} the uv lo9i found.
 name: claude-code
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.1.0
 description: Hand coding tasks to Claude Code, which works on them on its own in your repositories
 # lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [agent-tasks]
+# While the assistant's model is GitHub Copilot, Claude Code runs on that Copilot plan, with nothing to
+# enter here (lo9i's core/mcp/logins.py, relay.py). A Claude token, when given, is used instead.
+model_login: copilot
 fields:
   - key: CLAUDE_TOKEN
     label: Claude token or Anthropic API key
     secret: true
+    optional: true
     help: https://console.anthropic.com/settings/keys
 # Shown above the field when installing.
 steps:
-  - "With a Claude Pro or Max plan: on a computer with Claude Code, run claude setup-token and sign in. It prints a token that starts with sk-ant-oat."
-  - "Or with API billing: create a key in the Anthropic Console under API keys. It starts with sk-ant-api."
-  - "Paste it below. A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts."
+  - "With GitHub Copilot as the assistant's model, leave the field empty: Claude Code uses your Copilot plan."
+  - "Otherwise, with a Claude Pro or Max plan: on a computer with Claude Code, run claude setup-token and sign in. It prints a token that starts with sk-ant-oat. Or create an API key in the Anthropic Console (sk-ant-api)."
+  - "A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts."
 trusted: false
 
 # Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker

@@ -48,8 +48,9 @@ newer version later.
   through your iPhone, finding their numbers in Contacts. macOS asks you to confirm each call, and you
   do the talking. Mac only, while the assistant runs in your login session.
 - **claude-code** (`assistant/agents/claude-code`): hand coding tasks to Claude Code, which works on
-  them on its own in the repository you name and reports back. It asks for a Claude token (from a Pro or
-  Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
+  them on its own in the repository you name and reports back. While the assistant's model is GitHub
+  Copilot it runs on your Copilot plan, with nothing to enter; otherwise it takes a Claude token (from a
+  Pro or Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
 - **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
   GitHub token with the Copilot Requests permission, and downloads the Copilot CLI on its first task.
 - **programmer** (`assistant/modes/programmer`): a skill for coding in your repositories: read the
