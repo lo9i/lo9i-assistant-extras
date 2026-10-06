@@ -9,19 +9,46 @@
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   <script src="{{ asset('htmx.min.js') }}"></script>
 </head>
-<body>
+<body hx-boost="true">
   <header class="top">
-    <nav>
-      <a href="./" class="{{ 'on' if nav == 'show' }}">Shows</a>
-      <a href="movies" class="{{ 'on' if nav == 'movie' }}">Movies</a>
-      <a href="channels" class="{{ 'on' if nav == 'channels' }}">Channels</a>
-    </nav>
+    <div class="container">
+      <a href="./" class="brand">watchlist</a>
+      <nav>
+        <a href="./" class="{{ 'on' if nav == 'home' }}">Home</a>
+        <a href="shows" class="{{ 'on' if nav == 'show' }}">Shows</a>
+        <a href="movies" class="{{ 'on' if nav == 'movie' }}">Movies</a>
+        <a href="channels" class="{{ 'on' if nav == 'channels' }}">Channels</a>
+      </nav>
+      <button class="btn sm" onclick="openDialog('add-title')">+ Add</button>
+    </div>
   </header>
-  <main>
-    <div id="toast" class="banner" hidden></div>
-    {% block main %}{% endblock %}
-  </main>
+
+  {% block content %}{% endblock %}
+
+  {# Search TMDB and add a movie or show; the new title's page opens. #}
+  <dialog id="add-title" class="modal">
+    <h2>Add to watchlist</h2>
+    <div class="search-box">
+      <input class="input" name="q" type="search" placeholder="Search TMDB..." autocomplete="off"
+             hx-get="search" hx-trigger="input changed delay:250ms, search" hx-target="#results" hx-indicator="#searching">
+      <span id="searching" class="htmx-indicator">Searching…</span>
+    </div>
+    <div id="results" class="results"></div>
+    <div class="modal-foot"><button type="button" class="btn" onclick="this.closest('dialog').close()">Close</button></div>
+  </dialog>
+  {% block dialogs %}{% endblock %}
+
+  <div id="toast" class="toast" hidden></div>
   <script>
+    function openDialog(id) {
+      const d = document.getElementById(id);
+      d.showModal();
+      d.querySelector("input")?.focus();
+    }
+    // Clicking the backdrop closes a dialog.
+    document.addEventListener("click", (e) => {
+      if (e.target.tagName === "DIALOG") e.target.close();
+    });
     // Errors outside forms come back as plain text; show them instead of failing silently.
     document.body.addEventListener("htmx:responseError", (e) => {
       const toast = document.getElementById("toast");

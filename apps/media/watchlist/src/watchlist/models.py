@@ -45,6 +45,9 @@ class Title:
     # Series", "Ended" or "Canceled" for a show.
     tmdb_status: str
     runtime: int | None
+    # TMDB's average vote, 0-10.
+    rating: float | None
+    imdb_id: str | None
     # Shows: episodes in each season, specials (season 0) left out.
     seasons: dict[int, int]
     last_aired: Episode | None
@@ -81,6 +84,8 @@ class Title:
             genres=info.get("genres", []),
             tmdb_status=info.get("tmdb_status", ""),
             runtime=info.get("runtime"),
+            rating=info.get("rating"),
+            imdb_id=info.get("imdb_id"),
             seasons=seasons,
             last_aired=last_aired,
             next_airing=Episode.from_dict(info.get("next_airing")),

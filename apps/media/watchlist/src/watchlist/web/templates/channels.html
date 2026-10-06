@@ -1,2 +1,50 @@
 {% extends "base.html" %}
-{% block main %}{% include "_channels.html" %}{% endblock %}
+{% block title %}Channels — Watchlist{% endblock %}
+{% block content %}
+<main class="page container">
+  <div class="head">
+    <div>
+      <h1>Channels</h1>
+      <p class="sub">{{ plural(channels | length, 'channel') }} followed.</p>
+    </div>
+    <button class="btn" onclick="openDialog('add-channel-dialog')">+ Add channel</button>
+  </div>
+
+  {% if channels %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 3.5rem"></th>
+          <th>Name</th>
+          <th>Handle</th>
+          <th class="hide-sm mono">Channel ID</th>
+          <th style="width: 3rem"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in channels %}
+        <tr id="channel-{{ c.id }}">
+          <td><a href="channels/{{ c.id }}">{% if c.thumbnail %}<img src="{{ c.thumbnail }}" alt="" class="avatar" loading="lazy">{% else %}<div class="avatar none">YT</div>{% endif %}</a></td>
+          <td class="medium"><a href="channels/{{ c.id }}" class="link">{{ c.name }}</a></td>
+          <td class="muted">{{ c.handle or '—' }}</td>
+          <td class="hide-sm mono text-xs muted"><a href="https://www.youtube.com/channel/{{ c.id }}" target="_blank" rel="noreferrer" hx-boost="false" class="link">{{ c.id }}</a></td>
+          <td class="right">
+            <button class="x" title="Unfollow" hx-post="channels/{{ c.id }}/delete" hx-target="#channel-{{ c.id }}" hx-swap="delete swap:200ms" hx-confirm="Stop following {{ c.name }}?">&times;</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No channels yet. Add one with the button above.</div>
+  {% endif %}
+</main>
+{% endblock %}
+{% block dialogs %}
+<dialog id="add-channel-dialog" class="modal">
+  <h2>Add channel</h2>
+  {% with channel = '', error = none %}{% include "_add_channel.html" %}{% endwith %}
+</dialog>
+{% endblock %}

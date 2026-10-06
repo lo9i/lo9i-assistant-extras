@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }} — Watchlist{% endblock %}
+{% block content %}
+<main class="page container">
+  <div class="head">
+    <div>
+      <a href="channels" class="back">&larr; Channels</a>
+      <h1 style="margin-top: 0.25rem">{{ c.name }}</h1>
+      <p class="sub">{% if c.handle %}{{ c.handle }} · {% endif %}{{ plural(videos | length, 'latest upload') }}, read from YouTube.</p>
+    </div>
+    <div class="actions" style="margin-top: 0">
+      <a class="btn sm" href="{{ c.url }}" target="_blank" rel="noreferrer" hx-boost="false">Open on YouTube</a>
+      <button class="btn sm quiet" hx-post="channels/{{ c.id }}/delete" hx-vals='{"back": "1"}' hx-confirm="Stop following {{ c.name }}?">Unfollow</button>
+    </div>
+  </div>
+
+  {% if error %}<div class="empty danger">{{ error }}</div>
+  {% elif videos %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width: 8rem" class="hide-sm"></th><th>Title</th><th>Published</th></tr></thead>
+      <tbody>
+        {% for v in videos %}
+        <tr>
+          <td class="hide-sm"><a href="{{ v.url }}" target="_blank" rel="noreferrer" hx-boost="false">{% if v.thumbnail %}<img src="{{ v.thumbnail }}" alt="" style="width: 6rem; aspect-ratio: 16/9; object-fit: cover; border-radius: 0.25rem" loading="lazy">{% endif %}</a></td>
+          <td>
+            <a href="{{ v.url }}" target="_blank" rel="noreferrer" hx-boost="false" class="medium link">{{ v.title }}</a>
+            {% if v.short %}<span class="tag muted">Short</span>{% endif %}
+          </td>
+          <td class="nowrap text-xs muted">{{ v.published[:10] }} · {{ v.published | ago }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No uploads in this channel's feed.</div>
+  {% endif %}
+</main>
+{% endblock %}

@@ -83,13 +83,15 @@ class Tmdb:
 
     def details(self, kind: str, tmdb_id: int) -> tuple[str, dict]:
         """The title's name and what to store about it (Title in models.py)."""
-        d = self._get(f"/{TMDB_KIND[kind]}/{tmdb_id}")
+        d = self._get(f"/{TMDB_KIND[kind]}/{tmdb_id}", append_to_response="external_ids")
         info = {
             "overview": d.get("overview") or "",
             "poster": _image(d.get("poster_path")),
             "released": d.get("release_date") or d.get("first_air_date") or None,
             "genres": [g["name"] for g in d.get("genres", [])],
             "tmdb_status": d.get("status") or "",
+            "rating": d.get("vote_average") or None,
+            "imdb_id": d.get("imdb_id") or (d.get("external_ids") or {}).get("imdb_id") or None,
         }
         if kind == "movie":
             return d.get("title") or "", {**info, "runtime": d.get("runtime") or None}
@@ -106,6 +108,15 @@ class Tmdb:
             "last_aired": _episode(d.get("last_episode_to_air")),
             "next_airing": _episode(d.get("next_episode_to_air")),
         }
+
+
+    def season(self, tmdb_id: int, season: int) -> list[dict]:
+        """A show's season: its episodes' numbers, names and air dates."""
+        d = self._get(f"/tv/{tmdb_id}/season/{season}")
+        return [
+            {"episode": e["episode_number"], "name": e.get("name") or "", "air_date": e.get("air_date") or None}
+            for e in d.get("episodes", [])
+        ]
 
 
 def _image(path: str | None) -> str | None:

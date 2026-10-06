@@ -1,0 +1,7 @@
+<form class="box" hx-post="titles/{{ t.id }}/notes" hx-swap="outerHTML">
+  <div class="label">Notes</div>
+  <div class="notes">
+    <input class="input" name="notes" value="{{ t.notes }}" placeholder="Who recommended it, where to watch it…">
+    <button class="btn sm">{{ 'Saved ✓' if saved else 'Save' }}</button>
+  </div>
+</form>

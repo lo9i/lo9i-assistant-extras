@@ -1,14 +1,21 @@
-<div class="uploads">
-  {% for name, why in failed.items() %}<p class="error small">{{ name }}: {{ why }}</p>{% endfor %}
-  <div class="videos">
+<section>
+  <div class="section-head">
+    <h1>Latest videos</h1>
+    <p class="sub">{% if videos %}{{ plural(videos | length, 'video') }} from your channels, last {{ days }} days.{% else %}Nothing new in the last {{ days }} days.{% endif %}</p>
+    {% for name, why in failed.items() %}<p class="text-xs danger">{{ name }}: {{ why }}</p>{% endfor %}
+  </div>
+  {% if videos %}
+  <div class="row-scroll">
     {% for v in videos %}
-    <a class="video" href="{{ v.url }}" target="_blank" rel="noopener">
-      {% if v.thumbnail %}<img src="{{ v.thumbnail }}" alt="" loading="lazy">{% endif %}
-      <span class="title clamp">{{ v.title }}</span>
-      <span class="muted small">{{ v.channel }} · {{ v.published | ago }}</span>
-    </a>
-    {% else %}
-    <p class="empty">Nothing new in the last {{ days }} days.</p>
+    <div class="video-card">
+      <a href="{{ v.url }}" target="_blank" rel="noreferrer" hx-boost="false">{% if v.thumbnail %}<img src="{{ v.thumbnail }}" alt="{{ v.title }}" loading="lazy">{% endif %}</a>
+      <div class="body">
+        <a href="{{ v.url }}" target="_blank" rel="noreferrer" hx-boost="false" class="text-sm medium clamp-2 link">{{ v.title }}</a>
+        <a href="channels/{{ v.channel_id }}" class="text-xs muted link">{{ v.channel }}</a>
+        <span class="text-xs muted">{{ v.published | ago }}</span>
+      </div>
+    </div>
     {% endfor %}
   </div>
-</div>
+  {% endif %}
+</section>

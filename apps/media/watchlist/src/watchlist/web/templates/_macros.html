@@ -1,25 +1,32 @@
-{% macro poster(url) -%}
-  {%- if url %}<img class="poster" src="{{ url }}" alt="" loading="lazy">{% else %}<div class="poster"></div>{% endif -%}
+{% macro poster_img(t, cls="poster") -%}
+  {%- if t.poster %}<img src="{{ t.poster }}" alt="{{ t.name }}" class="{{ cls }}" loading="lazy">
+  {%- else %}<div class="{{ 'no-poster' if cls == 'poster' else cls ~ ' none' }}">{{ 'No poster' if cls == 'poster' else ('MOV' if t.kind == 'movie' else 'TV') }}</div>{% endif -%}
 {%- endmacro %}
 
-{# What to know about a title at a glance: progress and next episode for a show, release for a movie. #}
-{% macro facts(t, today) -%}
-  {%- set parts = [] -%}
-  {%- if t.kind == 'show' -%}
-    {%- if t.watched_up_to %}{% set _ = parts.append('Watched up to ' ~ t.watched_up_to.code) %}{% elif t.status != 'to_watch' %}{% set _ = parts.append('Not started') %}{% endif -%}
-    {%- if t.unwatched and t.status != 'dropped' %}{% set _ = parts.append(t.unwatched ~ ' to watch') %}{% endif -%}
-    {%- if t.next_airing and t.next_airing.air_date %}{% set _ = parts.append(t.next_airing.code ~ ' airs ' ~ t.next_airing.air_date) %}{% endif -%}
-    {%- if t.tmdb_status in ('Ended', 'Canceled') %}{% set _ = parts.append(t.tmdb_status) %}{% elif t.seasons %}{% set _ = parts.append(t.seasons | length ~ (' season' if t.seasons | length == 1 else ' seasons')) %}{% endif -%}
-  {%- else -%}
-    {%- if t.released and t.released > today %}{% set _ = parts.append('Out ' ~ t.released) %}{% elif not t.released %}{% set _ = parts.append('No release date') %}{% endif -%}
-    {%- if t.runtime %}{% set _ = parts.append(t.runtime | runtime) %}{% endif -%}
-  {%- endif -%}
-  {%- if t.genres %}{% set _ = parts.append(t.genres[:2] | join(', ')) %}{% endif -%}
-  {{ parts | join(' · ') }}
+{# A movie's release: its date, in amber with the days left while it's not out. #}
+{% macro release(t) -%}
+  {%- set left = days_until(t.released) -%}
+  {%- if not t.released %}<span class="text-xs muted">{{ t.tmdb_status or 'No date' }}</span>
+  {%- elif left %}<span class="text-xs warning">releases {{ t.released }}</span>
+    <span class="tag warning">in {{ plural(left, 'day') }}</span>
+  {%- else %}<span class="text-xs muted">{{ t.released }}</span>{% endif -%}
+{%- endmacro %}
+
+{# A show's next episode, in green, or where it stands. #}
+{% macro airing(t) -%}
+  {%- if t.next_airing and t.next_airing.air_date %}<span class="text-xs success">Next: {{ t.next_airing.code }} · {{ t.next_airing.air_date }}</span>
+  {%- elif t.tmdb_status %}<span class="text-xs muted">{{ t.tmdb_status }}</span>{% endif -%}
 {%- endmacro %}
 
 {% macro status_select(t) -%}
-<select name="status" class="status" hx-post="titles/{{ t.id }}/status" hx-trigger="change" hx-target="#titles" hx-swap="outerHTML" aria-label="Status">
+<select class="select" name="status" aria-label="Status" hx-post="titles/{{ t.id }}/status" hx-trigger="change" hx-swap="none">
   {% for s in (MOVIE_STATUSES if t.kind == 'movie' else STATUSES) %}<option value="{{ s }}" {{ 'selected' if t.status == s }}>{{ STATUS_LABELS[s] }}</option>{% endfor %}
 </select>
+{%- endmacro %}
+
+{% macro watched_button(t, cls="btn xs") -%}
+  {%- set code = next_up(t) -%}
+  {%- if code and t.status != 'dropped' -%}
+  <button class="{{ cls }}" title="Mark {{ code }} as watched" hx-post="titles/{{ t.id }}/next">Watched {{ code }}</button>
+  {%- endif -%}
 {%- endmacro %}

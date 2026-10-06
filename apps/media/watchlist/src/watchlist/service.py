@@ -19,7 +19,7 @@ from typing import Any
 import httpx
 
 from . import repo, youtube
-from .models import Channel, Title, Video, episodes
+from .models import Channel, Episode, Title, Video, episodes
 from .tmdb import Found, Tmdb, TmdbError
 
 log = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ def update_title(
 ) -> Title:
     """`season` and `episode` are the last episode watched, given together.
     Watching an episode of a show still to watch starts it, unless `status`
-    says otherwise."""
+    says otherwise; marking a show watched catches it up."""
     title = get_title(conn, id)
     fields: dict[str, Any] = {}
     if season is not UNSET or episode is not UNSET:
@@ -187,6 +187,9 @@ def update_title(
             fields["status"] = "watching"
     if status is not UNSET:
         fields["status"] = _status(title.kind, status)
+        # A show marked watched is caught up, unless the caller says where it stopped.
+        if status == "watched" and title.kind == "show" and "season" not in fields and title.last_aired:
+            fields |= {"season": title.last_aired.season, "episode": title.last_aired.episode}
     if notes is not UNSET:
         fields["notes"] = notes.strip()
     with conn:
@@ -219,6 +222,31 @@ def watch_next(conn: sqlite3.Connection, id: int) -> Title:
     status = "watched" if caught_up and title.tmdb_status in ENDED else "watching"
     with conn:
         repo.update_title(conn, id, {"season": nxt[0], "episode": nxt[1], "status": status})
+    return get_title(conn, id)
+
+
+def season_episodes(tmdb: Tmdb, title: Title, season: int) -> list[Episode]:
+    """A season's episodes, from TMDB now: they aren't stored."""
+    if title.kind != "show":
+        raise ValidationError(f"{title.name} is a movie: only shows have episodes")
+    if season not in title.seasons:
+        raise ValidationError(f"{title.name} has no season {season}, expected one of {sorted(title.seasons)}")
+    try:
+        found = tmdb.season(title.tmdb_id, season)
+    except TmdbError as e:
+        raise RemoteError(str(e)) from None
+    return [Episode(season, e["episode"], e["air_date"], e["name"]) for e in found]
+
+
+def refresh_title(conn: sqlite3.Connection, tmdb: Tmdb, id: int) -> Title:
+    """Fetch what TMDB says about a title now, however recent the copy."""
+    title = get_title(conn, id)
+    try:
+        name, info = tmdb.details(title.kind, title.tmdb_id)
+    except TmdbError as e:
+        raise RemoteError(str(e)) from None
+    with conn:
+        repo.save_info(conn, id, name or title.name, info)
     return get_title(conn, id)
 
 
