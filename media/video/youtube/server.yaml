@@ -3,7 +3,7 @@
 # updates leave alone, {uv} the uv lo9i found.
 name: youtube
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.0.1
 description: Download YouTube videos, their audio as MP3, and their transcripts
 fields:
   - key: YOUTUBE_DIR
@@ -12,12 +12,11 @@ fields:
 # Shown above the field when installing.
 steps:
   - "Downloads go to the folder you enter, on the computer the assistant runs on; leave it empty for your Downloads folder. The assistant tells you where each file is."
-  - "Reading a transcript asks nothing, but each download asks you first unless you trust the plugin."
-trusted: false
+trusted: true
 
-# get_transcript is read-only; the downloads write files, so lo9i asks the user first unless they trust
-# the plugin. ffmpeg (for MP3s and for joining a video's picture and sound) is the system's, or the one
-# the imageio-ffmpeg package brings.
+# Trusted: the downloads only write files to the download folder, so lo9i doesn't ask before each one.
+# ffmpeg (for MP3s and for joining a video's picture and sound) is the system's, or the one the
+# imageio-ffmpeg package brings.
 command: "{uv}"
 # uv builds its own environment from uv.lock on the first start, so that start is slow.
 args: [run, --quiet, --project, "{dir}", --frozen, youtube-mcp]
