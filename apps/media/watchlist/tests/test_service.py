@@ -44,6 +44,7 @@ def test_a_show_keeps_what_tmdb_says(conn, tmdb):
     assert t.last_aired.code == "S02E10" and t.next_airing is None
     assert t.genres == ["Drama", "Mystery", "Sci-Fi"]
     assert t.unwatched == 19 and t.watched_up_to is None
+    assert (t.rating, t.imdb_id) == (8.4, "tt11280740")
 
 
 def test_a_title_is_added_once(conn, tmdb):
@@ -109,6 +110,13 @@ def test_progress_can_be_cleared_and_status_given_with_it(conn, tmdb):
     assert (t.watched_up_to.code, t.status) == ("S01E03", "dropped")
     t = service.update_title(conn, t.id, season=None, episode=None)
     assert t.watched_up_to is None and t.unwatched == 19
+
+
+def test_a_show_marked_watched_is_caught_up(conn, tmdb):
+    t = service.update_title(conn, add_show(conn, tmdb).id, status="watched")
+    assert (t.watched_up_to.code, t.unwatched) == ("S02E10", 0)
+    t = service.update_title(conn, t.id, status="watched", season=1, episode=4)
+    assert t.watched_up_to.code == "S01E04"
 
 
 def test_unknown_ids_list_the_known_ones(conn, tmdb):

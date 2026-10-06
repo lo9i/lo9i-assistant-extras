@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster_img, status_select, watched_button %}
+{% set page = 'shows' if t.kind == 'show' else 'movies' %}
+{% block title %}{{ t.name }} — Watchlist{% endblock %}
+{% block content %}
+<main class="page container">
+  <div>
+    <a href="{{ page }}" class="back">&larr; {{ page | capitalize }}</a>
+  </div>
+
+  <div class="detail">
+    <div class="side">
+      {{ poster_img(t) }}
+      {% if t.rating %}
+      <div class="score"><div class="label">TMDB</div><div>{{ "%.1f" | format(t.rating) }}</div></div>
+      {% endif %}
+    </div>
+
+    <div class="main">
+      <div>
+        <h1 class="big">{{ t.name }}{% if t.year %}<span class="year">({{ t.year }})</span>{% endif %}</h1>
+        <div class="facts">
+          {% if t.kind == 'movie' %}
+            {% set left = days_until(t.released) %}
+            {% if not t.released %}
+              {% if t.tmdb_status %}<span class="badge">{{ t.tmdb_status | upper }}</span>{% endif %}
+            {% elif left %}
+              <span class="badge warning">UPCOMING</span>
+              <span class="warning">releases {{ t.released }} · in {{ plural(left, 'day') }}</span>
+            {% else %}
+              <span class="badge">RELEASED</span><span class="muted">{{ t.released }}</span>
+            {% endif %}
+            {% if t.runtime %}<span class="muted">{{ t.runtime }} min</span>{% endif %}
+          {% else %}
+            {% if t.tmdb_status %}<span class="badge {{ 'success' if t.tmdb_status == 'Returning Series' }}">{{ t.tmdb_status | upper }}</span>{% endif %}
+            <span class="muted">{{ plural(t.seasons | length, 'season') }}</span>
+            {% if t.runtime %}<span class="muted">{{ t.runtime }} min episodes</span>{% endif %}
+            {% if t.next_airing and t.next_airing.air_date %}<span class="success">Next: {{ t.next_airing.code }} · {{ t.next_airing.air_date }}</span>{% endif %}
+          {% endif %}
+        </div>
+
+        <div class="actions">
+          {{ status_select(t) }}
+          {{ watched_button(t, "btn sm primary") }}
+          <a class="btn sm" hx-boost="false" target="_blank" rel="noopener noreferrer"
+             href="{% if t.imdb_id %}https://www.imdb.com/title/{{ t.imdb_id }}/{% else %}https://www.imdb.com/find/?q={{ t.name | urlencode }}{% endif %}">IMDb</a>
+          <a class="btn sm" hx-boost="false" target="_blank" rel="noopener noreferrer"
+             href="https://www.themoviedb.org/{{ 'movie' if t.kind == 'movie' else 'tv' }}/{{ t.tmdb_id }}">TMDB</a>
+          <button class="btn sm" hx-post="titles/{{ t.id }}/refresh" hx-disabled-elt="this"
+                  hx-on::before-request="this.textContent = 'Refreshing…'">Refresh info</button>
+          <button class="btn sm quiet" hx-post="titles/{{ t.id }}/delete" hx-vals='{"back": "1"}'
+                  hx-confirm="Remove {{ t.name }} from the watchlist?">Remove</button>
+        </div>
+      </div>
+
+      {% if t.overview %}<div class="overview">{{ t.overview }}</div>{% endif %}
+
+      {% if t.genres %}
+      <div class="tags">{% for g in t.genres %}<span class="text-xs muted" style="text-transform: uppercase; letter-spacing: 0.05em">#{{ g }}</span>{% endfor %}</div>
+      {% endif %}
+
+      {% if t.kind == 'show' %}
+      <div class="box">
+        <div class="label">Progress</div>
+        <div class="progress">
+          {% if t.watched_up_to %}
+          <span>Watched up to <strong>{{ t.watched_up_to.code }}</strong></span>
+          {% else %}<span class="muted">Not started</span>{% endif %}
+          {% if t.unwatched %}<span class="success">{{ plural(t.unwatched, 'aired episode') }} to watch</span>
+          {% elif t.watched_up_to %}<span class="muted">Caught up</span>{% endif %}
+          {% if t.watched_up_to %}
+          <button class="btn xs quiet" hx-post="titles/{{ t.id }}/progress" hx-confirm="Mark {{ t.name }} as not started?">Start over</button>
+          {% endif %}
+        </div>
+        <p class="text-xs muted" style="margin-top: 0.5rem">Open a season below to mark where you are.</p>
+      </div>
+      {% endif %}
+
+      {% include "_notes.html" %}
+    </div>
+  </div>
+
+  {% if t.kind == 'show' and t.seasons %}
+  <section class="seasons">
+    {% for n, count in t.seasons | dictsort %}
+    {% set seen = count if t.season and t.season > n else (t.episode if t.season == n else 0) %}
+    <details class="season" hx-get="titles/{{ t.id }}/seasons/{{ n }}" hx-trigger="toggle once" hx-target="find .episodes" hx-swap="innerHTML">
+      <summary><span class="label">Season {{ n }}<span class="count">{{ seen }}/{{ count }}</span></span></summary>
+      <div class="episodes"><p class="loading">Reading the episodes from TMDB…</p></div>
+    </details>
+    {% endfor %}
+  </section>
+  {% endif %}
+</main>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% if error %}<p class="loading danger">{{ error }}</p>{% else %}
+<table>
+  <tbody>
+    {% for e in episodes %}
+    {% set is_seen = t.season is not none and (e.season, e.episode) <= (t.season, t.episode) %}
+    {% set aired = t.last_aired and (e.season, e.episode) <= (t.last_aired.season, t.last_aired.episode) %}
+    <tr class="{{ 'seen' if is_seen }}">
+      <td class="ep-num">E{{ '%02d' % e.episode }}</td>
+      <td class="ep-name">{{ e.name or '—' }}</td>
+      <td class="nowrap text-xs {{ 'warning' if not aired else 'muted' }}">{{ e.air_date or 'TBA' }}</td>
+      <td class="right nowrap">
+        {% if is_seen %}<span class="text-xs success">✓ Watched</span>
+        {% elif aired %}<button class="btn xs" hx-post="titles/{{ t.id }}/progress" hx-vals='{"season": {{ e.season }}, "episode": {{ e.episode }}}'>Watched up to here</button>
+        {% else %}<span class="text-xs muted">Not aired</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

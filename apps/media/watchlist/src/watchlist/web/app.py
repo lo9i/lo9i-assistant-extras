@@ -8,11 +8,12 @@ no login: the daemon lets only the user's paired devices through. The daemon
 serves it under a path (/watchlist/) and says which in X-Forwarded-Prefix;
 pages link relative to it (<base> in base.html).
 
-Pages are server-rendered; htmx swaps a page's main section after each
-action. A form that fails is re-rendered with its error and the values typed,
-in place of the form (HX-Retarget), so nothing is lost. Handlers that reach
-TMDB or YouTube are plain functions, which FastAPI runs in a thread pool, so
-one slow request doesn't hold up the others.
+Pages are server-rendered and look like the assistant's earlier app: a home
+page of poster and video rows, tables for shows, movies and channels, and a
+page per title. Actions are htmx requests; one that changes what several
+parts of a page show answers HX-Refresh, so the page is read again whole.
+Handlers that reach TMDB or YouTube are plain functions, which FastAPI runs
+in a thread pool, so one slow request doesn't hold up the others.
 """
 
 import argparse
@@ -43,10 +44,9 @@ HERE = Path(__file__).parent
 # What the daemon may send as X-Forwarded-Prefix: path segments, like /watchlist.
 PREFIX = re.compile(r"^(/[A-Za-z0-9_-]+)*$")
 STATUS_LABELS = {"to_watch": "To watch", "watching": "Watching", "watched": "Watched", "dropped": "Dropped"}
-# The order a page lists them in. Watched and dropped start folded.
-GROUPS = {"show": ("watching", "to_watch", "watched", "dropped"), "movie": ("to_watch", "watched", "dropped")}
-FOLDED = ("watched", "dropped")
-# How far back the channels page shows uploads.
+# The order the list pages' tabs and rows go in.
+ORDER = {"show": ("watching", "to_watch", "watched", "dropped"), "movie": ("to_watch", "watched", "dropped")}
+# How far back the home page shows uploads.
 UPLOAD_DAYS = 14
 
 
@@ -66,25 +66,34 @@ def next_up(t: Title) -> str | None:
     return f"S{nxt[0]:02d}E{nxt[1]:02d}"
 
 
+def days_until(day: str | None) -> int | None:
+    """Days from today to a future YYYY-MM-DD; None for today, the past, or no date."""
+    if not day:
+        return None
+    n = (date.fromisoformat(day) - date.today()).days
+    return n if n > 0 else None
+
+
 def ago(published: str) -> str:
     days = (datetime.now(UTC).date() - datetime.fromisoformat(published).date()).days
     return "today" if days <= 0 else "yesterday" if days == 1 else f"{days} days ago"
 
 
-def runtime(minutes: int | None) -> str:
-    if not minutes:
-        return ""
-    return f"{minutes // 60}h {minutes % 60:02d}m" if minutes >= 60 else f"{minutes} min"
+def plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
 templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.globals["asset"] = asset_url
-templates.env.globals["next_up"] = next_up
-templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
-templates.env.globals["MOVIE_STATUSES"] = service.MOVIE_STATUSES
-templates.env.globals["STATUSES"] = service.STATUSES
+templates.env.globals |= {
+    "asset": asset_url,
+    "next_up": next_up,
+    "days_until": days_until,
+    "plural": plural,
+    "STATUS_LABELS": STATUS_LABELS,
+    "MOVIE_STATUSES": service.MOVIE_STATUSES,
+    "STATUSES": service.STATUSES,
+}
 templates.env.filters["ago"] = ago
-templates.env.filters["runtime"] = runtime
 
 
 def get_conn() -> Iterator[sqlite3.Connection]:
@@ -135,123 +144,176 @@ def _form_error(request: Request, template: str, target: str, **ctx: Any) -> HTM
     return resp
 
 
-def _page(request: Request, page: str, partial: str, **ctx: Any) -> HTMLResponse:
-    """The whole page, or only its main section for an htmx request."""
-    return _render(request, partial if request.headers.get("HX-Request") else page, **ctx)
+def _refresh() -> Response:
+    """Read the page again: the change shows in more than one place on it."""
+    return Response(headers={"HX-Refresh": "true"})
+
+
+def _go(request: Request, path: str) -> Response:
+    """Open another page of this app."""
+    return Response(headers={"HX-Redirect": f"{request.scope.get('root_path', '')}/{path}"})
+
+
+# --- Home ---
+
+
+def _home_routes(app: FastAPI) -> None:
+    @app.get("/", response_class=HTMLResponse)
+    def home(request: Request, conn: Conn) -> HTMLResponse:
+        service.refresh(conn, _tmdb(request))
+        titles = service.list_titles(conn)
+        up_next = [t for t in titles if t.kind == "show" and t.status in ("watching", "watched") and next_up(t)]
+        return _render(
+            request,
+            "home.html",
+            nav="home",
+            up_next=up_next,
+            movies=[t for t in titles if t.kind == "movie" and t.status == "to_watch"],
+            shows=[t for t in titles if t.kind == "show" and t.status in ("watching", "to_watch")],
+            has_channels=bool(service.list_channels(conn)),
+            days=UPLOAD_DAYS,
+        )
+
+    @app.get("/uploads", response_class=HTMLResponse)
+    def uploads(request: Request, conn: Conn) -> HTMLResponse:
+        """The home page's videos row, read from the channels' feeds."""
+        videos, failed = service.new_uploads(conn, _http(request), days=UPLOAD_DAYS)
+        return _render(request, "_uploads.html", videos=videos, failed=failed, days=UPLOAD_DAYS)
 
 
 # --- Movies and shows ---
 
 
-def _titles_ctx(conn: sqlite3.Connection, kind: str, **extra: Any) -> dict[str, Any]:
-    titles = service.list_titles(conn, kind)
-    groups = [
-        {"status": s, "label": STATUS_LABELS[s], "folded": s in FOLDED, "titles": [t for t in titles if t.status == s]}
-        for s in GROUPS[kind]
-    ]
-    today = date.today().isoformat()
-    return {"nav": kind, "kind": kind, "groups": groups, "empty": not titles, "today": today, **extra}
+def _list_routes(app: FastAPI) -> None:
+    def list_page(request: Request, conn: sqlite3.Connection, kind: str, status: str) -> HTMLResponse:
+        service.refresh(conn, _tmdb(request), kind=kind)
+        titles = service.list_titles(conn, kind)
+        order = ORDER[kind]
+        titles.sort(key=lambda t: (order.index(t.status), t.name.lower()))
+        counts = {s: sum(1 for t in titles if t.status == s) for s in order}
+        shown = [t for t in titles if t.status == status] if status in order else titles
+        ctx = {"nav": kind, "kind": kind, "titles": shown, "total": len(titles), "counts": counts, "tab": status}
+        return _render(request, "titles.html", **ctx)
+
+    @app.get("/shows", response_class=HTMLResponse)
+    def shows(request: Request, conn: Conn, status: str = "") -> HTMLResponse:
+        return list_page(request, conn, "show", status)
+
+    @app.get("/movies", response_class=HTMLResponse)
+    def movies(request: Request, conn: Conn, status: str = "") -> HTMLResponse:
+        return list_page(request, conn, "movie", status)
+
+    @app.get("/search", response_class=HTMLResponse)
+    def search(request: Request, conn: Conn, q: str = "", kind: str = "") -> HTMLResponse:
+        """Results in the Add dialog, as the user types."""
+        if not q.strip():
+            return HTMLResponse("")
+        try:
+            found = service.search(_tmdb(request), q, kind or None)
+        except WatchlistError as e:
+            return _render(request, "_results.html", found=[], error=str(e), q=q)
+        added = {(t.kind, t.tmdb_id): t.id for t in service.list_titles(conn)}
+        return _render(request, "_results.html", found=found, added=added, q=q)
+
+    @app.post("/titles")
+    async def add_title(request: Request, conn: Conn) -> Response:
+        """Add a search result and open its page."""
+        form = dict(await request.form())
+        tmdb_id = _int(form, "tmdb_id")
+        if tmdb_id is None:
+            raise service.ValidationError("tmdb_id is required")
+        title = await run_in_threadpool(service.add_title, conn, _tmdb(request), tmdb_id, _text(form, "kind"))
+        return _go(request, f"titles/{title.id}")
+
+
+# --- A title's page ---
 
 
 def _title_routes(app: FastAPI) -> None:
-    def titles_page(request: Request, conn: sqlite3.Connection, kind: str) -> HTMLResponse:
-        service.refresh(conn, _tmdb(request), kind=kind)
-        return _page(request, "titles.html", "_titles.html", **_titles_ctx(conn, kind))
+    @app.get("/titles/{id}", response_class=HTMLResponse)
+    def title_page(request: Request, id: int, conn: Conn) -> HTMLResponse:
+        t = service.get_title(conn, id)
+        return _render(request, "title.html", nav=t.kind, t=t)
 
-    @app.get("/", response_class=HTMLResponse)
-    def shows(request: Request, conn: Conn) -> HTMLResponse:
-        return titles_page(request, conn, "show")
-
-    @app.get("/movies", response_class=HTMLResponse)
-    def movies(request: Request, conn: Conn) -> HTMLResponse:
-        return titles_page(request, conn, "movie")
-
-    @app.get("/search", response_class=HTMLResponse)
-    def search(request: Request, conn: Conn, kind: str, q: str = "") -> HTMLResponse:
+    @app.get("/titles/{id}/seasons/{season}", response_class=HTMLResponse)
+    def season(request: Request, id: int, season: int, conn: Conn) -> HTMLResponse:
+        """A season's episodes, read from TMDB when its row is opened."""
+        t = service.get_title(conn, id)
         try:
-            found = service.search(_tmdb(request), q, kind)
+            episodes = service.season_episodes(_tmdb(request), t, season)
         except WatchlistError as e:
-            return _render(request, "_results.html", found=[], error=str(e))
-        added = {t.tmdb_id for t in service.list_titles(conn, kind)}
-        return _render(request, "_results.html", found=found, added=added)
+            return _render(request, "_season.html", t=t, episodes=[], error=str(e))
+        return _render(request, "_season.html", t=t, episodes=episodes, today=date.today().isoformat())
 
-    @app.post("/titles", response_class=HTMLResponse)
-    async def add_title(request: Request, conn: Conn) -> HTMLResponse:
+    @app.post("/titles/{id}/status")
+    async def set_status(request: Request, id: int, conn: Conn) -> Response:
         form = dict(await request.form())
-        kind = _text(form, "kind")
-        try:
-            tmdb_id = _int(form, "tmdb_id")
-            if tmdb_id is None:
-                raise service.ValidationError("tmdb_id is required")
-            await run_in_threadpool(service.add_title, conn, _tmdb(request), tmdb_id, kind)
-        except WatchlistError as e:
-            return _render(request, "_titles.html", **_titles_ctx(conn, kind, banner=str(e)))
-        return _render(request, "_titles.html", **_titles_ctx(conn, kind))
+        service.update_title(conn, id, status=_text(form, "status"))
+        return _refresh() if _text(form, "refresh") else Response()
 
-    @app.get("/titles/{id}/edit", response_class=HTMLResponse)
-    def edit_title(request: Request, id: int, conn: Conn) -> HTMLResponse:
-        return _render(request, "_edit_title.html", t=service.get_title(conn, id), form=None)
+    @app.post("/titles/{id}/next")
+    def watch_next(id: int, conn: Conn) -> Response:
+        service.watch_next(conn, id)
+        return _refresh()
 
-    @app.post("/titles/{id}", response_class=HTMLResponse)
-    async def save_title(request: Request, id: int, conn: Conn) -> HTMLResponse:
+    @app.post("/titles/{id}/progress")
+    async def set_progress(request: Request, id: int, conn: Conn) -> Response:
+        """The last episode watched: one picked in a season's list, or none."""
         form = dict(await request.form())
-        title = service.get_title(conn, id)
-        try:
-            changes: dict[str, Any] = {"status": _text(form, "status"), "notes": _text(form, "notes")}
-            if title.kind == "show":
-                changes |= {"season": _int(form, "season"), "episode": _int(form, "episode")}
-            service.update_title(conn, id, **changes)
-        except WatchlistError as e:
-            return _form_error(request, "_edit_title.html", f"#title-{id}", t=title, form=form, error=str(e))
-        return _render(request, "_titles.html", **_titles_ctx(conn, title.kind))
+        service.update_title(conn, id, season=_int(form, "season"), episode=_int(form, "episode"))
+        return _refresh()
 
-    @app.post("/titles/{id}/status", response_class=HTMLResponse)
-    async def set_status(request: Request, id: int, conn: Conn) -> HTMLResponse:
+    @app.post("/titles/{id}/notes", response_class=HTMLResponse)
+    async def save_notes(request: Request, id: int, conn: Conn) -> HTMLResponse:
         form = dict(await request.form())
-        title = service.update_title(conn, id, status=_text(form, "status"))
-        return _render(request, "_titles.html", **_titles_ctx(conn, title.kind))
+        t = service.update_title(conn, id, notes=_text(form, "notes"))
+        return _render(request, "_notes.html", t=t, saved=True)
 
-    @app.post("/titles/{id}/next", response_class=HTMLResponse)
-    def watch_next(request: Request, id: int, conn: Conn) -> HTMLResponse:
-        title = service.watch_next(conn, id)
-        return _render(request, "_titles.html", **_titles_ctx(conn, title.kind))
+    @app.post("/titles/{id}/refresh")
+    def refresh_title(request: Request, id: int, conn: Conn) -> Response:
+        service.refresh_title(conn, _tmdb(request), id)
+        return _refresh()
 
-    @app.post("/titles/{id}/delete", response_class=HTMLResponse)
-    def delete_title(request: Request, id: int, conn: Conn) -> HTMLResponse:
-        title = service.remove_title(conn, id)
-        return _render(request, "_titles.html", **_titles_ctx(conn, title.kind))
+    @app.post("/titles/{id}/delete")
+    async def delete_title(request: Request, id: int, conn: Conn) -> Response:
+        """From a list, its row goes (hx-swap delete); from its page, back to the list."""
+        form = dict(await request.form())
+        t = service.remove_title(conn, id)
+        return _go(request, "shows" if t.kind == "show" else "movies") if _text(form, "back") else Response()
 
 
 # --- Channels ---
 
 
 def _channel_routes(app: FastAPI) -> None:
-    def ctx(conn: sqlite3.Connection, **extra: Any) -> dict[str, Any]:
-        return {"nav": "channels", "channels": service.list_channels(conn), "days": UPLOAD_DAYS, **extra}
-
     @app.get("/channels", response_class=HTMLResponse)
     def channels(request: Request, conn: Conn) -> HTMLResponse:
-        return _page(request, "channels.html", "_channels.html", **ctx(conn))
+        return _render(request, "channels.html", nav="channels", channels=service.list_channels(conn))
 
     @app.post("/channels", response_class=HTMLResponse)
-    async def add_channel(request: Request, conn: Conn) -> HTMLResponse:
+    async def add_channel(request: Request, conn: Conn) -> Response:
         form = dict(await request.form())
+        typed = _text(form, "channel")
         try:
-            await run_in_threadpool(service.add_channel, conn, _http(request), _text(form, "channel"))
+            await run_in_threadpool(service.add_channel, conn, _http(request), typed)
         except WatchlistError as e:
-            typed = _text(form, "channel")
             return _form_error(request, "_add_channel.html", "#add-channel", channel=typed, error=str(e))
-        return _render(request, "_channels.html", **ctx(conn))
+        return _refresh()
 
-    @app.post("/channels/{id}/delete", response_class=HTMLResponse)
-    def delete_channel(request: Request, id: str, conn: Conn) -> HTMLResponse:
+    @app.get("/channels/{id}", response_class=HTMLResponse)
+    def channel_page(request: Request, id: str, conn: Conn) -> HTMLResponse:
+        c = service.get_channel(conn, id)
+        try:
+            videos, error = service.channel_uploads(_http(request), c, shorts=True), None
+        except WatchlistError as e:
+            videos, error = [], str(e)
+        return _render(request, "channel.html", nav="channels", c=c, videos=videos, error=error)
+
+    @app.post("/channels/{id}/delete")
+    async def delete_channel(request: Request, id: str, conn: Conn) -> Response:
+        form = dict(await request.form())
         service.remove_channel(conn, id)
-        return _render(request, "_channels.html", **ctx(conn))
-
-    @app.get("/uploads", response_class=HTMLResponse)
-    def uploads(request: Request, conn: Conn) -> HTMLResponse:
-        videos, failed = service.new_uploads(conn, _http(request), days=UPLOAD_DAYS)
-        return _render(request, "_uploads.html", videos=videos, failed=failed, days=UPLOAD_DAYS)
+        return _go(request, "channels") if _text(form, "back") else Response()
 
 
 # --- Serving under lo9i ---
@@ -284,8 +346,8 @@ def create_app(http: httpx.Client | None = None) -> FastAPI:
     app.state.http = http or httpx.Client()
     app.state.tmdb = Tmdb(os.environ.get("TMDB_API_KEY", ""), app.state.http)
 
-    # Errors outside a form (a title deleted in another tab): the page shows
-    # the message (see base.html).
+    # Errors outside a form (a title deleted in another tab, TMDB down): the
+    # page shows the message (see base.html).
     @app.exception_handler(WatchlistError)
     async def watchlist_error(request: Request, exc: WatchlistError) -> Response:
         status = 404 if isinstance(exc, service.NotFound) else 400
@@ -293,6 +355,8 @@ def create_app(http: httpx.Client | None = None) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.add_middleware(ForwardedPrefix)
+    _home_routes(app)
+    _list_routes(app)
     _title_routes(app)
     _channel_routes(app)
     return app

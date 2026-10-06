@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster_img, release, airing, watched_button %}
+{% block content %}
+<main class="page container">
+
+  {% if up_next %}
+  <section>
+    <div class="section-head">
+      <h1>Up next</h1>
+      <p class="sub">{{ plural(up_next | length, 'show') }} with episodes you haven't watched.</p>
+    </div>
+    <div class="row-scroll">
+      {% for t in up_next %}
+      <div class="poster-card">
+        <a href="titles/{{ t.id }}" class="poster-card">
+          {{ poster_img(t) }}
+          <div class="info">
+            <span class="poster-name clamp-2">{{ t.name }}</span>
+            <span class="text-xs success">{{ plural(t.unwatched, 'episode') }} to watch</span>
+          </div>
+        </a>
+        {{ watched_button(t) }}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if has_channels %}
+  <section hx-get="uploads" hx-trigger="load" hx-swap="outerHTML">
+    <div class="section-head">
+      <h1>Latest videos</h1>
+      <p class="sub">Reading your channels…</p>
+    </div>
+  </section>
+  {% else %}
+  <section>
+    <div class="section-head"><h1>Latest videos</h1><p class="sub">No channels yet.</p></div>
+    <div class="empty">Follow YouTube channels on the <a href="channels">Channels</a> page.</div>
+  </section>
+  {% endif %}
+
+  <section>
+    <div class="section-head">
+      <h1>Movies</h1>
+      <p class="sub">{% if movies %}{{ plural(movies | length, 'movie') }} to watch.{% else %}Add one with + Add.{% endif %}</p>
+    </div>
+    {% if movies %}
+    <div class="row-scroll">
+      {% for t in movies %}
+      <a href="titles/{{ t.id }}" class="poster-card">
+        {{ poster_img(t) }}
+        <div class="info"><span class="poster-name clamp-2">{{ t.name }}</span>{{ release(t) }}</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">No movies to watch. Add one with <a href="#" onclick="openDialog('add-title'); return false">+ Add</a>.</div>
+    {% endif %}
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h1>Shows</h1>
+      <p class="sub">{% if shows %}{{ plural(shows | length, 'show') }} watching or to watch.{% else %}No shows yet.{% endif %}</p>
+    </div>
+    {% if shows %}
+    <div class="row-scroll">
+      {% for t in shows %}
+      <a href="titles/{{ t.id }}" class="poster-card">
+        {{ poster_img(t) }}
+        <div class="info"><span class="poster-name clamp-2">{{ t.name }}</span>{{ airing(t) }}</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">No shows yet. Add one with <a href="#" onclick="openDialog('add-title'); return false">+ Add</a>.</div>
+    {% endif %}
+  </section>
+
+</main>
+{% endblock %}

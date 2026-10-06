@@ -30,6 +30,8 @@ SHOW = {
     ],
     "last_episode_to_air": {"season_number": 2, "episode_number": 10, "air_date": "2025-03-20", "name": "Cold Harbor"},
     "next_episode_to_air": None,
+    "vote_average": 8.4,
+    "external_ids": {"imdb_id": "tt11280740"},
 }
 MOVIE = {
     "id": 1170608,

@@ -1,2 +1,80 @@
 {% extends "base.html" %}
-{% block main %}{% include "_titles.html" %}{% endblock %}
+{% from "_macros.html" import poster_img, release, status_select, watched_button %}
+{% set noun = 'show' if kind == 'show' else 'movie' %}
+{% set page = 'shows' if kind == 'show' else 'movies' %}
+{% block title %}{{ noun | capitalize }}s — Watchlist{% endblock %}
+{% block content %}
+<main class="page container">
+  <div class="head">
+    <div>
+      <h1>{{ noun | capitalize }}s</h1>
+      <p class="sub">{{ plural(total, noun) }} on the watchlist.</p>
+    </div>
+    <button class="btn" onclick="openDialog('add-title')">+ Add {{ noun }}</button>
+  </div>
+
+  {% if total %}
+  <div class="tabs">
+    <a href="{{ page }}" class="{{ 'on' if tab not in counts }}">All {{ total }}</a>
+    {% for s, n in counts.items() %}
+    <a href="{{ page }}?status={{ s }}" class="{{ 'on' if tab == s }}">{{ STATUS_LABELS[s] }} {{ n }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 3.5rem"></th>
+          <th>Title</th>
+          {% if kind == 'show' %}
+          <th>Progress</th>
+          <th class="hide-sm">Next episode</th>
+          {% else %}
+          <th>Release</th>
+          <th class="hide-sm">Runtime</th>
+          {% endif %}
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in titles %}
+        <tr id="title-{{ t.id }}">
+          <td><a href="titles/{{ t.id }}">{{ poster_img(t, 'thumb') }}</a></td>
+          <td class="medium">
+            <a href="titles/{{ t.id }}" class="link">{{ t.name }}</a>
+            {% if t.year %}<span class="text-xs muted">({{ t.year }})</span>{% endif %}
+          </td>
+          {% if kind == 'show' %}
+          <td class="nowrap">
+            <span class="muted">{{ t.watched_up_to.code if t.watched_up_to else '—' }}</span>
+            {% if t.unwatched and t.status != 'dropped' %}<span class="text-xs success"> · {{ t.unwatched }} to watch</span>{% endif %}
+          </td>
+          <td class="hide-sm nowrap">
+            {% if t.next_airing and t.next_airing.air_date %}<span class="text-xs success">{{ t.next_airing.code }} · {{ t.next_airing.air_date }}</span>
+            {% else %}<span class="text-xs muted">{{ t.tmdb_status or '—' }}</span>{% endif %}
+          </td>
+          {% else %}
+          <td class="nowrap">{{ release(t) }}</td>
+          <td class="hide-sm muted">{{ (t.runtime ~ ' min') if t.runtime else '—' }}</td>
+          {% endif %}
+          <td>{{ status_select(t) }}</td>
+          <td>
+            <div class="cell-actions">
+              {{ watched_button(t) }}
+              <button class="x" title="Remove" hx-post="titles/{{ t.id }}/delete" hx-target="#title-{{ t.id }}" hx-swap="delete swap:200ms" hx-confirm="Remove {{ t.name }} from the watchlist?">&times;</button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">None {{ STATUS_LABELS[tab] | lower }}.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No {{ noun }}s yet. Add one with the button above.</div>
+  {% endif %}
+</main>
+{% endblock %}
