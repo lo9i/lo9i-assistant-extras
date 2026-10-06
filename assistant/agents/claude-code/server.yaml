@@ -3,7 +3,7 @@
 # updates leave alone, {uv} the uv lo9i found.
 name: claude-code
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.1.0
+version: 1.2.0
 description: Hand coding tasks to Claude Code, which works on them on its own in your repositories
 # lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [agent-tasks]
@@ -22,6 +22,11 @@ steps:
   - "Otherwise, with a Claude Pro or Max plan: on a computer with Claude Code, run claude setup-token and sign in. It prints a token that starts with sk-ant-oat. Or create an API key in the Anthropic Console (sk-ant-api)."
   - "A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts."
 trusted: false
+# /claude <folder> in the apps hands a conversation to Claude Code: lo9i sends each message to converse,
+# which continues the conversation's session in that folder (lib/agent-tasks). It's for that only, so the
+# assistant's model doesn't get it as a tool.
+agent: {command: claude, name: Claude Code, tool: converse}
+exclude: [converse]
 
 # Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker
 # process of its own that outlives this server; their records are under {data}/tasks.
