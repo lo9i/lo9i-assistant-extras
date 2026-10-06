@@ -1,0 +1,25 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format
+# is in lo9i's core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that
+# updates leave alone, {uv} the uv lo9i found, {socket} where the web page listens.
+name: watchlist
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 0.1.0
+description: Movies and TV shows to watch, how far you are in each show, and the YouTube channels you follow
+fields:
+  - {key: TMDB_API_KEY, label: TMDB API key, secret: true, help: https://www.themoviedb.org/settings/api}
+# Shown above the field when installing.
+steps:
+  - "Posters, release dates and episodes come from TMDB, The Movie Database, whose API is free for personal use. Sign in at themoviedb.org (or create an account), then open Settings, API and request a key for personal use."
+  - "Paste the API Key (the short one) or the API Read Access Token (the long one)."
+command: "{uv}"
+# uv builds its own environment from uv.lock on the first start, so that start is slow.
+args: [run, --quiet, --project, "{dir}", --frozen, watchlist-mcp]
+env:
+  WATCHLIST_DB: "{data}/watchlist.db"
+trusted: false
+
+# The page lo9i shows as Watchlist in its web app. It gets the env above and listens on {socket};
+# lo9i signs the user in and serves it under /watchlist/ (X-Forwarded-Prefix).
+page:
+  command: "{uv}"
+  args: [run, --quiet, --project, "{dir}", --frozen, watchlist-web, --socket, "{socket}"]

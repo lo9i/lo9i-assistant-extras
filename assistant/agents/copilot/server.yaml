@@ -3,7 +3,7 @@
 # updates leave alone, {uv} the uv lo9i found.
 name: copilot
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.1.0
+version: 1.2.0
 description: Hand coding tasks to GitHub Copilot, which works on them on its own in your repositories
 # lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [agent-tasks]

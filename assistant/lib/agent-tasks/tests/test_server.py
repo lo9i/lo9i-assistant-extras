@@ -101,6 +101,18 @@ async def test_a_conversation_continues_its_session_in_the_same_folder(store, re
     assert middle.follow_up_of and not newest.follow_up_of
 
 
+async def test_each_step_is_sent_as_progress_while_the_agent_works(store, repo):
+    steps: list[str | None] = []
+
+    async def progress(progress: float, total: float | None, message: str | None) -> None:
+        steps.append(message)
+
+    async with Client(build("agent", "the agent", "", _WORKER, store)) as client:
+        arguments = {"conversation": "c", "folder": str(repo), "message": "finish"}
+        result = await client.call_tool("converse", arguments, progress_callback=progress)
+    assert not result.is_error and steps == [f"Read: {repo}/README.md"]
+
+
 async def test_a_failing_turn_or_a_missing_folder_is_an_error(store, repo):
     failed = await _converse(store, "owner:abc", repo, "fail")
     assert failed.is_error and "the agent gave up" in failed.content[0].text
