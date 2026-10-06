@@ -2,8 +2,6 @@
 stopping change the user's code and spend their plan, so they aren't read-only: lo9i asks the user first
 unless they trust the plugin."""
 
-import asyncio
-import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -11,29 +9,27 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
-from watchfiles import awatch
 
 from agent_tasks import launch
+from agent_tasks.conversations import Conversations, add_converse
 from agent_tasks.tasks import TaskNotFoundError, TaskState, TaskStore, lost
+from agent_tasks.waiting import at_most
 
 READ_ONLY = ToolAnnotations(read_only_hint=True)
 # The longest a status call waits for a task to finish.
 MAX_WAIT_SECONDS = 600
 # Results longer than this are cut in tool output; the whole text stays in the task's result.json.
 _MAX_RESULT = 20_000
-# How often a wait looks again without a file change: it misses no change made just before it began.
-_RECHECK_MS = 2_000
-
-# watchfiles logs every change it sees at INFO, which would fill lo9i's log while a task is followed.
-logging.getLogger("watchfiles").setLevel(logging.WARNING)
 
 
 def build(name: str, agent: str, instructions: str, worker: list[str], store: TaskStore) -> MCPServer:
-    """`worker`: the command that runs one task, given its folder (worker.py)."""
+    """`worker`: the command that runs one task, given its folder (worker.py). Which task each handed-over
+    conversation is at is kept next to the tasks (conversations.py)."""
     server = MCPServer(name, instructions=instructions)
     _add_start(server, agent, worker, store)
     _add_following(server, store)
     _add_stop(server, store)
+    add_converse(server, worker, store, Conversations(store.root.parent / "conversations"))
     return server
 
 
@@ -65,7 +61,8 @@ def _add_following(server: MCPServer, store: TaskStore) -> None:
     ) -> str:
         """A task's state: running, done, failed or stopped, its latest steps, and its result once it ends."""
         if wait_seconds:
-            await _wait(store, task_id, wait_seconds)
+            _state(store, task_id)
+            await at_most(store, task_id, wait_seconds)
         return render(_state(store, task_id))
 
     @server.tool(annotations=READ_ONLY)
@@ -132,21 +129,6 @@ def _session_to_continue(store: TaskStore, task_id: str) -> str:
     if state.status == "running":
         raise ToolError(f"Task {task_id} is still running. Wait for it or stop it before following up.")
     return state.task.session
-
-
-async def _wait(store: TaskStore, task_id: str, seconds: int) -> None:
-    """Until the task ends or `seconds` pass. Wakes on any change in its folder (the worker writing its
-    result, or its progress), and looks again every few seconds for a worker that died without one."""
-    if _state(store, task_id).status != "running":
-        return
-    folder = store.folder(task_id)
-    try:
-        async with asyncio.timeout(seconds):
-            async for _ in awatch(folder, yield_on_timeout=True, rust_timeout=_RECHECK_MS):
-                if store.state(task_id, progress_lines=0).status != "running":
-                    return
-    except TimeoutError:
-        return
 
 
 def _start_description(agent: str) -> str:

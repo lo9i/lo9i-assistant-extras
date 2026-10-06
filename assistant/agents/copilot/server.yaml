@@ -3,7 +3,7 @@
 # updates leave alone, {uv} the uv lo9i found.
 name: copilot
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.1.0
 description: Hand coding tasks to GitHub Copilot, which works on them on its own in your repositories
 # lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [agent-tasks]
@@ -18,6 +18,9 @@ steps:
   - "Open the field's link to create a fine-grained personal access token. Under Permissions, add Copilot Requests, then generate it."
   - "Paste it below. A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts. The first task downloads the Copilot CLI (about 150 MB)."
 trusted: false
+# /copilot <folder> in the apps hands a conversation to GitHub Copilot, as /claude does for Claude Code.
+agent: {command: copilot, name: GitHub Copilot, tool: converse}
+exclude: [converse]
 
 # Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker
 # process of its own that outlives this server; their records are under {data}/tasks, the downloaded

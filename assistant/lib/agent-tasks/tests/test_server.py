@@ -1,5 +1,7 @@
 """The tools over an in-process MCP session, with real detached workers running tests/fake_worker.py."""
 
+import asyncio
+import contextlib
 import re
 import sys
 from pathlib import Path
@@ -77,3 +79,48 @@ async def test_a_folder_that_doesnt_exist_or_a_relative_one_is_refused(store, re
         assert error and "isn't an existing folder" in text
     error, text = await _call(store, "task_status", task_id="nope")
     assert error and "No task nope." in text
+
+
+async def _converse(store, conversation, folder, message):
+    async with Client(build("agent", "the agent", "", _WORKER, store)) as client:
+        return await client.call_tool(
+            "converse", {"conversation": conversation, "folder": str(folder), "message": message}
+        )
+
+
+async def test_a_conversation_continues_its_session_in_the_same_folder(store, repo, tmp_path):
+    first = await _converse(store, "owner:abc", repo, "finish")
+    second = await _converse(store, "owner:abc", repo, "finish")
+    elsewhere = tmp_path / "other"
+    elsewhere.mkdir()
+    third = await _converse(store, "owner:abc", elsewhere, "finish")
+    assert not first.is_error and first.content[0].text.startswith("Did it in session")
+    sessions = [r.content[0].text for r in (first, second, third)]
+    assert sessions[0] == sessions[1] != sessions[2]
+    newest, middle, _ = store.recent()
+    assert middle.follow_up_of and not newest.follow_up_of
+
+
+async def test_a_failing_turn_or_a_missing_folder_is_an_error(store, repo):
+    failed = await _converse(store, "owner:abc", repo, "fail")
+    assert failed.is_error and "the agent gave up" in failed.content[0].text
+    missing = await _converse(store, "owner:abc", repo / "missing", "finish")
+    assert missing.is_error and "isn't an existing folder" in missing.content[0].text
+
+
+async def test_cancelling_the_call_stops_the_task(store, repo):
+    async with Client(build("agent", "the agent", "", _WORKER, store)) as client:
+        call = asyncio.create_task(
+            client.call_tool("converse", {"conversation": "c", "folder": str(repo), "message": "sleep"})
+        )
+        while not store.recent() or store.pid(store.recent()[0].id) is None:
+            await asyncio.sleep(0.05)
+        call.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await call
+        task_id = store.recent()[0].id
+        for _ in range(100):
+            if store.state(task_id).status == "stopped":
+                break
+            await asyncio.sleep(0.05)
+    assert store.state(task_id).status == "stopped"
