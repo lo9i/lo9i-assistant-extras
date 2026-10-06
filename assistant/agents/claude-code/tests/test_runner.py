@@ -30,6 +30,7 @@ def test_a_new_task_starts_its_session_and_a_follow_up_resumes_it():
     assert new.session_id == _task().session and new.resume is None
     assert follow.resume == _task().session and follow.session_id is None
     assert new.cwd == "/repo" and new.permission_mode == "bypassPermissions"
+    assert new.max_buffer_size == 64 * 1024 * 1024  # a screenshot read whole fits
     assert new.system_prompt == {"type": "preset", "preset": "claude_code", "append": runner._UNDER_LO9I}
 
 
