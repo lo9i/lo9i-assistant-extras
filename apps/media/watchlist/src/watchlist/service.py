@@ -10,6 +10,7 @@ the field.
 """
 
 import logging
+import re
 import sqlite3
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -147,6 +148,27 @@ def add_title(
             info=info,
         )
     return get_title(conn, id)
+
+
+IMDB_ID = re.compile(r"^tt\d{5,10}$")
+
+
+def add_imdb_title(
+    conn: sqlite3.Connection, tmdb: Tmdb, imdb_id: str, *, status: str = "to_watch", notes: str = ""
+) -> Title:
+    """Add the movie or show an IMDb link names (its tt… id)."""
+    imdb_id = imdb_id.strip()
+    if not IMDB_ID.match(imdb_id):
+        raise ValidationError(
+            f'imdb_id must look like "tt0133093", the part of an IMDb link after /title/, got "{imdb_id}"'
+        )
+    try:
+        found = tmdb.find_imdb(imdb_id)
+    except TmdbError as e:
+        raise RemoteError(str(e)) from None
+    if found is None:
+        raise NotFound(f"TMDB has no movie or show with IMDb id {imdb_id}: search by its name instead")
+    return add_title(conn, tmdb, found.tmdb_id, found.kind, status=status, notes=notes)
 
 
 def _progress(title: Title, season: int | None, episode: int | None) -> tuple[int, int] | tuple[None, None]:

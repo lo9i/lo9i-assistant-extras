@@ -27,7 +27,8 @@ Tracks the movies and TV shows the user wants to watch or is watching, and
 the YouTube channels they follow.
 
 - Titles are movies and shows (kind movie or show), from TMDB. Find one with
-  search, then add_title with its tmdb_id and kind.
+  search, then add_title with its tmdb_id and kind. A TMDB link gives both;
+  an IMDb link gives the imdb_id add_title also takes.
 - A title's status is to_watch, watching, watched or dropped (movies have no
   watching). For a show, season and episode are the last episode watched;
   unwatched counts the episodes aired since. watch_next marks the next one.
@@ -137,13 +138,20 @@ def list_titles(
 
 @mcp.tool()
 def add_title(
-    tmdb_id: Annotated[int, Field(description="From search")],
-    kind: Annotated[str, Field(description="movie or show, as search said")],
+    tmdb_id: Annotated[
+        int | None, Field(description="From search, or from a TMDB link (/movie/<id> or /tv/<id>)")
+    ] = None,
+    kind: Annotated[str | None, Field(description="movie or show, with tmdb_id")] = None,
+    imdb_id: Annotated[str | None, Field(description="Instead of tmdb_id: the tt… id in an IMDb link")] = None,
     status: Annotated[str, Field(description="to_watch, watching, watched or dropped")] = "to_watch",
     notes: str = "",
 ) -> dict:
-    """Add a movie or show found with search."""
+    """Add a movie or show: one found with search, or the one a TMDB or IMDb link names."""
     with _db() as conn:
+        if imdb_id is not None:
+            return _title(service.add_imdb_title(conn, _tmdb(), imdb_id, status=status, notes=notes))
+        if tmdb_id is None or kind is None:
+            raise ToolError("give tmdb_id and kind (from search or a TMDB link), or imdb_id (from an IMDb link)")
         return _title(service.add_title(conn, _tmdb(), tmdb_id, kind, status=status, notes=notes))
 
 

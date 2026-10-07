@@ -3,7 +3,7 @@
 # updates leave alone, {uv} the uv lo9i found, {socket} where the web page listens.
 name: watchlist
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.2.1
+version: 0.3.0
 description: Movies and TV shows to watch, how far you are in each show, and the YouTube channels you follow
 fields:
   - {key: TMDB_API_KEY, label: TMDB API key, secret: true, help: https://www.themoviedb.org/settings/api}
@@ -16,7 +16,9 @@ command: "{uv}"
 args: [run, --quiet, --project, "{dir}", --frozen, watchlist-mcp]
 env:
   WATCHLIST_DB: "{data}/watchlist.db"
-trusted: false
+# Trusted: its changes only touch the watchlist, and are undone on its page, so adding a title from a
+# photo sent in Telegram doesn't wait for an approval.
+trusted: true
 
 # The page lo9i shows as Watchlist in its web app. It gets the env above and listens on {socket};
 # lo9i signs the user in and serves it under /watchlist/ (X-Forwarded-Prefix).

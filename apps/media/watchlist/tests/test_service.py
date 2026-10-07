@@ -53,6 +53,17 @@ def test_a_title_is_added_once(conn, tmdb):
         add_show(conn, tmdb)
 
 
+def test_an_imdb_link_names_a_title(conn, tmdb):
+    t = service.add_imdb_title(conn, tmdb, " tt11280740 ")
+    assert (t.name, t.kind, t.tmdb_id) == ("Severance", "show", 95396)
+    with pytest.raises(Conflict, match="already on the list"):
+        service.add_imdb_title(conn, tmdb, "tt11280740")
+    with pytest.raises(NotFound, match="search by its name instead"):
+        service.add_imdb_title(conn, tmdb, "tt0000001")
+    with pytest.raises(ValidationError, match="the part of an IMDb link after /title/"):
+        service.add_imdb_title(conn, tmdb, "https://www.imdb.com/title/tt11280740/")
+
+
 def test_an_unknown_tmdb_id_is_an_error(conn, tmdb):
     with pytest.raises(RemoteError, match="nothing"):
         service.add_title(conn, tmdb, 5, "movie")
@@ -153,14 +164,17 @@ def test_a_failed_refresh_keeps_the_old_copy(conn, tmdb, tmdb_data):
 
 
 def test_summary_lists_episodes_to_catch_up_and_releases(conn, tmdb, tmdb_data):
-    tmdb_data["/3/tv/95396"]["next_episode_to_air"] = {"season_number": 3, "episode_number": 1, "air_date": SOON, "name": "Back"}
+    tmdb_data["/3/tv/95396"]["next_episode_to_air"] = {
+        "season_number": 3, "episode_number": 1, "air_date": SOON, "name": "Back"
+    }
     show = service.update_title(conn, add_show(conn, tmdb).id, season=2, episode=8)
     service.add_title(conn, tmdb, 1170608, "movie")
     s = service.summary(conn)
     assert s["catch_up"] == [
         {"id": show.id, "name": "Severance", "unwatched": 2, "watched_up_to": "S02E08", "next_to_watch": "S02E09"}
     ]
-    assert [(c["kind"], c["date"], c.get("episode")) for c in s["coming"]] == [("movie", SOON, None), ("show", SOON, "S03E01")]
+    coming = [(c["kind"], c["date"], c.get("episode")) for c in s["coming"]]
+    assert coming == [("movie", SOON, None), ("show", SOON, "S03E01")]
     assert s["counts"] == {"movie": {"to_watch": 1}, "show": {"watching": 1}}
     assert [c["name"] for c in service.summary(conn, days=5)["coming"]] == []
 
@@ -216,7 +230,8 @@ def test_when_the_feed_fails_uploads_come_from_the_videos_page(conn, http, youtu
     service.add_channel(conn, http, "@mkbhd")
     del youtube_data[f"/feeds/videos.xml?channel_id={CHANNEL_ID}"]
     videos, failed = service.new_uploads(conn, http, days=7)
-    assert ([(v.id, v.title, v.channel) for v in videos], failed) == ([("paged", "Paged phone", "Marques Brownlee")], {})
+    assert [(v.id, v.title, v.channel) for v in videos] == [("paged", "Paged phone", "Marques Brownlee")]
+    assert failed == {}
     assert videos[0].published[:10] == (date.today() - timedelta(days=2)).isoformat()
 
 

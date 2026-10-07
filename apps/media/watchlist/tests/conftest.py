@@ -130,6 +130,8 @@ def tmdb_data():
         "/3/tv/95396": copy.deepcopy(SHOW),
         "/3/movie/1170608": copy.deepcopy(MOVIE),
         "/3/search/multi": SEARCH,
+        "/3/find/tt11280740": {"movie_results": [], "tv_results": [SEARCH["results"][0]]},
+        "/3/find/tt0000001": {"movie_results": [], "tv_results": [], "person_results": [{"id": 1}]},
         "/3/search/tv": {"results": [r for r in SEARCH["results"] if r["media_type"] == "tv"]},
     }
 
