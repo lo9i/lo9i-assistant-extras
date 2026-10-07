@@ -1,9 +1,9 @@
-# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is in
-# lo9i's core/mcp/install.py and docs/channel-plugins.md. {dir} is this folder once installed, {uv}
-# the uv lo9i found.
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py and docs/channel-plugins.md. {dir} is this folder once installed, {bin} the
+# scripts of its own environment (built from its uv.lock).
 name: slack
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.1.0
+version: 1.1.1
 description: Chat with the assistant in Slack and get its messages there, and let it search, read and post in your workspace
 # lib/lo9i-chat is installed next to this folder, so the path dependency in pyproject.toml works.
 libraries: [lo9i-chat]
@@ -26,13 +26,10 @@ trusted: false
 
 # The workspace tools: search, read and post as the user. Posting isn't marked read-only, so lo9i
 # asks the user before every post.
-command: "{uv}"
-# uv builds its own environment from uv.lock on the first start, so that start is slow.
-args: [run, --quiet, --project, "{dir}", --frozen, lo9i-slack-mcp]
+command: "{bin}/lo9i-slack-mcp"
 
 # The chat, over Socket Mode, so Slack needs no public URL. lo9i keeps it running while the plugin is
 # on; it talks to lo9i over HTTP (LO9I_URL, LO9I_CHANNEL, LO9I_CHANNEL_TOKEN).
 channel:
-  command: "{uv}"
-  args: [run, --quiet, --project, "{dir}", --frozen, lo9i-slack]
+  command: "{bin}/lo9i-slack"
   style: A Slack DM. Short messages. Markdown is rendered, including code blocks and small tables.

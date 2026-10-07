@@ -1,9 +1,9 @@
-# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format
-# is in lo9i's core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that
-# updates leave alone, {uv} the uv lo9i found.
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that
+# updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: youtube
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.1
+version: 1.0.2
 description: Download YouTube videos, their audio as MP3, and their transcripts
 fields:
   - key: YOUTUBE_DIR
@@ -17,6 +17,4 @@ trusted: true
 # Trusted: the downloads only write files to the download folder, so lo9i doesn't ask before each one.
 # ffmpeg (for MP3s and for joining a video's picture and sound) is the system's, or the one the
 # imageio-ffmpeg package brings.
-command: "{uv}"
-# uv builds its own environment from uv.lock on the first start, so that start is slow.
-args: [run, --quiet, --project, "{dir}", --frozen, youtube-mcp]
+command: "{bin}/youtube-mcp"
