@@ -3,7 +3,7 @@
 # updates leave alone, {uv} the uv lo9i found, {socket} where the web page listens.
 name: watchlist
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.2.0
+version: 0.2.1
 description: Movies and TV shows to watch, how far you are in each show, and the YouTube channels you follow
 fields:
   - {key: TMDB_API_KEY, label: TMDB API key, secret: true, help: https://www.themoviedb.org/settings/api}

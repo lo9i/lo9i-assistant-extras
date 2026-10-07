@@ -1,11 +1,19 @@
 """YouTube channels: finding one from what the user gives (a handle, a link,
-an id), and its latest uploads from the channel's feed, which needs no API
-key. The feed lists a channel's last 15 uploads."""
+an id), and its latest uploads, which need no API key.
+
+Uploads come from the channel's feed, which has their exact times and its
+last 15 uploads. YouTube's feeds fail often, though (404 or 500 for hours,
+for some channels and not others), so when one does they're read from the
+channel's Videos page instead: its last 30 uploads, without Shorts, whose
+times are as near as the page says ("4 days ago").
+"""
 
 import html
+import json
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 import httpx
@@ -22,6 +30,17 @@ NS = {
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Accept-Language": "en"}
 # The cookie skips the consent page YouTube shows some countries first.
 PAGE_HEADERS = {**HEADERS, "Cookie": "SOCS=CAI"}
+# How long ago an upload was, as a channel's Videos page says it: "4 days ago".
+AGO = re.compile(r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago")
+UNIT = {
+    "second": timedelta(seconds=1),
+    "minute": timedelta(minutes=1),
+    "hour": timedelta(hours=1),
+    "day": timedelta(days=1),
+    "week": timedelta(weeks=1),
+    "month": timedelta(days=30),
+    "year": timedelta(days=365),
+}
 
 
 class YoutubeError(Exception):
@@ -94,7 +113,18 @@ def resolve(text: str, http: httpx.Client) -> Found:
 
 
 def uploads(channel_id: str, http: httpx.Client) -> list[Video]:
-    """The channel's latest uploads, newest first."""
+    """The channel's latest uploads, newest first: from its feed, or its
+    Videos page when the feed fails."""
+    try:
+        return _feed_uploads(channel_id, http)
+    except YoutubeError as feed_error:
+        try:
+            return _page_uploads(channel_id, http)
+        except YoutubeError as page_error:
+            raise YoutubeError(f"{feed_error}; its Videos page failed too: {page_error}") from None
+
+
+def _feed_uploads(channel_id: str, http: httpx.Client) -> list[Video]:
     url = f"{FEED}?channel_id={channel_id}"
     try:
         r = http.get(url, headers=HEADERS, timeout=15)
@@ -126,3 +156,55 @@ def uploads(channel_id: str, http: httpx.Client) -> list[Video]:
             )
         )
     return sorted(videos, key=lambda v: v.published, reverse=True)
+
+
+def _page_uploads(channel_id: str, http: httpx.Client) -> list[Video]:
+    """From the data the channel's Videos page is drawn from (ytInitialData)."""
+    page = _fetch(http, f"https://www.youtube.com/channel/{channel_id}/videos")
+    m = re.search(r"var ytInitialData = (\{.*?\});</script>", page, re.S)
+    if m is None:
+        raise YoutubeError(f"the Videos page of channel {channel_id} has no list of videos")
+    try:
+        data = json.loads(m.group(1))
+    except json.JSONDecodeError as e:
+        raise YoutubeError(f"the Videos page of channel {channel_id} isn't readable: {e}") from None
+    channel = data.get("metadata", {}).get("channelMetadataRenderer", {}).get("title") or channel_id
+    now = datetime.now(UTC)
+    videos = []
+    for lockup in _find(data, "lockupViewModel"):
+        if lockup.get("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO" or not lockup.get("contentId"):
+            continue
+        meta = lockup.get("metadata", {}).get("lockupMetadataViewModel", {})
+        labels = [part.get("accessibilityLabel", "") for parts in _find(meta, "metadataParts") for part in parts]
+        age = next((m for label in labels if (m := AGO.search(label))), None)
+        if age is None:
+            continue
+        video_id = lockup["contentId"]
+        videos.append(
+            Video(
+                id=video_id,
+                channel_id=channel_id,
+                channel=channel,
+                title=meta.get("title", {}).get("content", ""),
+                url=f"https://www.youtube.com/watch?v={video_id}",
+                published=(now - int(age.group(1)) * UNIT[age.group(2)]).isoformat(timespec="seconds"),
+                thumbnail=f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+                short=False,
+            )
+        )
+    return sorted(videos, key=lambda v: v.published, reverse=True)
+
+
+def _find(data: object, key: str) -> list:
+    """Every value under `key`, anywhere in decoded JSON."""
+    found = []
+    stack = [data]
+    while stack:
+        o = stack.pop()
+        if isinstance(o, dict):
+            if key in o:
+                found.append(o[key])
+            stack.extend(o.values())
+        elif isinstance(o, list):
+            stack.extend(o)
+    return found
