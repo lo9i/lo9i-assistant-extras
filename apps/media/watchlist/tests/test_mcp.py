@@ -54,6 +54,15 @@ def test_a_movie_has_no_episodes():
     assert payload(movie)["runtime"] == 150
 
 
+def test_a_title_is_added_from_a_tmdb_or_imdb_link():
+    by_imdb, missing = call(
+        ("add_title", {"imdb_id": "tt11280740", "status": "watching"}),
+        ("add_title", {"tmdb_id": 1170608}),
+    )
+    assert (payload(by_imdb)["name"], payload(by_imdb)["status"]) == ("Severance", "watching")
+    assert missing.is_error and "or imdb_id" in missing.content[0].text
+
+
 def test_service_errors_reach_the_model():
     _, again, bad_status = call(
         ("add_title", {"tmdb_id": 95396, "kind": "show"}),

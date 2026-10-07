@@ -63,23 +63,15 @@ class Tmdb:
         it to movies or shows."""
         path = f"/search/{TMDB_KIND[kind]}" if kind else "/search/multi"
         results = self._get(path, query=query, include_adult="false")["results"]
-        found = []
-        for r in results:
-            tmdb_kind = TMDB_KIND[kind] if kind else r.get("media_type")
-            if tmdb_kind not in ("movie", "tv"):
-                continue
-            released = r.get("release_date") or r.get("first_air_date")
-            found.append(
-                Found(
-                    tmdb_id=r["id"],
-                    kind="movie" if tmdb_kind == "movie" else "show",
-                    name=r.get("title") or r.get("name") or "",
-                    year=released[:4] if released else None,
-                    overview=r.get("overview") or "",
-                    poster=_image(r.get("poster_path")),
-                )
-            )
-        return found[:10]
+        found = [_found(r, TMDB_KIND[kind] if kind else r.get("media_type")) for r in results]
+        return [f for f in found if f][:10]
+
+    def find_imdb(self, imdb_id: str) -> Found | None:
+        """The movie or show with this IMDb id (tt…), from an IMDb link."""
+        d = self._get(f"/find/{imdb_id}", external_source="imdb_id")
+        found = [_found(r, "movie") for r in d.get("movie_results", [])]
+        found += [_found(r, "tv") for r in d.get("tv_results", [])]
+        return next((f for f in found if f), None)
 
     def details(self, kind: str, tmdb_id: int) -> tuple[str, dict]:
         """The title's name and what to store about it (Title in models.py)."""
@@ -117,6 +109,21 @@ class Tmdb:
             {"episode": e["episode_number"], "name": e.get("name") or "", "air_date": e.get("air_date") or None}
             for e in d.get("episodes", [])
         ]
+
+
+def _found(r: dict, tmdb_kind: str | None) -> Found | None:
+    """A search or find result, or None when it's neither a movie nor a show (a person)."""
+    if tmdb_kind not in ("movie", "tv"):
+        return None
+    released = r.get("release_date") or r.get("first_air_date")
+    return Found(
+        tmdb_id=r["id"],
+        kind="movie" if tmdb_kind == "movie" else "show",
+        name=r.get("title") or r.get("name") or "",
+        year=released[:4] if released else None,
+        overview=r.get("overview") or "",
+        poster=_image(r.get("poster_path")),
+    )
 
 
 def _image(path: str | None) -> str | None:
