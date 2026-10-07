@@ -4,6 +4,8 @@
 name: youtube
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 1.0.2
+# The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
+format: 2
 description: Download YouTube videos, their audio as MP3, and their transcripts
 fields:
   - key: YOUTUBE_DIR
