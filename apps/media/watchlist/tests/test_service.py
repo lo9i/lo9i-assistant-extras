@@ -212,6 +212,14 @@ def test_new_uploads_are_recent_and_skip_shorts(conn, http):
     assert [v.id for v in videos] == ["new", "short", "old"]
 
 
+def test_when_the_feed_fails_uploads_come_from_the_videos_page(conn, http, youtube_data):
+    service.add_channel(conn, http, "@mkbhd")
+    del youtube_data[f"/feeds/videos.xml?channel_id={CHANNEL_ID}"]
+    videos, failed = service.new_uploads(conn, http, days=7)
+    assert ([(v.id, v.title, v.channel) for v in videos], failed) == ([("paged", "Paged phone", "Marques Brownlee")], {})
+    assert videos[0].published[:10] == (date.today() - timedelta(days=2)).isoformat()
+
+
 def test_a_failing_feed_is_reported_with_the_others_read(conn, http, youtube_data):
     service.add_channel(conn, http, "@mkbhd")
     conn.execute("INSERT INTO channels (id, name, added_at) VALUES ('UCxxxxxxxxxxxxxxxxxxxxxx', 'Gone', 'x')")

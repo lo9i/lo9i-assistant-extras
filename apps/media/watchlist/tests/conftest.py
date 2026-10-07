@@ -3,6 +3,7 @@ transport, so the real clients run without the network. Tests change TMDB's
 answers through the `tmdb_data` fixture."""
 
 import copy
+import json
 from datetime import date, timedelta
 
 import httpx
@@ -45,7 +46,13 @@ MOVIE = {
 }
 SEARCH = {
     "results": [
-        {"id": 95396, "media_type": "tv", "name": "Severance", "first_air_date": "2022-02-17", "poster_path": "/sev.jpg"},
+        {
+            "id": 95396,
+            "media_type": "tv",
+            "name": "Severance",
+            "first_air_date": "2022-02-17",
+            "poster_path": "/sev.jpg",
+        },
         {"id": 1, "media_type": "person", "name": "Someone"},
         {"id": 1170608, "media_type": "movie", "title": "Dune: Part Three", "release_date": SOON},
     ]
@@ -75,6 +82,43 @@ def feed(*entries: tuple[str, str, str, bool]) -> str:
       xmlns="http://www.w3.org/2005/Atom"><title>Marques Brownlee</title>{items}</feed>"""
 
 
+def videos_page(*entries: tuple[str, str, str]) -> str:
+    """A channel's Videos page with (id, title, "4 days ago") entries, in the
+    shape of YouTube's ytInitialData."""
+    lockups = [
+        {
+            "richItemRenderer": {
+                "content": {
+                    "lockupViewModel": {
+                        "contentId": vid,
+                        "contentType": "LOCKUP_CONTENT_TYPE_VIDEO",
+                        "metadata": {
+                            "lockupMetadataViewModel": {
+                                "title": {"content": title},
+                                "metadata": {
+                                    "contentMetadataViewModel": {
+                                        "metadataRows": [
+                                            {
+                                                "metadataParts": [
+                                                    {"text": {"content": "1M"}, "accessibilityLabel": "1M views"},
+                                                    {"text": {"content": "?"}, "accessibilityLabel": age},
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                },
+                            }
+                        },
+                    }
+                }
+            }
+        }
+        for vid, title, age in entries
+    ]
+    data = {"metadata": {"channelMetadataRenderer": {"title": "Marques Brownlee"}}, "contents": lockups}
+    return f"<html><script>var ytInitialData = {json.dumps(data)};</script></html>"
+
+
 def ago(days: int) -> str:
     return (date.today() - timedelta(days=days)).isoformat() + "T12:00:00+00:00"
 
@@ -101,6 +145,9 @@ def youtube_data():
             ("new", "New phone", ago(1), False),
             ("short", "A short", ago(2), True),
             ("old", "Old phone", ago(30), False),
+        ),
+        f"/channel/{CHANNEL_ID}/videos": videos_page(
+            ("paged", "Paged phone", "2 days ago"), ("older", "Older", "1 month ago")
         ),
     }
 
