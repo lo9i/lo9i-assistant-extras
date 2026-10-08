@@ -54,12 +54,11 @@ async def run(task: Task, progress: Progress) -> Outcome:
     """With the Claude token when there is one, else on the user's Copilot plan."""
     token, github_token = _take(TOKEN_ENV), _take(COPILOT_ENV)
     if token:
-        return await _run(task, progress, options(task, auth_env(token), _SHOWN_THINKING))
+        return await _run(task, progress, options(task, auth_env(token)))
     if not github_token:
         raise RuntimeError(_NO_LOGIN)
     async with Relay(github_token).running() as relay:
         progress(note("Using Claude on your GitHub Copilot plan"))
-        # Claude Code's own thinking setting: whether Copilot takes the one that shows it is untested.
         outcome = await _run(task, progress, options(task, relay.claude_env()))
     # Claude Code prices its calls at Anthropic's API rates, which isn't what Copilot charges.
     return replace(outcome, cost_usd=None)
@@ -79,9 +78,10 @@ async def _run(task: Task, progress: Progress, settings: ClaudeAgentOptions) -> 
     return Outcome(ok=not result.is_error, text=text, cost_usd=result.total_cost_usd)
 
 
-def options(task: Task, env: dict[str, str], thinking: ThinkingConfig | None = None) -> ClaudeAgentOptions:
+def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
     """Claude Code as the user runs it: its own system prompt and the user's and the project's settings
-    and CLAUDE.md. It works without asking: the user approved the task when it started."""
+    and CLAUDE.md, with its thinking shown, on a Claude token as on Copilot. It works without asking: the
+    user approved the task when it started."""
     follow_up = bool(task.follow_up_of)
     return ClaudeAgentOptions(
         cwd=task.repository,
@@ -92,7 +92,7 @@ def options(task: Task, env: dict[str, str], thinking: ThinkingConfig | None = N
         resume=task.session if follow_up else None,
         session_id=None if follow_up else task.session,
         max_buffer_size=_MESSAGE_BYTES,
-        thinking=thinking,
+        thinking=_SHOWN_THINKING,
     )
 
 

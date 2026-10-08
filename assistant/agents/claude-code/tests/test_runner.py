@@ -83,13 +83,9 @@ def test_a_subagents_steps_name_the_call_that_started_it():
     assert runner.Steps().of(message) == [Step("tool", tool="Read", detail="/repo/a.py", id="9", within="5")]
 
 
-def test_thinking_is_shown_with_a_claude_token_and_left_as_it_is_on_copilot():
-    env = runner.auth_env("sk-ant-api-x")
-    assert runner.options(_task(), env, runner._SHOWN_THINKING).thinking == {
-        "type": "adaptive",
-        "display": "summarized",
-    }
-    assert runner.options(_task(), env).thinking is None
+def test_thinking_is_shown_as_a_summary():
+    options = runner.options(_task(), runner.auth_env("sk-ant-api-x"))
+    assert options.thinking == {"type": "adaptive", "display": "summarized"}
 
 
 async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environment(monkeypatch):
