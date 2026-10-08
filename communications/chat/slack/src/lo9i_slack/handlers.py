@@ -1,4 +1,5 @@
-"""What the Slack channel sends lo9i from Slack: the owner's DMs, buttons pressed and /new and /home.
+"""What the Slack channel sends lo9i from Slack: the owner's DMs, buttons pressed and slash commands
+(/new, /home, an agent's /claude <folder>).
 lo9i shows what follows in the DM through the stream's operations (channel.py). Only the owner (the
 user who installed the app) is heard; everyone else is ignored."""
 
@@ -22,7 +23,7 @@ class Conversation(Protocol):
 
     async def message(self, chat: str, text: str, files: Sequence[Attachment] = (), voice: bool = False) -> None: ...
     async def press(self, chat: str, message: str, text: str, data: str) -> None: ...
-    async def command(self, command: str) -> str: ...
+    async def command(self, command: str, text: str = "") -> str: ...
 
 
 class Handlers:
@@ -58,7 +59,8 @@ class Handlers:
         if payload.get("user_id") != self._owner_id:
             return {"text": "This assistant only answers the person who set it up."}
         try:
-            return {"text": await self._daemon.command(str(payload.get("command", "")).removeprefix("/"))}
+            name, text = str(payload.get("command", "")).removeprefix("/"), str(payload.get("text", "")).strip()
+            return {"text": await self._daemon.command(name, text)}
         except DaemonError as e:
             return {"text": f"⚠️ {e}"}
 

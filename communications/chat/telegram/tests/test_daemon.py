@@ -55,10 +55,11 @@ async def test_what_the_user_does_goes_to_lo9i():
     daemon = _daemon(lo9i)
     await daemon.message("42", "look", [Attachment("a.jpg", "image/jpeg", b"x")], voice=True)
     await daemon.press("42", "9", "Approve?", "a:i1")
-    assert await daemon.command("home") == "Back home."
+    assert await daemon.command("claude", "~/code/app") == "Back home."
     sent = lo9i.requests[0].content
     assert b'name="chat"\r\n\r\n42' in sent and b'name="voice"\r\n\r\ntrue' in sent and b'filename="a.jpg"' in sent
     assert json.loads(lo9i.requests[1].content) == {"chat": "42", "message": "9", "text": "Approve?", "data": "a:i1"}
+    assert json.loads(lo9i.requests[2].content) == {"command": "claude", "text": "~/code/app"}
     assert [r.url.path for r in lo9i.requests] == [
         "/channels/telegram/messages",
         "/channels/telegram/presses",
@@ -81,8 +82,12 @@ class FakeChannel:
     def __init__(self):
         self.names, self.done = [], asyncio.Event()
 
-    async def hello(self, assistant_name):
+    async def hello(self, assistant_name, commands):
         self.names.append(assistant_name)
+        self.offered = commands
+
+    async def commands(self, commands):
+        self.offered = commands
 
     async def renamed(self, assistant_name):
         self.names.append(assistant_name)
@@ -100,7 +105,9 @@ class FakeChannel:
 async def test_each_operation_is_confirmed_with_its_result_or_its_error():
     sent = {"id": "op1", "chat": "42", "text": "hi"}
     broadcast = {"id": "op2", "chat": "", "text": "hi"}
-    lo9i = FakeLo9i(_sse(("hello", {"assistant_name": "Max"}), ("send", sent), ("send", broadcast)))
+    claude = [{"command": "claude", "description": "Hand this conversation to Claude Code"}]
+    events = [("hello", {"assistant_name": "Max", "commands": []}), ("commands", {"commands": claude})]
+    lo9i = FakeLo9i(_sse(*events, ("send", sent), ("send", broadcast)))
     channel = FakeChannel()
     running = asyncio.create_task(Runner(_daemon(lo9i), channel, LIMITS).run())
     for _ in range(100):
@@ -113,4 +120,4 @@ async def test_each_operation_is_confirmed_with_its_result_or_its_error():
         "op1": {"error": "", "message": "1001"},
         "op2": {"error": "No Telegram account is paired yet.", "message": ""},
     }
-    assert channel.names == ["Max"]
+    assert channel.names == ["Max"] and channel.offered == claude

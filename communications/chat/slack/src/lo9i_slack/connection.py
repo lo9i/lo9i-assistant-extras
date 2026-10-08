@@ -52,8 +52,17 @@ class Owner:
     name: str
 
 
-def manifest(name: str) -> str:
-    """The app manifest to paste in Slack's "Create New App → From a manifest"."""
+# Until lo9i says which commands there are (its stream's `hello`).
+_COMMANDS = [
+    {"command": "new", "description": "Start a side conversation"},
+    {"command": "home", "description": "Go back to the home conversation"},
+]
+
+
+def manifest(name: str, commands: list[dict[str, str]] | None = None) -> str:
+    """The app manifest to paste in Slack's "Create New App → From a manifest". Slack offers only the
+    slash commands it lists, so when lo9i's commands change (an agent installed), the app's manifest is
+    updated with this one."""
     app = {
         "display_information": {"name": name, "description": "Personal assistant"},
         "features": {
@@ -63,10 +72,7 @@ def manifest(name: str) -> str:
                 "messages_tab_read_only_enabled": False,
             },
             "bot_user": {"display_name": name, "always_online": True},
-            "slash_commands": [
-                {"command": "/new", "description": "Start a side conversation", "should_escape": False},
-                {"command": "/home", "description": "Go back to the home conversation", "should_escape": False},
-            ],
+            "slash_commands": [_slash(c) for c in commands or _COMMANDS],
         },
         "oauth_config": {"scopes": {"bot": _BOT_SCOPES, "user": _USER_SCOPES}},
         "settings": {
@@ -78,6 +84,10 @@ def manifest(name: str) -> str:
         },
     }
     return json.dumps(app, indent=2)
+
+
+def _slash(command: dict[str, str]) -> dict[str, object]:
+    return {"command": f"/{command['command']}", "description": command["description"], "should_escape": False}
 
 
 async def verify(tokens: Tokens) -> Owner:

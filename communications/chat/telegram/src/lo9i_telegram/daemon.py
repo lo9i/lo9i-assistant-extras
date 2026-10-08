@@ -92,9 +92,10 @@ class Daemon:
         """A button pressed on `message`, whose text is `text`."""
         await self._request("POST", "/presses", json={"chat": chat, "message": message, "text": text, "data": data})
 
-    async def command(self, command: str) -> str:
-        """`command` without its slash; returns what to answer."""
-        return str((await self._request("POST", "/commands", json={"command": command})).json()["text"])
+    async def command(self, command: str, text: str = "") -> str:
+        """`command` without its slash, and what follows it; returns what to answer."""
+        response = await self._request("POST", "/commands", json={"command": command, "text": text})
+        return str(response.json()["text"])
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         with _errors():

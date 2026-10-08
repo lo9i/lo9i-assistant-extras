@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 
 from telegram import Update
 from telegram.error import TelegramError
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, Updater, filters
+from telegram.ext import Application, CallbackQueryHandler, MessageHandler, Updater, filters
 
 from lo9i_telegram.handlers import Handlers
 
@@ -14,7 +14,8 @@ _MESSAGES = filters.TEXT & ~filters.COMMAND | filters.PHOTO | filters.Document.A
 
 def build_application(token: str, handlers: Handlers) -> Application:
     app = Application.builder().token(token).build()
-    app.add_handler(CommandHandler(["start", "new", "home"], handlers.command))
+    # Every command goes to lo9i, which knows them: /new, /home, /start and the agents' (/claude <folder>).
+    app.add_handler(MessageHandler(filters.COMMAND, handlers.command))
     app.add_handler(CallbackQueryHandler(handlers.button))
     app.add_handler(MessageHandler(_MESSAGES, handlers.message))
     app.add_error_handler(handlers.failed)

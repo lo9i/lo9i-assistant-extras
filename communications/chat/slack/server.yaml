@@ -3,7 +3,7 @@
 # scripts of its own environment (built from its uv.lock).
 name: slack
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 2.0.0
+version: 2.1.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Chat with the assistant in Slack and get its messages there, and let it search, read and post in your workspace

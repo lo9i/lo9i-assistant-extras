@@ -22,8 +22,11 @@ class FakeClient:
 
 async def test_hello_names_the_bot_and_shows_the_open_code(tmp_path, bot):
     client, pairing = FakeClient(), await Pairing.load(tmp_path)
-    await TelegramChannel(client, pairing, bot, "Bot: @lo9i_bot").hello("Max")
+    commands = [{"command": "new", "description": "Start a side conversation"}]
+    await TelegramChannel(client, pairing, bot, "Bot: @lo9i_bot").hello("Max", commands)
     assert bot.set_my_name.call_args.args == ("Max",)
+    [menu] = bot.set_my_commands.call_args.args
+    assert [(c.command, c.description) for c in menu] == [("new", "Start a side conversation")]
     assert client.statuses[-1] == [
         ("text", "", "Bot: @lo9i_bot"),
         ("text", "", "Nobody is paired yet."),
@@ -48,7 +51,7 @@ async def test_a_new_code_from_the_app_and_a_pairing_update_the_status(tmp_path,
 async def test_without_a_bot_operations_say_why(tmp_path):
     pairing = await Pairing.load(tmp_path)
     channel = TelegramChannel(FakeClient(), pairing, None, "Telegram refused the bot token.")
-    await channel.hello("Max")
+    await channel.hello("Max", [])
     with pytest.raises(OperationError, match="refused"):
         await channel.operate("send", {"chat": "42", "text": "hi"})
     pairing.close()

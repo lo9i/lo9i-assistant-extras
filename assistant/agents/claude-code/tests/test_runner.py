@@ -4,6 +4,7 @@ import pytest
 from claude_agent_sdk import (
     AssistantMessage,
     ResultMessage,
+    StreamEvent,
     TextBlock,
     ThinkingBlock,
     ToolResultBlock,
@@ -74,6 +75,20 @@ def test_steps_are_its_thinking_what_it_says_and_each_tool_with_its_result():
     assert failed == Step("result", "Error: 1 failed", "Bash", id="1")
     assert long.tool == "TodoWrite" and long.text == "x" * 2000 + "\n…"
     assert steps.of(_result()) == []
+
+
+def test_words_stream_as_deltas_before_their_whole_block():
+    def event(delta, parent=None):
+        return StreamEvent("u", "s", {"type": "content_block_delta", "index": 0, "delta": delta}, parent)
+
+    steps = runner.Steps()
+    assert steps.of(event({"type": "text_delta", "text": "Run"})) == [Step("text_delta", "Run")]
+    assert steps.of(event({"type": "thinking_delta", "thinking": "hm"}, "a1")) == [
+        Step("thinking_delta", "hm", within="a1")
+    ]
+    assert steps.of(event({"type": "input_json_delta", "partial_json": "{"})) == []
+    assert steps.of(StreamEvent("u", "s", {"type": "message_stop"})) == []
+    assert runner.options(_task(), runner.auth_env("sk-ant-api-x")).include_partial_messages
 
 
 def test_a_subagents_steps_name_the_call_that_started_it():

@@ -59,19 +59,21 @@ class FakeClient:
 async def test_the_status_shows_the_workspace_and_a_manifest_that_follows_the_name():
     client = FakeClient()
     channel = SlackChannel(client, None, Owner("Acme", "U1", "ani"))
-    await channel.hello("Max")
+    claude = {"command": "claude", "description": "Hand this conversation to Claude Code"}
+    await channel.hello("Max", [])
     await channel.renamed("Ada")
+    await channel.commands([claude])
     (kind, _, line), (copy_kind, label, manifest) = client.statuses[-1]
     assert (kind, line) == ("text", "Workspace: Acme · owner: ani")
-    assert (copy_kind, label) == ("copy", "App manifest") and json.loads(manifest)["display_information"][
-        "name"
-    ] == "Ada"
+    app = json.loads(manifest)
+    assert (copy_kind, label) == ("copy", "App manifest") and app["display_information"]["name"] == "Ada"
+    assert [c["command"] for c in app["features"]["slash_commands"]] == ["/claude"]
 
 
 async def test_refused_tokens_show_why_and_fail_operations():
     client = FakeClient()
     channel = SlackChannel(client, None, "Slack rejected the bot token: invalid_auth")
-    await channel.hello("Max")
+    await channel.hello("Max", [])
     assert client.statuses[-1][0] == ("text", "", "Slack rejected the bot token: invalid_auth")
     with pytest.raises(OperationError, match="invalid_auth"):
         await channel.operate("send", {"chat": "", "text": "hi"})

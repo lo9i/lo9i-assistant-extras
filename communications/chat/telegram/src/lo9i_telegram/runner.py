@@ -1,6 +1,6 @@
 """Keeps the channel's stream from lo9i open for as long as the process runs, and hands its events to
 the channel: lo9i's name, the apps' setup buttons, and the chat operations, each confirmed with its
-result. While lo9i is away it reconnects, waiting longer after each failure."""
+result, and the commands the channel offers. While lo9i is away it reconnects, waiting longer after each failure."""
 
 import asyncio
 import logging
@@ -19,12 +19,20 @@ class OperationError(Exception):
     """The channel couldn't carry out an operation; the text tells lo9i why."""
 
 
+# What the channel offers: {"command": "new", "description": "..."} each, /new, /home and each agent's.
+Commands = list[dict[str, str]]
+
+
 class Channel(Protocol):
-    async def hello(self, assistant_name: str) -> None:
+    async def hello(self, assistant_name: str, commands: Commands) -> None:
         """The stream opened: the first event of every stream. A good time to send the status."""
         ...
 
     async def renamed(self, assistant_name: str) -> None: ...
+
+    async def commands(self, commands: Commands) -> None:
+        """The commands changed: an agent plugin was installed or removed."""
+        ...
 
     async def action(self, action: str) -> None:
         """The user pressed one of the channel's setup buttons in an app."""
@@ -71,7 +79,9 @@ class Runner:
         if kind in _OPERATIONS:
             self._spawn(self._operate(kind, data))
         elif kind == "hello":
-            await _logged(self._channel.hello(data["assistant_name"]))
+            await _logged(self._channel.hello(data["assistant_name"], data.get("commands", [])))
+        elif kind == "commands":
+            await _logged(self._channel.commands(data["commands"]))
         elif kind == "renamed":
             await _logged(self._channel.renamed(data["assistant_name"]))
         elif kind == "action":

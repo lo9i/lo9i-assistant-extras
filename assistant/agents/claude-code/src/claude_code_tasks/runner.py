@@ -9,6 +9,7 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ResultMessage,
+    StreamEvent,
     TextBlock,
     ThinkingBlock,
     ToolResultBlock,
@@ -93,6 +94,8 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
         session_id=None if follow_up else task.session,
         max_buffer_size=_MESSAGE_BYTES,
         thinking=_SHOWN_THINKING,
+        # Its words as they're written, so lo9i shows them as they come (Steps._words).
+        include_partial_messages=True,
     )
 
 
@@ -109,6 +112,8 @@ class Steps:
         self._tools: dict[str, str] = {}
 
     def of(self, message: object) -> list[Step]:
+        if isinstance(message, StreamEvent):
+            return _words(message)
         if isinstance(message, AssistantMessage):
             within = message.parent_tool_use_id or ""
             return [step for block in message.content if (step := self._said(block, within))]
@@ -131,6 +136,18 @@ class Steps:
         text = _output(block.content)
         tool = self._tools.pop(block.tool_use_id, "")
         return Step("result", f"Error: {text}" if block.is_error else text, tool, id=block.tool_use_id, within=within)
+
+
+def _words(event: StreamEvent) -> list[Step]:
+    """The words of a text or a thinking as they stream; the whole block follows in an AssistantMessage."""
+    data = event.event
+    delta = data.get("delta", {}) if data.get("type") == "content_block_delta" else {}
+    within = event.parent_tool_use_id or ""
+    if delta.get("type") == "text_delta" and delta.get("text"):
+        return [Step("text_delta", delta["text"], within=within)]
+    if delta.get("type") == "thinking_delta" and delta.get("thinking"):
+        return [Step("thinking_delta", delta["thinking"], within=within)]
+    return []
 
 
 def _output(content: str | list[dict[str, Any]] | None) -> str:

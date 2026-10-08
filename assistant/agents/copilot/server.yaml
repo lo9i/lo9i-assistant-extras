@@ -3,7 +3,7 @@
 # updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: copilot
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 2.0.0
+version: 2.0.1
 # The plugin format (lo9i's core/repositories/formats.py): 3 for the agent's worker.
 format: 3
 description: Hand coding tasks to GitHub Copilot, which works on them on its own in your repositories
@@ -29,3 +29,6 @@ agent:
   worker: "{bin}/copilot-worker"
 env:
   COPILOT_CLI_DIR: "{data}/cli"
+  # Where the CLI finds lo9i's instructions (instructions/lo9i.instructions.md): it runs under lo9i's
+  # daemon, so it must never stop it, and how to restart it instead.
+  COPILOT_CUSTOM_INSTRUCTIONS_DIRS: "{dir}/instructions"

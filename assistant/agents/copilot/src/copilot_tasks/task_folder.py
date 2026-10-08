@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-Kind = Literal["note", "text", "thinking", "tool", "result"]
+Kind = Literal["note", "text", "thinking", "tool", "result", "text_delta", "thinking_delta"]
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,9 @@ class Outcome:
 class Step:
     """One thing the agent does: a note about the task, its text, its thinking, a tool call (`tool` its
     name, `detail` what it's about) or a tool call's result (`tool` the call it ends, `text` its output).
-    `id` is a tool call's id, `within` the id of the call whose subagent took the step."""
+    `text_delta` and `thinking_delta` are the words of a text or thinking as they're written, before the
+    whole of it comes as a `text` or `thinking` step. `id` is a tool call's id, `within` the id of the call
+    whose subagent took the step."""
 
     kind: Kind
     text: str = ""

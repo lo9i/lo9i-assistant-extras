@@ -1,19 +1,20 @@
-"""What the Telegram bot does with lo9i's stream (runner.py): follows the assistant's name, carries out
-chat operations, keeps the apps' status current and opens pairing codes."""
+"""What the Telegram bot does with lo9i's stream (runner.py): follows the assistant's name, shows its
+commands in Telegram's menu, carries out chat operations, keeps the apps' status current and opens
+pairing codes."""
 
 import base64
 import logging
 from collections.abc import Sequence
 from typing import Any, Protocol
 
-from telegram import Bot
+from telegram import Bot, BotCommand
 from telegram.error import TelegramError
 
 from lo9i_telegram.daemon import DaemonError
 from lo9i_telegram.name import BotName
 from lo9i_telegram.pairing import Pairing
 from lo9i_telegram.port import TelegramChat
-from lo9i_telegram.runner import OperationError
+from lo9i_telegram.runner import Commands, OperationError
 from lo9i_telegram.status import NEW_PAIRING_CODE, items
 
 logger = logging.getLogger(__name__)
@@ -39,13 +40,23 @@ class TelegramChannel:
         self._name = BotName()
         pairing.subscribe(self.publish_status)
 
-    async def hello(self, assistant_name: str) -> None:
+    async def hello(self, assistant_name: str, commands: Commands) -> None:
         await self.renamed(assistant_name)
+        await self.commands(commands)
         await self.publish_status()
 
     async def renamed(self, assistant_name: str) -> None:
         if self._bot is not None:
             await self._name.apply(self._bot, assistant_name)
+
+    async def commands(self, commands: Commands) -> None:
+        """Telegram's command menu: /new, /home and each agent's command. Any command typed goes to lo9i."""
+        if self._bot is None:
+            return
+        try:
+            await self._bot.set_my_commands([BotCommand(c["command"], c["description"]) for c in commands])
+        except TelegramError as e:
+            logger.warning("Couldn't set the bot's commands: %s", e)
 
     async def action(self, action: str) -> None:
         if action == NEW_PAIRING_CODE:

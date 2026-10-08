@@ -1,5 +1,7 @@
 """The runner with a fake `copilot`: a script that prints its arguments and what it would do."""
 
+from pathlib import Path
+
 import pytest
 
 from copilot_tasks import cli, runner
@@ -64,3 +66,10 @@ async def test_without_a_token_nothing_runs(fake_cli, repo, monkeypatch):
     monkeypatch.delenv(runner.TOKEN_ENV)
     with pytest.raises(RuntimeError, match="No GitHub token"):
         await runner.run(_task(repo), lambda _: None)
+
+
+def test_the_cli_gets_lo9is_instructions_from_the_plugins_folder():
+    plugin = Path(__file__).parents[1]
+    assert '\n  COPILOT_CUSTOM_INSTRUCTIONS_DIRS: "{dir}/instructions"\n' in (plugin / "server.yaml").read_text()
+    instructions = (plugin / "instructions/lo9i.instructions.md").read_text()
+    assert instructions.startswith('---\napplyTo: "**"\n---\n') and "/system/restart" in instructions

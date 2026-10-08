@@ -20,10 +20,10 @@ class FakeDaemon:
     async def press(self, chat, message, text, data):
         self.presses.append((chat, message, text, data))
 
-    async def command(self, command):
+    async def command(self, command, text=""):
         if self.down:
             raise DaemonUnavailableError("The assistant isn't reachable")
-        self.commands.append(command)
+        self.commands.append((command, text))
         return "Started a side conversation. /home goes back."
 
 
@@ -79,6 +79,7 @@ async def test_commands_are_for_the_owner_only_and_answered_with_lo9is_text():
     started = "Started a side conversation. /home goes back."
     assert (await handlers.command({"user_id": "U1", "command": "/new"}))["text"] == started
     assert "only answers" in (await handlers.command({"user_id": "U2", "command": "/new"}))["text"]
-    assert daemon.commands == ["new"]
+    await handlers.command({"user_id": "U1", "command": "/claude", "text": " ~/code/app "})
+    assert daemon.commands == [("new", ""), ("claude", "~/code/app")]
     daemon.down = True
     assert "isn't reachable" in (await handlers.command({"user_id": "U1", "command": "/home"}))["text"]

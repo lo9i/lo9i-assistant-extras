@@ -1,5 +1,6 @@
-"""Telegram updates from paired accounts, sent to lo9i: messages, buttons pressed and /start, /new and
-/home. lo9i shows what follows in the chat through the stream's operations (channel.py)."""
+"""Telegram updates from paired accounts, sent to lo9i: messages, buttons pressed and commands (/new,
+/home, /start, an agent's /claude <folder>). lo9i shows what follows in the chat through the stream's
+operations (channel.py)."""
 
 import logging
 from collections.abc import Sequence
@@ -21,7 +22,7 @@ class Conversation(Protocol):
 
     async def message(self, chat: str, text: str, files: Sequence[Attachment] = (), voice: bool = False) -> None: ...
     async def press(self, chat: str, message: str, text: str, data: str) -> None: ...
-    async def command(self, command: str) -> str: ...
+    async def command(self, command: str, text: str = "") -> str: ...
 
 
 class Handlers:
@@ -30,12 +31,13 @@ class Handlers:
         self._pairing = pairing
 
     async def command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """/start, /new and /home: lo9i says what to answer."""
+        """Any command, with what follows it (/claude ~/code/app): lo9i says what to answer."""
         message = update.effective_message
         if message is None or not message.text or not is_allowed(self._pairing, update):
             return
-        name = message.text.split()[0].removeprefix("/").split("@")[0]
-        await message.reply_text(await self._daemon.command(name))
+        first, _, rest = message.text.partition(" ")
+        name = first.removeprefix("/").split("@")[0]
+        await message.reply_text(await self._daemon.command(name, rest.strip()))
 
     async def message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         message = update.effective_message
