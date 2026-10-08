@@ -15,7 +15,8 @@ import uuid
 from pathlib import Path
 
 import httpx
-from agent_tasks import Progress
+
+from copilot_tasks.task_folder import Progress, note
 
 VERSION = "1.0.91"
 _REGISTRY = "https://registry.npmjs.org"
@@ -34,7 +35,7 @@ async def ensure(root: Path, progress: Progress, version: str = VERSION) -> Path
     if binary.is_file():
         return binary
     package = f"@github/copilot-{platform_name()}"
-    progress(f"Downloading the Copilot CLI {version} ({package}), once")
+    progress(note(f"Downloading the Copilot CLI {version} ({package}), once"))
     archive = await _download(package, version)
     await asyncio.to_thread(_install, archive, binary)
     return binary

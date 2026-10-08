@@ -15,12 +15,13 @@ from pathlib import Path
 
 from telegram.error import InvalidToken
 
-from lo9i_chat.client import ChannelClient
-from lo9i_chat.runner import Runner
 from lo9i_telegram.bot import build_application, polling
 from lo9i_telegram.channel import TelegramChannel
+from lo9i_telegram.daemon import Daemon
 from lo9i_telegram.handlers import Handlers
 from lo9i_telegram.pairing import Pairing
+from lo9i_telegram.port import LIMITS
+from lo9i_telegram.runner import Runner
 
 logger = logging.getLogger(__name__)
 
@@ -36,27 +37,27 @@ def main() -> None:
 
 
 async def run(environ: Mapping[str, str]) -> None:
-    client = ChannelClient.from_env(environ)
+    daemon = Daemon.from_env(environ)
     pairing = await Pairing.load(Path(environ["TELEGRAM_DATA"]))
     try:
-        await _serve(client, pairing, environ["TELEGRAM_TOKEN"].strip())
+        await _serve(daemon, pairing, environ["TELEGRAM_TOKEN"].strip())
     finally:
         pairing.close()
-        await client.aclose()
+        await daemon.aclose()
 
 
-async def _serve(client: ChannelClient, pairing: Pairing, token: str) -> None:
-    app = build_application(token, Handlers(client, pairing))
+async def _serve(daemon: Daemon, pairing: Pairing, token: str) -> None:
+    app = build_application(token, Handlers(daemon, pairing))
     try:
         await app.initialize()
     except InvalidToken:
         logger.error("Telegram refused the bot token.")
-        await Runner(client, TelegramChannel(client, pairing, None, _REFUSED)).run()
+        await Runner(daemon, TelegramChannel(daemon, pairing, None, _REFUSED), LIMITS).run()
         return
     async with polling(app):
         logger.info("Telegram bot running as @%s.", app.bot.username)
-        channel = TelegramChannel(client, pairing, app.bot, f"Bot: @{app.bot.username}")
-        await Runner(client, channel).run()
+        channel = TelegramChannel(daemon, pairing, app.bot, f"Bot: @{app.bot.username}")
+        await Runner(daemon, channel, LIMITS).run()
 
 
 if __name__ == "__main__":

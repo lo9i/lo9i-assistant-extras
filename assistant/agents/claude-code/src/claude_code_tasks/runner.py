@@ -5,10 +5,21 @@ import os
 from dataclasses import replace
 from typing import Any
 
-from agent_tasks import Outcome, Progress, Task
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, ToolUseBlock, query
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+    query,
+)
+from claude_agent_sdk.types import ThinkingConfig
 
 from claude_code_tasks.relay import Relay
+from claude_code_tasks.task_folder import Outcome, Progress, Step, Task, note
 
 # The plugin's optional field: a Claude token (`claude setup-token`, from a Pro or Max plan) or an
 # Anthropic API key.
@@ -20,6 +31,10 @@ _OAUTH_PREFIX = "sk-ant-oat"
 # Tool inputs that say what a step is about, in the order they're looked for.
 _DETAILS = ("command", "file_path", "path", "pattern", "url", "query", "description")
 _LINE = 200
+# A tool's output is shown shortened: the whole of a file read or a long log would flood the chat.
+_OUTPUT = 2_000
+# Opus 4.7 and later leave their thinking out unless asked for a summary of it.
+_SHOWN_THINKING: ThinkingConfig = {"type": "adaptive", "display": "summarized"}
 # Each message from Claude Code is one JSON line, and a file it reads comes whole in one: a screenshot
 # the user sent is a few MB as base64, past the SDK's default of 1 MB.
 _MESSAGE_BYTES = 64 * 1024 * 1024
@@ -39,20 +54,22 @@ async def run(task: Task, progress: Progress) -> Outcome:
     """With the Claude token when there is one, else on the user's Copilot plan."""
     token, github_token = _take(TOKEN_ENV), _take(COPILOT_ENV)
     if token:
-        return await _run(task, progress, auth_env(token))
+        return await _run(task, progress, options(task, auth_env(token), _SHOWN_THINKING))
     if not github_token:
         raise RuntimeError(_NO_LOGIN)
     async with Relay(github_token).running() as relay:
-        progress("Using Claude on your GitHub Copilot plan")
-        outcome = await _run(task, progress, relay.claude_env())
+        progress(note("Using Claude on your GitHub Copilot plan"))
+        # Claude Code's own thinking setting: whether Copilot takes the one that shows it is untested.
+        outcome = await _run(task, progress, options(task, relay.claude_env()))
     # Claude Code prices its calls at Anthropic's API rates, which isn't what Copilot charges.
     return replace(outcome, cost_usd=None)
 
 
-async def _run(task: Task, progress: Progress, env: dict[str, str]) -> Outcome:
+async def _run(task: Task, progress: Progress, settings: ClaudeAgentOptions) -> Outcome:
     result: ResultMessage | None = None
-    async for message in query(prompt=task.prompt, options=options(task, env)):
-        for step in steps(message):
+    steps = Steps()
+    async for message in query(prompt=task.prompt, options=settings):
+        for step in steps.of(message):
             progress(step)
         if isinstance(message, ResultMessage):
             result = message
@@ -62,7 +79,7 @@ async def _run(task: Task, progress: Progress, env: dict[str, str]) -> Outcome:
     return Outcome(ok=not result.is_error, text=text, cost_usd=result.total_cost_usd)
 
 
-def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
+def options(task: Task, env: dict[str, str], thinking: ThinkingConfig | None = None) -> ClaudeAgentOptions:
     """Claude Code as the user runs it: its own system prompt and the user's and the project's settings
     and CLAUDE.md. It works without asking: the user approved the task when it started."""
     follow_up = bool(task.follow_up_of)
@@ -75,6 +92,7 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
         resume=task.session if follow_up else None,
         session_id=None if follow_up else task.session,
         max_buffer_size=_MESSAGE_BYTES,
+        thinking=thinking,
     )
 
 
@@ -83,19 +101,43 @@ def auth_env(token: str) -> dict[str, str]:
     return {key: token}
 
 
-def steps(message: object) -> list[str]:
-    """Progress lines for a message: what Claude Code says and each tool it uses."""
-    if not isinstance(message, AssistantMessage):
+class Steps:
+    """The steps in Claude Code's messages: its thinking, what it says, each tool call and its result. A
+    result names only its call's id, so the calls' names are kept until their results come."""
+
+    def __init__(self) -> None:
+        self._tools: dict[str, str] = {}
+
+    def of(self, message: object) -> list[Step]:
+        if isinstance(message, AssistantMessage):
+            within = message.parent_tool_use_id or ""
+            return [step for block in message.content if (step := self._said(block, within))]
+        if isinstance(message, UserMessage) and isinstance(message.content, list):
+            within = message.parent_tool_use_id or ""
+            return [self._result(block, within) for block in message.content if isinstance(block, ToolResultBlock)]
         return []
-    return [line for block in message.content if (line := _step(block))]
+
+    def _said(self, block: object, within: str) -> Step | None:
+        if isinstance(block, ToolUseBlock):
+            self._tools[block.id] = block.name
+            return Step("tool", tool=block.name, detail=_detail(block.input), id=block.id, within=within)
+        if isinstance(block, TextBlock) and block.text.strip():
+            return Step("text", block.text.strip(), within=within)
+        if isinstance(block, ThinkingBlock) and block.thinking.strip():
+            return Step("thinking", block.thinking.strip(), within=within)
+        return None
+
+    def _result(self, block: ToolResultBlock, within: str) -> Step:
+        text = _output(block.content)
+        tool = self._tools.pop(block.tool_use_id, "")
+        return Step("result", f"Error: {text}" if block.is_error else text, tool, id=block.tool_use_id, within=within)
 
 
-def _step(block: object) -> str:
-    if isinstance(block, ToolUseBlock):
-        return f"{block.name}: {_detail(block.input)}".rstrip(": ")
-    if isinstance(block, TextBlock) and block.text.strip():
-        return _short(block.text.strip().splitlines()[0])
-    return ""
+def _output(content: str | list[dict[str, Any]] | None) -> str:
+    if isinstance(content, list):
+        content = "\n".join(str(part.get("text", "[image]")) for part in content)
+    text = (content or "").strip()
+    return text if len(text) <= _OUTPUT else text[:_OUTPUT] + "\n…"
 
 
 def _detail(tool_input: dict[str, Any]) -> str:

@@ -6,7 +6,6 @@ requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.14.3",
     "httpx>=0.28.1",
-    "lo9i-chat",
     "mcp>=2.2.0",
     "slack-sdk>=3.44.1",
     "websockets>=16",
@@ -15,9 +14,6 @@ dependencies = [
 [project.scripts]
 lo9i-slack = "lo9i_slack.app:main"
 lo9i-slack-mcp = "lo9i_slack.mcp_server:main"
-
-[tool.uv.sources]
-lo9i-chat = { path = "../../lib/lo9i-chat", editable = true }
 
 [dependency-groups]
 dev = [
@@ -45,4 +41,4 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["lo9i_slack", "lo9i_chat", "tests"]
+known-first-party = ["lo9i_slack", "tests"]

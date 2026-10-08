@@ -3,12 +3,10 @@
 # updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: claude-code
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.3.2
-# The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
-format: 2
+version: 2.0.0
+# The plugin format (lo9i's core/repositories/formats.py): 3 for the agent's worker.
+format: 3
 description: Hand coding tasks to Claude Code, which works on them on its own in your repositories
-# lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
-libraries: [agent-tasks]
 # While the assistant's model is GitHub Copilot, Claude Code runs on that Copilot plan, with nothing to
 # enter here (lo9i's core/mcp/logins.py, relay.py). A Claude token, when given, is used instead.
 model_login: copilot
@@ -24,14 +22,12 @@ steps:
   - "Otherwise, with a Claude Pro or Max plan: on a computer with Claude Code, run claude setup-token and sign in. It prints a token that starts with sk-ant-oat. Or create an API key in the Anthropic Console (sk-ant-api)."
   - "A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts."
 trusted: false
-# /claude <folder> in the apps hands a conversation to Claude Code: lo9i sends each message to converse,
-# which continues the conversation's session in that folder (lib/agent-tasks). It's for that only, so the
-# assistant's model doesn't get it as a tool.
-agent: {command: claude, name: Claude Code, tool: converse}
-exclude: [converse]
-
-# Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker
-# process of its own that outlives this server; their records are under {data}/tasks.
-command: "{bin}/claude-code-tasks"
-env:
-  AGENT_TASKS_DIR: "{data}/tasks"
+# A coding agent (lo9i's docs/agent-plugins.md). lo9i gives the assistant tools to start and follow its
+# tasks (start_task, task_status, list_tasks, stop_task); starting and stopping one ask the user first
+# unless the plugin is trusted. /claude <folder> in the apps hands a conversation to it: each message
+# runs as a task that continues the conversation's session in that folder. lo9i runs the worker for
+# each task, detached, so it outlives a restart; the records are under {data}/tasks.
+agent:
+  command: claude
+  name: Claude Code
+  worker: "{bin}/claude-code-worker"

@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from lo9i_chat.attachments import Attachment
+from lo9i_slack.daemon import Attachment
 
 _TIMEOUT = 60
 

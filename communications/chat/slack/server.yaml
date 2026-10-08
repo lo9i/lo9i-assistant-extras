@@ -3,12 +3,10 @@
 # scripts of its own environment (built from its uv.lock).
 name: slack
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.1.1
+version: 2.0.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Chat with the assistant in Slack and get its messages there, and let it search, read and post in your workspace
-# lib/lo9i-chat is installed next to this folder, so the path dependency in pyproject.toml works.
-libraries: [lo9i-chat]
 # One Slack app, created from manifest.json, gives the three tokens.
 fields:
   - key: SLACK_APP_TOKEN
@@ -34,4 +32,6 @@ command: "{bin}/lo9i-slack-mcp"
 # on; it talks to lo9i over HTTP (LO9I_URL, LO9I_CHANNEL, LO9I_CHANNEL_TOKEN).
 channel:
   command: "{bin}/lo9i-slack"
+  # The channel protocol it speaks (lo9i's docs/channel-plugins.md).
+  protocol: 2
   style: A Slack DM. Short messages. Markdown is rendered, including code blocks and small tables.

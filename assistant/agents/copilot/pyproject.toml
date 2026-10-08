@@ -4,16 +4,11 @@ version = "1.0.0"
 description = "Coding tasks for GitHub Copilot, started and followed from lo9i"
 requires-python = ">=3.12"
 dependencies = [
-    "agent-tasks",
     "httpx>=0.28.1",
-    "mcp>=2.2.0",
 ]
 
 [project.scripts]
-copilot-tasks = "copilot_tasks.server:main"
-
-[tool.uv.sources]
-agent-tasks = { path = "../../lib/agent-tasks", editable = true }
+copilot-worker = "copilot_tasks.worker:main"
 
 [dependency-groups]
 dev = [

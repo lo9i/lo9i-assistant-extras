@@ -1,4 +1,4 @@
-"""ChatPort for a Slack DM (lo9i_chat.port), and the limits a turn keeps there."""
+"""One Slack conversation, as lo9i's chat operations need it, and the limits lo9i keeps there."""
 
 import logging
 from typing import Any
@@ -6,19 +6,21 @@ from typing import Any
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
-from lo9i_chat.port import Buttons
-from lo9i_chat.turn import Limits
+from lo9i_slack.daemon import Limits
 
 logger = logging.getLogger(__name__)
 
 # chat.update allows about 50 calls a minute; a markdown block holds up to 12,000 characters.
-LIMITS = Limits(edit_interval=1.2, stream_limit=3500, chunk=11000)
+# Bots can't send voice notes here.
+LIMITS = Limits(edit_seconds=1.2, draft_limit=3500, message_limit=11000, voice=False)
+# (label, button data), as lo9i sends them.
+Buttons = list[list[str]]
 # The most a section block holds; approval requests show their text in one.
 _SECTION = 3000
 
 
 class SlackChat:
-    """ChatPort for one conversation. Message ids are Slack timestamps. Markdown goes in a markdown
+    """Message ids are Slack timestamps. Markdown goes in a markdown
     block, and is resent as plain text if Slack rejects the block."""
 
     def __init__(self, client: AsyncWebClient, channel: str) -> None:

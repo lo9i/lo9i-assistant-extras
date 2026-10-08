@@ -3,12 +3,10 @@
 # updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: copilot
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.2.1
-# The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
-format: 2
+version: 2.0.0
+# The plugin format (lo9i's core/repositories/formats.py): 3 for the agent's worker.
+format: 3
 description: Hand coding tasks to GitHub Copilot, which works on them on its own in your repositories
-# lib/agent-tasks is installed next to this folder, so the path dependency in pyproject.toml works.
-libraries: [agent-tasks]
 fields:
   - key: COPILOT_GITHUB_TOKEN
     label: GitHub token with Copilot Requests
@@ -20,14 +18,14 @@ steps:
   - "Open the field's link to create a fine-grained personal access token. Under Permissions, add Copilot Requests, then generate it."
   - "Paste it below. A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts. The first task downloads the Copilot CLI (about 150 MB)."
 trusted: false
-# /copilot <folder> in the apps hands a conversation to GitHub Copilot, as /claude does for Claude Code.
-agent: {command: copilot, name: GitHub Copilot, tool: converse}
-exclude: [converse]
-
-# Starting and stopping a task aren't read-only, so lo9i asks the user first. Each task runs in a worker
-# process of its own that outlives this server; their records are under {data}/tasks, the downloaded
-# CLI under {data}/cli.
-command: "{bin}/copilot-tasks"
+# A coding agent (lo9i's docs/agent-plugins.md). lo9i gives the assistant tools to start and follow its
+# tasks; starting and stopping one ask the user first unless the plugin is trusted. /copilot <folder> in
+# the apps hands a conversation to it, as /claude does for Claude Code. lo9i runs the worker for each
+# task, detached, so it outlives a restart; the records are under {data}/tasks, the downloaded CLI under
+# {data}/cli.
+agent:
+  command: copilot
+  name: GitHub Copilot
+  worker: "{bin}/copilot-worker"
 env:
-  AGENT_TASKS_DIR: "{data}/tasks"
   COPILOT_CLI_DIR: "{data}/cli"

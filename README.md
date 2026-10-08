@@ -17,11 +17,8 @@ A plugin folder holds one of:
 A plugin that works only on some systems says so with `platforms:` (`linux`, `macos`) in its `server.yaml` or
 `SKILL.md` header; lo9i doesn't list it anywhere else.
 
-`<group>/lib/<name>/` is a library the group's plugins share, named in their `server.yaml` under
-`libraries:` and installed with them. `communications/lib/lo9i-chat` is what the chat channels share:
-the assistant's channel API, how a run looks in a chat, approval and question buttons.
-`assistant/lib/agent-tasks` is what the coding agents share: each task runs in a detached worker that
-outlives the MCP server, its records in the plugin's data folder, and the tools to start and follow it.
+Plugins share no code: each one is complete in its folder. What lo9i does for them (running a chat, a
+coding agent's tasks) is in lo9i, and they talk to it through the protocols in lo9i's `docs/`.
 
 Install from the app: Plugins in the web app, `/plugins` in the terminal app. **Update** downloads a
 newer version later.
@@ -83,5 +80,6 @@ uv run pytest
 ```
 
 A chat channel (`channel:` in `server.yaml`) is a process lo9i runs that talks to it over HTTP; the
-protocol is in lo9i's `docs/channel-plugins.md`. Plugins depend on a library with a uv path dependency
-on `../../lib/<name>`, which works both here and once installed.
+protocol is in lo9i's `docs/channel-plugins.md`. A coding agent (`agent:`) is a worker lo9i runs for
+each task, which reads the task from a folder and writes its steps and result there; the protocol is in
+lo9i's `docs/agent-plugins.md`.

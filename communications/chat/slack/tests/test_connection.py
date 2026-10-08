@@ -5,9 +5,9 @@ import json
 import pytest
 
 import lo9i_slack.connection as connection
-from lo9i_chat.runner import DeliveryError
 from lo9i_slack.channel import SlackChannel
 from lo9i_slack.connection import Owner, SlackError, Tokens, verify
+from lo9i_slack.runner import OperationError
 
 _ANSWERS = {
     "xoxb-1": {"team_id": "T1", "team": "Acme", "user_id": "B1", "user": "bot"},
@@ -53,7 +53,7 @@ class FakeClient:
         self.statuses = []
 
     async def set_status(self, items):
-        self.statuses.append([(i.kind, i.label, i.value) for i in items])
+        self.statuses.append([(i["kind"], i["label"], i["value"]) for i in items])
 
 
 async def test_the_status_shows_the_workspace_and_a_manifest_that_follows_the_name():
@@ -68,10 +68,10 @@ async def test_the_status_shows_the_workspace_and_a_manifest_that_follows_the_na
     ] == "Ada"
 
 
-async def test_refused_tokens_show_why_and_fail_deliveries():
+async def test_refused_tokens_show_why_and_fail_operations():
     client = FakeClient()
     channel = SlackChannel(client, None, "Slack rejected the bot token: invalid_auth")
     await channel.hello("Max")
     assert client.statuses[-1][0] == ("text", "", "Slack rejected the bot token: invalid_auth")
-    with pytest.raises(DeliveryError, match="invalid_auth"):
-        await channel.deliver("hi")
+    with pytest.raises(OperationError, match="invalid_auth"):
+        await channel.operate("send", {"chat": "", "text": "hi"})

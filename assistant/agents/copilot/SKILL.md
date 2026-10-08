@@ -1,9 +1,9 @@
 ---
 name: copilot
-description: Handing coding work in the user's repositories to GitHub Copilot with the copilot MCP server - bugs, features, refactors, reviews that need reading and changing a lot of code. Use it when the user asks for Copilot, or for coding work too big to do well with bash here.
+description: Handing coding work in the user's repositories to GitHub Copilot with lo9i's task tools - bugs, features, refactors, reviews that need reading and changing a lot of code. Use it when the user asks for Copilot, or for coding work too big to do well with bash here.
 ---
 
-GitHub Copilot is a coding agent. The `copilot` MCP server's tools (`mcp__copilot__<tool>`) hand it a task; it then reads the code, edits files and runs commands in that repository on its own, in the background, and reports. Each task asks the user before it starts. The first one downloads the Copilot CLI, so it starts slowly.
+GitHub Copilot is a coding agent. lo9i's task tools hand it a task (`start_task` with `agent: "copilot"`); it then reads the code, edits files and runs commands in that repository on its own, in the background, and reports. Each task asks the user before it starts unless the plugin is trusted. The first one downloads the Copilot CLI, so it starts slowly.
 
 ## How to work
 

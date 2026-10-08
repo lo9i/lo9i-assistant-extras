@@ -1,9 +1,9 @@
 """The runner with a fake `copilot`: a script that prints its arguments and what it would do."""
 
 import pytest
-from agent_tasks import Task
 
 from copilot_tasks import cli, runner
+from copilot_tasks.task_folder import Task
 
 _FAKE = """#!/bin/sh
 echo "args: $*"
@@ -42,9 +42,10 @@ def _task(repo, follow_up_of=""):
 
 
 async def test_a_task_runs_headless_in_its_session_and_repository(fake_cli, repo):
-    steps = []
-    outcome = await runner.run(_task(repo), steps.append)
-    assert outcome.ok and outcome.text.endswith("Done: fixed the tests.")
+    notes = []
+    outcome = await runner.run(_task(repo), notes.append)
+    steps = [step.text for step in notes if step.kind == "note"]
+    assert outcome.ok and outcome.text.endswith("Done: fixed the tests.") and len(steps) == len(notes)
     args = steps[0]
     assert "--prompt fix the tests --allow-all-tools" in args
     assert "--session-id 6f1c8e2a-0000-4000-8000-000000000000" in args

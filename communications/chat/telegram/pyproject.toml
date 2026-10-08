@@ -4,16 +4,13 @@ version = "1.0.0"
 description = "Chat with the lo9i assistant on Telegram"
 requires-python = ">=3.12"
 dependencies = [
-    "lo9i-chat",
+    "httpx>=0.28",
     "python-telegram-bot>=22",
     "telegramify-markdown>=1.4.0",
 ]
 
 [project.scripts]
 lo9i-telegram = "lo9i_telegram.app:main"
-
-[tool.uv.sources]
-lo9i-chat = { path = "../../lib/lo9i-chat", editable = true }
 
 [dependency-groups]
 dev = [
@@ -41,4 +38,4 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["lo9i_telegram", "lo9i_chat", "tests"]
+known-first-party = ["lo9i_telegram", "tests"]

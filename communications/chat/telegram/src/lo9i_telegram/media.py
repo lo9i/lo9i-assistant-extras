@@ -2,7 +2,7 @@
 
 from telegram import Audio, Document, Message, PhotoSize, Voice
 
-from lo9i_chat.attachments import Attachment
+from lo9i_telegram.daemon import Attachment
 
 
 class UnsupportedMediaError(Exception):

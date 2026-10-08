@@ -15,12 +15,12 @@ from collections.abc import Mapping
 
 from slack_sdk.web.async_client import AsyncWebClient
 
-from lo9i_chat.client import ChannelClient
-from lo9i_chat.runner import Runner
 from lo9i_slack.channel import SlackChannel
 from lo9i_slack.connection import SlackError, SlackUnreachableError, Tokens, verify
+from lo9i_slack.daemon import Daemon
 from lo9i_slack.handlers import Handlers
-from lo9i_slack.sender import SlackSender
+from lo9i_slack.port import LIMITS
+from lo9i_slack.runner import Runner
 from lo9i_slack.socket_mode import Requests, connected
 
 logger = logging.getLogger(__name__)
@@ -36,25 +36,25 @@ def tokens_from(environ: Mapping[str, str]) -> Tokens:
 
 
 async def run(environ: Mapping[str, str]) -> None:
-    client = ChannelClient.from_env(environ)
+    daemon = Daemon.from_env(environ)
     try:
-        await _serve(client, tokens_from(environ))
+        await _serve(daemon, tokens_from(environ))
     finally:
-        await client.aclose()
+        await daemon.aclose()
 
 
-async def _serve(client: ChannelClient, tokens: Tokens) -> None:
+async def _serve(daemon: Daemon, tokens: Tokens) -> None:
     try:
         owner = await verify(tokens)
     except SlackUnreachableError:
         raise
     except SlackError as e:
         logger.error("%s", e)
-        await Runner(client, SlackChannel(client, None, str(e))).run()
+        await Runner(daemon, SlackChannel(daemon, None, str(e)), LIMITS).run()
         return
     web = AsyncWebClient(tokens.bot)
-    async with connected(tokens.app, web, Requests(Handlers(client, web, tokens.bot, owner.id))):
-        await Runner(client, SlackChannel(client, SlackSender(web, owner.id), owner)).run()
+    async with connected(tokens.app, web, Requests(Handlers(daemon, web, tokens.bot, owner.id))):
+        await Runner(daemon, SlackChannel(daemon, web, owner), LIMITS).run()
 
 
 if __name__ == "__main__":

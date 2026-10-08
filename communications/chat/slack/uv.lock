@@ -545,30 +545,12 @@ wheels = [
 ]
 
 [[package]]
-name = "lo9i-chat"
-version = "1.0.0"
-source = { editable = "../../lib/lo9i-chat" }
-dependencies = [
-    { name = "httpx" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "httpx", specifier = ">=0.28.1" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-asyncio", specifier = ">=1.4.0" },
-]
-
-[[package]]
 name = "lo9i-slack"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "httpx" },
-    { name = "lo9i-chat" },
     { name = "mcp" },
     { name = "slack-sdk" },
     { name = "websockets" },
@@ -584,7 +566,6 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.3" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "lo9i-chat", editable = "../../lib/lo9i-chat" },
     { name = "mcp", specifier = ">=2.2.0" },
     { name = "slack-sdk", specifier = ">=3.44.1" },
     { name = "websockets", specifier = ">=16" },

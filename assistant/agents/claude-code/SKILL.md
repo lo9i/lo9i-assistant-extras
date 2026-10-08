@@ -1,9 +1,9 @@
 ---
 name: claude-code
-description: Handing coding work in the user's repositories to Claude Code with the claude-code MCP server - bugs, features, refactors, reviews that need reading and changing a lot of code. Use it when the user asks for Claude Code, or for coding work too big to do well with bash here.
+description: Handing coding work in the user's repositories to Claude Code with lo9i's task tools - bugs, features, refactors, reviews that need reading and changing a lot of code. Use it when the user asks for Claude Code, or for coding work too big to do well with bash here.
 ---
 
-Claude Code is a coding agent. The `claude-code` MCP server's tools (`mcp__claude-code__<tool>`) hand it a task; it then reads the code, edits files and runs commands in that repository on its own, in the background, and reports. Each task asks the user before it starts.
+Claude Code is a coding agent. lo9i's task tools hand it a task (`start_task` with `agent: "claude-code"`); it then reads the code, edits files and runs commands in that repository on its own, in the background, and reports. Each task asks the user before it starts unless the plugin is trusted.
 
 ## How to work
 

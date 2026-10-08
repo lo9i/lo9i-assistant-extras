@@ -51,5 +51,5 @@ async def test_the_cli_is_downloaded_once_per_version(tmp_path, monkeypatch):
     assert binary == tmp_path / "9.9.9" / "copilot" and binary.stat().st_mode & 0o111
     assert await cli.ensure(tmp_path, steps.append, version="9.9.9") == binary
     assert len(downloads) == 1 and downloads[0][0].startswith("@github/copilot-")
-    assert len(steps) == 1 and "Downloading the Copilot CLI 9.9.9" in steps[0]
+    assert len(steps) == 1 and "Downloading the Copilot CLI 9.9.9" in steps[0].text
     assert [p.name for p in binary.parent.iterdir()] == ["copilot"]  # no partial file left

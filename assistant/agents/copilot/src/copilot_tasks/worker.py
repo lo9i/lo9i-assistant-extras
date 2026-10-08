@@ -1,12 +1,10 @@
-"""Runs one task; the MCP server starts it detached with the task's folder (agent_tasks/launch.py)."""
+"""Runs one task. lo9i starts it detached with the task's folder (lo9i's docs/agent-plugins.md)."""
 
-from agent_tasks import worker
-
-from copilot_tasks import runner
+from copilot_tasks import runner, task_folder
 
 
 def main() -> None:
-    worker.main(runner.run)
+    task_folder.main(runner.run)
 
 
 if __name__ == "__main__":

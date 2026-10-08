@@ -5,9 +5,8 @@ import asyncio
 import os
 from pathlib import Path
 
-from agent_tasks import Outcome, Progress, Task
-
 from copilot_tasks import cli
+from copilot_tasks.task_folder import Outcome, Progress, Task, note
 
 # The plugin's field. Copilot reads it as its login and, given in --secret-env-vars, keeps it out of the
 # shells it starts and redacts it from their output.
@@ -59,7 +58,7 @@ async def _follow(process: asyncio.subprocess.Process, progress: Progress) -> li
         line = raw.decode(errors="replace").rstrip()
         lines.append(line)
         if line.strip():
-            progress(line)
+            progress(note(line))
     return lines
 
 

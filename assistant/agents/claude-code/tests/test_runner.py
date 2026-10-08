@@ -1,10 +1,18 @@
 import os
 
 import pytest
-from agent_tasks import Task
-from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock, ToolUseBlock
+from claude_agent_sdk import (
+    AssistantMessage,
+    ResultMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+)
 
 from claude_code_tasks import runner
+from claude_code_tasks.task_folder import Step, Task, note
 
 
 def _task(follow_up_of=""):
@@ -39,23 +47,49 @@ def test_a_plan_token_and_an_api_key_go_in_their_own_variables():
     assert runner.auth_env("sk-ant-api03-x") == {"ANTHROPIC_API_KEY": "sk-ant-api03-x"}
 
 
-def test_progress_shows_what_it_says_and_each_tool_it_uses():
-    message = AssistantMessage(
+def test_steps_are_its_thinking_what_it_says_and_each_tool_with_its_result():
+    steps = runner.Steps()
+    said = AssistantMessage(
         content=[
+            ThinkingBlock("The test expects a list.", "sig"),
             TextBlock("Let me look at the failing test.\nMore detail."),
             ToolUseBlock("1", "Bash", {"command": "pytest -q", "description": "Run tests"}),
-            ToolUseBlock("2", "Edit", {"file_path": "/repo/app.py", "old_string": "a", "new_string": "b"}),
-            ToolUseBlock("3", "TodoWrite", {"todos": []}),
+            ToolUseBlock("2", "TodoWrite", {"todos": []}),
         ],
         model="claude",
     )
-    assert runner.steps(message) == [
-        "Let me look at the failing test.",
-        "Bash: pytest -q",
-        "Edit: /repo/app.py",
-        "TodoWrite",
+    results = UserMessage(
+        content=[
+            ToolResultBlock("1", "1 failed", is_error=True),
+            ToolResultBlock("2", [{"type": "text", "text": "x" * 3000}]),
+        ]
+    )
+    assert steps.of(said) == [
+        Step("thinking", "The test expects a list."),
+        Step("text", "Let me look at the failing test.\nMore detail."),
+        Step("tool", tool="Bash", detail="pytest -q", id="1"),
+        Step("tool", tool="TodoWrite", id="2"),
     ]
-    assert runner.steps(_result()) == []
+    failed, long = steps.of(results)
+    assert failed == Step("result", "Error: 1 failed", "Bash", id="1")
+    assert long.tool == "TodoWrite" and long.text == "x" * 2000 + "\n…"
+    assert steps.of(_result()) == []
+
+
+def test_a_subagents_steps_name_the_call_that_started_it():
+    message = AssistantMessage(
+        content=[ToolUseBlock("9", "Read", {"file_path": "/repo/a.py"})], model="c", parent_tool_use_id="5"
+    )
+    assert runner.Steps().of(message) == [Step("tool", tool="Read", detail="/repo/a.py", id="9", within="5")]
+
+
+def test_thinking_is_shown_with_a_claude_token_and_left_as_it_is_on_copilot():
+    env = runner.auth_env("sk-ant-api-x")
+    assert runner.options(_task(), env, runner._SHOWN_THINKING).thinking == {
+        "type": "adaptive",
+        "display": "summarized",
+    }
+    assert runner.options(_task(), env).thinking is None
 
 
 async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environment(monkeypatch):
@@ -71,7 +105,9 @@ async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environme
     steps = []
     outcome = await runner.run(_task(), steps.append)
     assert outcome.ok and outcome.text == "Fixed 2 tests." and outcome.cost_usd == 0.42
-    assert steps == ["Bash: pytest"] and seen["env"] == {"ANTHROPIC_API_KEY": "sk-ant-api03-x"}
+    assert steps == [Step("tool", tool="Bash", detail="pytest", id="1")] and seen["env"] == {
+        "ANTHROPIC_API_KEY": "sk-ant-api03-x"
+    }
     assert runner.TOKEN_ENV not in os.environ
 
 
@@ -121,4 +157,4 @@ async def test_without_a_claude_token_it_runs_on_copilot_through_the_relay(monke
     outcome = await runner.run(_task(), steps.append)
     assert outcome.ok and outcome.cost_usd is None  # Anthropic's prices aren't what Copilot charges
     assert seen == {"github_token": "ghu_x", "env": {"ANTHROPIC_BASE_URL": "http://127.0.0.1:1"}}
-    assert steps == ["Using Claude on your GitHub Copilot plan"] and runner.COPILOT_ENV not in os.environ
+    assert steps == [note("Using Claude on your GitHub Copilot plan")] and runner.COPILOT_ENV not in os.environ

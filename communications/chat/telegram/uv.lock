@@ -93,28 +93,11 @@ wheels = [
 ]
 
 [[package]]
-name = "lo9i-chat"
-version = "1.0.0"
-source = { editable = "../../lib/lo9i-chat" }
-dependencies = [
-    { name = "httpx" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "httpx", specifier = ">=0.28.1" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-asyncio", specifier = ">=1.4.0" },
-]
-
-[[package]]
 name = "lo9i-telegram"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
-    { name = "lo9i-chat" },
+    { name = "httpx" },
     { name = "python-telegram-bot" },
     { name = "telegramify-markdown" },
 ]
@@ -127,7 +110,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "lo9i-chat", editable = "../../lib/lo9i-chat" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "python-telegram-bot", specifier = ">=22" },
     { name = "telegramify-markdown", specifier = ">=1.4.0" },
 ]
