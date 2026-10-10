@@ -6,7 +6,7 @@ name: contacts
 version: 1.0.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
-description: Look people up in the Contacts on your Mac: their numbers, emails, birthdays and addresses
+description: "Look people up in the Contacts on your Mac: their numbers, emails, birthdays and addresses"
 # Contacts is macOS's: lo9i doesn't list the plugin on other systems.
 platforms: [macos]
 # Shown when installing.
