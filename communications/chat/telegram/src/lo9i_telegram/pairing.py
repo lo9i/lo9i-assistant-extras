@@ -18,6 +18,11 @@ FILE = "telegram.json"
 # Written by lo9i when it moves the accounts paired with its old built-in Telegram here.
 IMPORT_FILE = "import.json"
 LIFETIME = timedelta(minutes=10)
+# Codes look like lo9i-k7m2-p9qx: 31^8 of them, in letters and digits that can't be mistaken for others.
+_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
+_PREFIX = "lo9i-"
+# Wrong codes an account may send before the open code stops working for it.
+MAX_FAILURES = 5
 
 Listener = Callable[[], Awaitable[None]]
 
@@ -36,6 +41,8 @@ class Pairing:
         self._code = ""
         self._expiry: asyncio.Task[None] | None = None
         self._listeners: list[Listener] = []
+        # Wrong codes sent by each account since the open code opened.
+        self._failures: dict[int, int] = {}
 
     @classmethod
     async def load(cls, folder: Path, lifetime: timedelta = LIFETIME) -> "Pairing":
@@ -80,12 +87,19 @@ class Pairing:
         return self._code
 
     async def pair(self, text: str, user_id: int, name: str) -> bool:
-        """Pairs the sender if `text` contains the open pairing code. The code works once."""
-        if not self._code or self._code.lower() not in text.lower():
+        """Pairs the sender if `text` is the open pairing code. The code works once, and not for an
+        account that sent MAX_FAILURES wrong ones; a paired account's messages never use it up."""
+        sent = text.strip().lower()
+        if not self._code or self.allowed(user_id) or not sent.startswith(_PREFIX):
             return False
-        if not self.allowed(user_id):
-            self._users.append(PairedUser(user_id, name))
-            await self._save()
+        if self._failures.get(user_id, 0) >= MAX_FAILURES:
+            logger.warning("Ignored a pairing code from user id %s: too many wrong ones.", user_id)
+            return False
+        if not secrets.compare_digest(sent.encode(), self._code.encode()):
+            self._failures[user_id] = self._failures.get(user_id, 0) + 1
+            return False
+        self._users.append(PairedUser(user_id, name))
+        await self._save()
         self._close()
         await self._changed()
         return True
@@ -96,7 +110,9 @@ class Pairing:
 
     def _open(self) -> None:
         self._close()
-        self._code = f"lo9i-{secrets.randbelow(9000) + 1000}"
+        letters = "".join(secrets.choice(_ALPHABET) for _ in range(8))
+        self._code = f"{_PREFIX}{letters[:4]}-{letters[4:]}"
+        self._failures = {}
         self._expiry = asyncio.create_task(self._expire())
 
     def _close(self) -> None:

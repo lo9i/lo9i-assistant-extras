@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/email`, `communications/phone`, `media/video` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `media/video` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -47,9 +47,12 @@ newer version later.
 - **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
   domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
   Installing it also takes the accounts that were connected by hand before it existed.
+- **contacts** (`communications/contacts/contacts`): the assistant looks people up in the Contacts on
+  your Mac, by name, email or phone number: their numbers, emails, birthday and addresses. It only reads.
+  Mac only, while the assistant runs in your login session.
 - **phone** (`communications/phone/phone`): the assistant calls people with the Phone app on your Mac,
-  through your iPhone, finding their numbers in Contacts. macOS asks you to confirm each call, and you
-  do the talking. Mac only, while the assistant runs in your login session.
+  through your iPhone, with their numbers from the contacts plugin. macOS asks you to confirm each call,
+  and you do the talking. Mac only, while the assistant runs in your login session.
 - **claude-code** (`assistant/agents/claude-code`): hand coding tasks to Claude Code, which works on
   them on its own in the repository you name and reports back. While the assistant's model is GitHub
   Copilot it runs on your Copilot plan, with nothing to enter; otherwise it takes a Claude token (from a

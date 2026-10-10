@@ -98,6 +98,15 @@ def test_an_episode_not_aired_yet_cant_be_watched(conn, tmdb, tmdb_data):
         service.watch_next(conn, t.id)
 
 
+def test_a_special_aired_last_still_counts_the_regular_episodes(conn, tmdb, tmdb_data):
+    show = tmdb_data["/3/tv/95396"]
+    show["seasons"][1]["air_date"], show["seasons"][2]["air_date"] = "2022-02-17", "2025-01-17"
+    show["last_episode_to_air"] = {"season_number": 0, "episode_number": 3, "air_date": "2025-04-01"}
+    t = service.update_title(conn, add_show(conn, tmdb).id, season=2, episode=8)
+    assert (t.last_aired.code, t.unwatched) == ("S02E10", 2)
+    assert service.watch_next(conn, t.id).watched_up_to.code == "S02E09"
+
+
 def test_catching_up_with_an_ended_show_finishes_it(conn, tmdb, tmdb_data):
     tmdb_data["/3/tv/95396"]["status"] = "Ended"
     t = service.update_title(conn, add_show(conn, tmdb).id, season=2, episode=9)

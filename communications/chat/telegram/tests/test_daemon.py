@@ -121,3 +121,17 @@ async def test_each_operation_is_confirmed_with_its_result_or_its_error():
         "op2": {"error": "No Telegram account is paired yet.", "message": ""},
     }
     assert channel.names == ["Max"] and channel.offered == claude
+
+
+async def test_a_malformed_event_is_skipped_and_the_stream_goes_on():
+    events = [("hello", {}), ("send", {"chat": "42"}), ("renamed", {"assistant_name": "Max"})]
+    lo9i = FakeLo9i(_sse(*events, ("send", {"id": "op1", "chat": "42", "text": "hi"})))
+    channel = FakeChannel()
+    running = asyncio.create_task(Runner(_daemon(lo9i), channel, LIMITS).run())
+    for _ in range(100):
+        if any("deliveries" in r.url.path for r in lo9i.requests):
+            break
+        await asyncio.sleep(0.01)
+    running.cancel()
+    assert channel.names == ["Max"]
+    assert [r.url.path.rsplit("/", 1)[1] for r in lo9i.requests if "deliveries" in r.url.path] == ["op1"]

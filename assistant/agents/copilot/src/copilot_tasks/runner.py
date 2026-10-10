@@ -15,6 +15,9 @@ TOKEN_ENV = "COPILOT_GITHUB_TOKEN"
 CLI_DIR_ENV = "COPILOT_CLI_DIR"
 # Lines of its output kept as the result: its final answer and the summary after it.
 _RESULT_LINES = 60
+# The longest line of its output read whole (a file it prints can be one long line); past the default
+# 64 KiB, reading stops with an error.
+_LINE_BYTES = 16 * 1024 * 1024
 
 
 async def run(task: Task, progress: Progress) -> Outcome:
@@ -27,8 +30,15 @@ async def run(task: Task, progress: Progress) -> Outcome:
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        limit=_LINE_BYTES,
     )
-    lines = await _follow(process, progress)
+    try:
+        lines = await _follow(process, progress)
+    except BaseException:
+        # Copilot must not go on working in the repository once the task has ended.
+        process.kill()
+        await process.wait()
+        raise
     code = await process.wait()
     text = "\n".join(lines[-_RESULT_LINES:]).strip() or f"Copilot ended with exit code {code} and no output."
     return Outcome(ok=code == 0, text=text)

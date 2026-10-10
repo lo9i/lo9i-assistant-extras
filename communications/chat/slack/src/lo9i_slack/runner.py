@@ -69,9 +69,14 @@ class Runner:
         try:
             async for kind, data in self._daemon.stream(self._limits):
                 failures = 0
-                await self._dispatch(kind, data)
+                try:
+                    await self._dispatch(kind, data)
+                except (KeyError, TypeError, ValueError):
+                    logger.exception("Ignored a malformed %s event from the assistant", kind)
         except DaemonUnavailableError as e:
             logger.warning("%s", e)
+        except ValueError as e:
+            logger.warning("The stream from the assistant isn't readable: %s", e)
         return failures
 
     async def _dispatch(self, kind: str, data: dict[str, Any]) -> None:
@@ -89,6 +94,9 @@ class Runner:
 
     async def _operate(self, kind: str, data: dict[str, Any]) -> None:
         """Whatever the channel raises is the operation's error, so lo9i knows why it failed."""
+        if not (operation := data.get("id")):
+            logger.warning("Ignored a %s operation without an id", kind)
+            return
         message, error = "", ""
         try:
             message = await self._channel.operate(kind, data)
@@ -96,7 +104,7 @@ class Runner:
             logger.warning("%s failed: %s", kind, e)
             error = str(e) or type(e).__name__
         try:
-            await self._daemon.done(data["id"], error, message)
+            await self._daemon.done(operation, error, message)
         except DaemonError as e:
             logger.warning("Couldn't report %s: %s", kind, e)
 

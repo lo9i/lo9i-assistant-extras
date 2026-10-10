@@ -68,7 +68,7 @@ async def get_conn(request: Request) -> AsyncIterator[sqlite3.Connection]:
         browser = currency.guess(request.headers.get("accept-language", ""))
         request.state.currency = currency.ensure(conn, browser)
         path = request.url.path.removeprefix(request.scope.get("root_path", ""))
-        if request.state.currency is None and path != "/settings":
+        if request.state.currency is None and path not in ("/settings", "/settings/formats"):
             raise NoCurrency
         recurring.generate(conn)
         yield conn

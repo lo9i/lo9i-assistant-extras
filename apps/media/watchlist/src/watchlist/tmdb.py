@@ -7,6 +7,7 @@ both.
 """
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 import httpx
@@ -97,7 +98,7 @@ class Tmdb:
             **info,
             "runtime": runtimes[0] if runtimes else None,
             "seasons": seasons,
-            "last_aired": _episode(d.get("last_episode_to_air")),
+            "last_aired": _last_aired(d),
             "next_airing": _episode(d.get("next_episode_to_air")),
         }
 
@@ -128,6 +129,25 @@ def _found(r: dict, tmdb_kind: str | None) -> Found | None:
 
 def _image(path: str | None) -> str | None:
     return f"{IMAGES}{path}" if path else None
+
+
+def _last_aired(d: dict) -> dict | None:
+    """The last regular episode aired. When TMDB's last one is a special
+    (season 0, which isn't counted among the seasons), it's the end of the
+    latest season that had started airing by the special's date."""
+    last = _episode(d.get("last_episode_to_air"))
+    if last is None or last["season"] != 0:
+        return last
+    by = last["air_date"] or date.today().isoformat()
+    started = [
+        s
+        for s in d.get("seasons", [])
+        if s.get("season_number") and s.get("episode_count") and s.get("air_date") and s["air_date"] <= by
+    ]
+    if not started:
+        return None
+    season = max(started, key=lambda s: s["season_number"])
+    return {"season": season["season_number"], "episode": season["episode_count"], "air_date": None, "name": ""}
 
 
 def _episode(e: dict | None) -> dict | None:

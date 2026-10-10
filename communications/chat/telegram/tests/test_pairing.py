@@ -3,9 +3,10 @@ and accounts imported from lo9i's old built-in Telegram."""
 
 import asyncio
 import json
+import re
 from datetime import timedelta
 
-from lo9i_telegram.pairing import FILE, IMPORT_FILE, Pairing
+from lo9i_telegram.pairing import FILE, IMPORT_FILE, MAX_FAILURES, Pairing
 
 
 async def test_a_code_is_open_while_nobody_is_paired_and_works_once(tmp_path):
@@ -17,13 +18,33 @@ async def test_a_code_is_open_while_nobody_is_paired_and_works_once(tmp_path):
 
     pairing.subscribe(changed)
     code = pairing.code
-    assert code.startswith("lo9i-")
+    assert re.fullmatch(r"lo9i-[2-9a-z]{4}-[2-9a-z]{4}", code)
     assert not await pairing.pair("hi lo9i-0000", 666, "Stranger")
-    assert await pairing.pair(f"code {code.upper()}", 222, "Ani")
+    assert not await pairing.pair(f"here it is: {code}", 666, "Stranger")
+    assert await pairing.pair(f" {code.upper()} ", 222, "Ani")
     assert not await pairing.pair(code, 333, "Other")
     assert pairing.allowed(222) and not pairing.allowed(333) and pairing.code == ""
     assert changes == [""]
     assert json.loads((tmp_path / FILE).read_text()) == {"users": [{"id": 222, "name": "Ani"}]}
+    pairing.close()
+
+
+async def test_an_account_guessing_codes_is_stopped(tmp_path):
+    pairing = await Pairing.load(tmp_path)
+    for _ in range(MAX_FAILURES):
+        assert not await pairing.pair("lo9i-aaaa-aaaa", 666, "Stranger")
+    assert not await pairing.pair(pairing.code, 666, "Stranger")
+    assert not pairing.allowed(666)
+    assert await pairing.pair(pairing.code, 222, "Ani")
+    pairing.close()
+
+
+async def test_a_paired_account_doesnt_use_up_the_code(tmp_path):
+    (tmp_path / FILE).write_text(json.dumps({"users": [{"id": 222, "name": "Ani"}]}))
+    pairing = await Pairing.load(tmp_path)
+    code = await pairing.open()
+    assert not await pairing.pair(code, 222, "Ani")
+    assert pairing.code == code
     pairing.close()
 
 

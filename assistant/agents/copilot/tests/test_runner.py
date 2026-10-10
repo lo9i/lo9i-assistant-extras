@@ -1,5 +1,6 @@
 """The runner with a fake `copilot`: a script that prints its arguments and what it would do."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -66,6 +67,26 @@ async def test_without_a_token_nothing_runs(fake_cli, repo, monkeypatch):
     monkeypatch.delenv(runner.TOKEN_ENV)
     with pytest.raises(RuntimeError, match="No GitHub token"):
         await runner.run(_task(repo), lambda _: None)
+
+
+async def test_a_long_line_of_output_is_read_whole(fake_cli, repo):
+    fake_cli.write_text('#!/bin/sh\nhead -c 200000 /dev/zero | tr "\\0" x\necho\necho "Done."\n')
+    notes = []
+    outcome = await runner.run(_task(repo), notes.append)
+    assert outcome.ok and len(notes[0].text) == 200_000 and outcome.text.endswith("Done.")
+
+
+async def test_copilot_is_stopped_when_following_it_fails(fake_cli, repo, tmp_path):
+    pid_file = tmp_path / "pid"
+    fake_cli.write_text(f'#!/bin/sh\necho $$ > {pid_file}\necho "Working"\nexec sleep 30\n')
+
+    def progress(step):
+        raise OSError("the task folder is gone")
+
+    with pytest.raises(OSError):
+        await runner.run(_task(repo), progress)
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pid_file.read_text()), 0)
 
 
 def test_the_cli_gets_lo9is_instructions_from_the_plugins_folder():

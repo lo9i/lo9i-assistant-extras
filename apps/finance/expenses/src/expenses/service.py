@@ -70,12 +70,13 @@ def _amount(a: float) -> float:
 
 
 def _date(d: str) -> str:
+    """Only YYYY-MM-DD: fromisoformat also takes 20261008 and week dates (2026-W41-3)."""
     d = d.strip()
     try:
-        date.fromisoformat(d)
+        valid = date.fromisoformat(d).isoformat() == d
     except ValueError:
-        raise ValidationError(f'due_date must be YYYY-MM-DD, got "{d}"') from None
-    if len(d) != 10:
+        valid = False
+    if not valid:
         raise ValidationError(f'due_date must be YYYY-MM-DD, got "{d}"')
     return d
 
@@ -83,10 +84,10 @@ def _date(d: str) -> str:
 def _period(p: str) -> str:
     p = p.strip()
     try:
-        date.fromisoformat(f"{p}-01")
+        valid = date.fromisoformat(f"{p}-01").isoformat()[:7] == p
     except ValueError:
-        raise ValidationError(f'period must be YYYY-MM, got "{p}"') from None
-    if len(p) != 7:
+        valid = False
+    if not valid:
         raise ValidationError(f'period must be YYYY-MM, got "{p}"')
     return p
 
@@ -340,7 +341,8 @@ def update_obligation(
     today: date | None = None,
 ) -> Obligation:
     """`due_day=None` stops it repeating. `expected_amount=None` goes back to
-    estimating from the last bill. `metadata` replaces the stored object."""
+    estimating from the last bill. `metadata` replaces the stored object.
+    Pending bills made ahead of time follow a new due day or fixed amount."""
     cur = get_obligation(conn, id)
     fields: dict[str, Any] = {}
     if name is not UNSET:
@@ -364,9 +366,32 @@ def update_obligation(
         if category is not UNSET:
             fields["category"] = _category(conn, category)
         repo.update_obligation(conn, id, fields)
+        _reschedule_bills(conn, cur, fields, today or date.today())
         if fields.get("due_day", cur.due_day) is not None:
             recurring._generate(conn, today or date.today())
     return get_obligation(conn, id)
+
+
+def _reschedule_bills(conn: sqlite3.Connection, before: Obligation, fields: dict[str, Any], today: date) -> None:
+    """Pending bills from this month on take a new due day or fixed amount,
+    where they still have the schedule's: the old due date, an estimate or
+    the old fixed amount. A date or amount the user gave stays."""
+    new_day = fields.get("due_day")
+    day_changed = new_day is not None and before.due_day is not None and new_day != before.due_day
+    amount_changed = "expected_amount" in fields and fields["expected_amount"] != before.expected_amount
+    if not (day_changed or amount_changed):
+        return
+    for b in repo.list_bills(conn, status="pending"):
+        if b.obligation_id != before.id or b.period < recurring.period_of(today):
+            continue
+        changes: dict[str, Any] = {}
+        year, month = int(b.period[:4]), int(b.period[5:])
+        if day_changed and b.due_date == recurring.due_date_in(year, month, before.due_day).isoformat():
+            changes["due_date"] = recurring.due_date_in(year, month, new_day).isoformat()
+        if amount_changed and (b.estimated or b.amount == before.expected_amount):
+            expected = fields["expected_amount"]
+            changes |= {"estimated": True} if expected is None else {"amount": expected, "estimated": False}
+        repo.update_bill(conn, b.id, changes)
 
 
 def remove_obligation(conn: sqlite3.Connection, id: int) -> None:

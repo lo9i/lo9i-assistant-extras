@@ -20,7 +20,7 @@ def is_allowed(pairing: Pairing, update: Update) -> bool:
 
 
 async def try_pairing(pairing: Pairing, update: Update) -> bool:
-    """Pairs the sender when the message holds the open pairing code, and confirms in the chat."""
+    """Pairs the sender when the message is the open pairing code, and confirms in the chat."""
     user, message = update.effective_user, update.effective_message
     if user is None or message is None or not message.text:
         return False

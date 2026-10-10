@@ -64,6 +64,9 @@ def test_with_nothing_to_guess_from_the_first_visit_asks_for_the_currency(tmp_pa
     first = c.get("/", headers={"X-Forwarded-Prefix": "/expenses"}, follow_redirects=False)
     assert (first.status_code, first.headers["location"]) == (303, "/expenses/settings")
     assert c.post("/bills", headers=HX).headers["HX-Redirect"] == "/settings"
+    # Picking a currency on the settings page lists its number formats, not a reload of the page.
+    formats = c.get("/settings/formats", headers=HX, params={"currency": "gbp"})
+    assert "HX-Redirect" not in formats.headers and 'value="en_GB"' in formats.text
     assert "Saved" in c.post("/settings", headers=HX, data={"currency": "gbp", "locale": "en_GB"}).text
     assert c.get("/", follow_redirects=False).status_code == 200
 

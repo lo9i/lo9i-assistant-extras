@@ -107,6 +107,23 @@ def test_obligation_with_bills_cannot_be_removed(conn):
         service.remove_obligation(conn, luz.id)
 
 
+def test_bills_made_ahead_follow_a_new_due_day_and_amount(conn):
+    rent = ob(conn, "Rent", due_day=10, expected_amount=1000)
+    service.update_obligation(conn, rent.id, due_day=15, expected_amount=1200, today=TODAY)
+    b = repo.find_period_bill(conn, rent.id, "2026-10")
+    assert (b.due_date, b.amount, b.estimated) == ("2026-10-15", 1200, False)
+    service.update_obligation(conn, rent.id, expected_amount=None, today=TODAY)
+    assert repo.find_period_bill(conn, rent.id, "2026-10").estimated
+
+
+def test_a_bill_the_user_gave_keeps_its_date_and_amount(conn):
+    rent = ob(conn, "Rent", due_day=10, expected_amount=1000)
+    service.add_bill(conn, 1050, "2026-10-12", obligation_id=rent.id)
+    service.update_obligation(conn, rent.id, due_day=15, expected_amount=1200, today=TODAY)
+    b = repo.find_period_bill(conn, rent.id, "2026-10")
+    assert (b.due_date, b.amount) == ("2026-10-12", 1050)
+
+
 # --- Bills ---
 
 
@@ -158,6 +175,10 @@ def test_bill_dates_are_validated(conn):
         service.add_bill(conn, 10, "2026-13-01", category="tax")
     with pytest.raises(ValidationError, match="due_date"):
         service.add_bill(conn, 10, "20261001", category="tax")
+    with pytest.raises(ValidationError, match="due_date"):
+        service.add_bill(conn, 10, "2026-W41-3", category="tax")
+    with pytest.raises(ValidationError, match="period"):
+        service.add_bill(conn, 10, "2026-10-01", obligation_id=ob(conn).id, period="2026-W41")
     with pytest.raises(ValidationError, match="amount"):
         service.add_bill(conn, -1, "2026-10-01", category="tax")
 
