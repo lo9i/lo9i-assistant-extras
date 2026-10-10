@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `media/video` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `media/video`, `productivity/calendar` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -64,6 +64,12 @@ newer version later.
   assistant read the transcript to summarize or answer questions about the video. Files go to the
   folder you enter, your Downloads folder by default. ffmpeg and the JavaScript runtime yt-dlp needs
   come with the plugin.
+- **calendar** (`productivity/calendar/calendar`): the assistant reads and manages your calendars: what's on
+  a day or a week, when you're free, and adding, moving or cancelling events (each change asks you
+  first), one occurrence of a repeating event or the whole series. On a Mac it uses the Calendar app's
+  calendars, from every account it has (iCloud, Google, Exchange), while the assistant runs in your login
+  session; anywhere, a CalDAV account (iCloud, Fastmail, Nextcloud) whose server, username and app
+  password you enter when installing it. Its tools and a skill.
 - **programmer** (`assistant/modes/programmer`): a skill for coding in your repositories: read the
   project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
   was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and
@@ -80,6 +86,15 @@ Each plugin folder with code, and each library, is its own uv project:
 ```
 cd apps/finance/expenses
 uv run pytest
+```
+
+Before committing, every plugin is checked the way lo9i reads it: a `server.yaml` lo9i can't read hides
+the whole repository from Plugins, and a plugin outside the category folders is never listed. The
+`.githooks/pre-commit` hook runs the check with a lo9i checkout next to this one (or `LO9I_DIR`); turn
+it on once per clone:
+
+```
+git config core.hooksPath .githooks
 ```
 
 A chat channel (`channel:` in `server.yaml`) is a process lo9i runs that talks to it over HTTP; the

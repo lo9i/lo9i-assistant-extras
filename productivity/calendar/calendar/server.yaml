@@ -1,0 +1,26 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. {bin} is the scripts of its own environment (built from its uv.lock).
+name: calendar
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+# The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
+format: 2
+description: Read and manage your calendars, in the Calendar app on your Mac and on a CalDAV server (iCloud, Fastmail, Nextcloud)
+# No platforms: on a Mac it reads the Calendar app and a CalDAV account; on Linux, the CalDAV account only.
+# All optional: on a Mac the Calendar app's calendars need nothing entered.
+fields:
+  - key: CALDAV_URL
+    label: CalDAV server
+    optional: true
+  - {key: CALDAV_USERNAME, label: CalDAV username, optional: true}
+  - {key: CALDAV_PASSWORD, label: CalDAV app password, secret: true, optional: true}
+# Shown above the fields when installing.
+steps:
+  - "On a Mac, the assistant uses the calendars in the Calendar app, from every account it has (iCloud, Google, Exchange). The first time, macOS asks to allow access to Calendars: choose Allow Full Access. This works while the assistant runs in your login session, not when it was started at boot."
+  - "For calendars the Mac doesn't have, or on Linux, enter a CalDAV account: its server, your username and an app password, which you create in your provider's account settings (not your usual password). iCloud: https://caldav.icloud.com with your Apple ID. Fastmail: https://caldav.fastmail.com. Nextcloud: https://your-server/remote.php/dav. Don't enter an account the Calendar app already has, or its events show twice."
+  - "Google Calendar: add your Google account to the Mac in System Settings → Internet Accounts. Google's own CalDAV needs a Google sign-in this plugin doesn't do."
+trusted: false
+
+# Reading is marked read-only; adding, changing and deleting events isn't, so lo9i asks the user before each
+# one unless they trust the plugin. lo9i gives the server the user's time zone as TZ.
+command: "{bin}/calendar-mcp"

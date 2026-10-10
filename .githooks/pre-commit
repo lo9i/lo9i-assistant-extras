@@ -1,0 +1,12 @@
+#!/bin/sh
+# Checks every plugin the way lo9i reads it (lo9i's core/repositories/check.py), so one lo9i can't read
+# never reaches main: a server.yaml it can't read hides the whole repository from Plugins.
+# Turn it on once per clone: git config core.hooksPath .githooks
+# LO9I_DIR is a lo9i checkout; by default the one next to this repository.
+root="$(git rev-parse --show-toplevel)"
+lo9i="${LO9I_DIR:-$root/../lo9i}"
+if [ ! -f "$lo9i/pyproject.toml" ]; then
+    echo "pre-commit: no lo9i checkout at $lo9i. Set LO9I_DIR to one to check the plugins." >&2
+    exit 1
+fi
+exec uv run --quiet --project "$lo9i" python -m assistant.core.repositories.check "$root"
