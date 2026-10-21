@@ -32,7 +32,7 @@
     {% for b in bills %}
     {% set m = b.period or b.due_date[:7] %}
     {% if filters.scope == 'month' and (loop.first or m != (loop.previtem.period or loop.previtem.due_date[:7])) %}
-    <h3 class="muted small">{{ m }}</h3>
+    <h3 class="muted small">{{ m | month_name }}</h3>
     {% endif %}
     <div class="row {{ b.status }}" id="bill-{{ b.id }}">
       <div class="main">
@@ -40,7 +40,7 @@
           {% if b.asset_id %}<span class="muted">· {{ assets.get(b.asset_id, b.asset_id) }}</span>{% endif %}
         </div>
         <div class="muted small">
-          Due {{ b.due_date }}{% if b.period %} · {{ b.period }}{% endif %} · {{ b.category }}{% if b.provider and b.obligation_id %} · {{ b.provider }}{% endif %}
+          Due {{ b.due_date }}{% if b.period %} · {{ b.period | month_name }}{% endif %} · {{ b.category }}{% if b.provider and b.obligation_id %} · {{ b.provider }}{% endif %}
         </div>
       </div>
       <div class="amount">{{ b.amount | money }}{% if b.estimated %}<span class="est" title="Estimated from the last real bill">est.</span>{% endif %}</div>

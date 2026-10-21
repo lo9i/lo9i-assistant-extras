@@ -149,6 +149,21 @@ def money(ctx: Any, amount: float) -> str:
 templates.env.filters["num"] = input_number
 templates.env.filters["money"] = money
 
+MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
+               "August", "September", "October", "November", "December"]
+
+
+def month_name(ym: str) -> str:
+    """'2026-11' -> 'November 2026'."""
+    try:
+        y, m = ym[:7].split("-")
+        return f"{MONTH_NAMES[int(m) - 1]} {y}"
+    except (ValueError, IndexError):
+        return ym
+
+
+templates.env.filters["month_name"] = month_name
+
 
 def _render(request: Request, template: str, **ctx: Any) -> HTMLResponse:
     return templates.TemplateResponse(request, template, ctx)
