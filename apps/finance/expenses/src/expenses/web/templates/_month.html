@@ -2,7 +2,7 @@
 <section id="month">
   <form id="filters" class="filters" hx-get="./" hx-trigger="change" hx-target="#month" hx-swap="outerHTML" hx-push-url="true">
     <select name="f_scope">
-      <option value="month" {{ 'selected' if filters.scope == 'month' }}>This month + unpaid</option>
+      <option value="month" {{ 'selected' if filters.scope == 'month' }}>This month, next month + unpaid</option>
       <option value="all" {{ 'selected' if filters.scope == 'all' }}>All months</option>
     </select>
     <select name="f_asset">
@@ -30,6 +30,10 @@
 
   <div class="list">
     {% for b in bills %}
+    {% set m = b.period or b.due_date[:7] %}
+    {% if filters.scope == 'month' and (loop.first or m != (loop.previtem.period or loop.previtem.due_date[:7])) %}
+    <h3 class="muted small">{{ m }}</h3>
+    {% endif %}
     <div class="row {{ b.status }}" id="bill-{{ b.id }}">
       <div class="main">
         <div class="title">{{ bill_label(b, obligations) }}

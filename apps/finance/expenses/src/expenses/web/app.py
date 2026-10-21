@@ -70,7 +70,7 @@ async def get_conn(request: Request) -> AsyncIterator[sqlite3.Connection]:
         path = request.url.path.removeprefix(request.scope.get("root_path", ""))
         if request.state.currency is None and path not in ("/settings", "/settings/formats"):
             raise NoCurrency
-        recurring.generate(conn)
+        recurring.generate(conn, months=2)
         yield conn
     finally:
         conn.close()
@@ -204,7 +204,7 @@ def _labels(conn: sqlite3.Connection) -> tuple[dict[int, Obligation], dict[str, 
 
 
 def _month_ctx(conn: sqlite3.Connection, filters: Filters, **extra: Any) -> dict[str, Any]:
-    bills = service.month_bills(conn) if filters.scope == "month" else service.list_bills(conn)
+    bills = service.month_bills(conn, months=2) if filters.scope == "month" else service.list_bills(conn)
     bills = [b for b in bills if filters.keep(b)]
     obligations, assets = _labels(conn)
     return {

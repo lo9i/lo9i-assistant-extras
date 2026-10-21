@@ -418,13 +418,19 @@ def list_bills(
     return repo.list_bills(conn, asset_id, category, status)
 
 
-def month_bills(conn: sqlite3.Connection, today: date | None = None) -> list[Bill]:
-    """This month's bills, plus unpaid ones from earlier months."""
-    this = (today or date.today()).strftime("%Y-%m")
+def month_bills(
+    conn: sqlite3.Connection, today: date | None = None, months: int = 1
+) -> list[Bill]:
+    """This month's bills (and the following `months - 1` months'), plus
+    unpaid ones from earlier months."""
+    today = today or date.today()
+    this = today.strftime("%Y-%m")
+    y, m = today.year, today.month + months - 1
+    last = f"{y + (m - 1) // 12:04d}-{(m - 1) % 12 + 1:02d}"
     out = []
     for b in repo.list_bills(conn):
         month = b.period or b.due_date[:7]
-        if month == this or (month < this and b.status == "pending"):
+        if this <= month <= last or (month < this and b.status == "pending"):
             out.append(b)
     return out
 

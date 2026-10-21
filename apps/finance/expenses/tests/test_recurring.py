@@ -94,3 +94,13 @@ def test_on_schedule_wraps_the_year():
     # Quarterly from November: Nov, Feb, May, Aug.
     months = [m for m in range(1, 13) if recurring.on_schedule(m, 3, 11)]
     assert months == [2, 5, 8, 11]
+
+
+def test_generates_next_month_when_asked(conn):
+    from datetime import date
+    from expenses import recurring, repo, service
+
+    service.add_obligation(conn, name="Gas", category="gas", due_day=4, expected_amount=10.0)
+    recurring.generate(conn, today=date(2026, 12, 21), months=2)
+    assert [b.period for b in repo.list_bills(conn)] == ["2027-01"]
+    assert [b.period for b in service.month_bills(conn, date(2026, 12, 21), months=2)] == ["2027-01"]

@@ -29,23 +29,27 @@ def on_schedule(month: int, every_months: int, anchor_month: int | None) -> bool
     return (month - (anchor_month or 1)) % every_months == 0
 
 
-def generate(conn: sqlite3.Connection, today: date | None = None) -> int:
-    """Create this month's missing bills, then refresh estimates. Returns how
-    many bills were created."""
+def generate(conn: sqlite3.Connection, today: date | None = None, months: int = 1) -> int:
+    """Create this month's missing bills (and the next `months - 1` months'),
+    then refresh estimates. Returns how many bills were created."""
     with conn:
-        return _generate(conn, today or date.today())
+        return _generate(conn, today or date.today(), months)
 
 
-def _generate(conn: sqlite3.Connection, today: date) -> int:
+def _generate(conn: sqlite3.Connection, today: date, months: int = 1) -> int:
     """`generate` without its own transaction, for callers already in one.
 
     A bill whose due date has already passed is not created: if it was real,
     it would have been entered by now."""
     created = 0
-    for ob in repo.list_obligations(conn):
-        if ob.due_day is None or not on_schedule(today.month, ob.every_months, ob.anchor_month):
+    targets = []
+    for i in range(months):
+        m = today.month - 1 + i
+        targets.append((today.year + m // 12, m % 12 + 1))
+    for (year, month), ob in ((t, ob) for t in targets for ob in repo.list_obligations(conn)):
+        if ob.due_day is None or not on_schedule(month, ob.every_months, ob.anchor_month):
             continue
-        due = due_date_in(today.year, today.month, ob.due_day)
+        due = due_date_in(year, month, ob.due_day)
         if due < today:
             continue
         period = period_of(due)
