@@ -53,10 +53,7 @@ class Owner:
 
 
 # Until lo9i says which commands there are (its stream's `hello`).
-_COMMANDS = [
-    {"command": "new", "description": "Start a side conversation"},
-    {"command": "home", "description": "Go back to the home conversation"},
-]
+_COMMANDS = [{"command": "new", "description": "Start a new conversation with your next message"}]
 
 
 def manifest(name: str, commands: list[dict[str, str]] | None = None) -> str:

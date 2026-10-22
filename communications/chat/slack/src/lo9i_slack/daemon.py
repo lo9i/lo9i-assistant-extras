@@ -82,10 +82,19 @@ class Daemon:
         """An operation's result: what went wrong, or the id of the message it sent."""
         await self._request("POST", f"/deliveries/{operation_id}", json={"error": error, "message": message})
 
-    async def message(self, chat: str, text: str, files: Sequence[Attachment] = (), voice: bool = False) -> None:
-        """`voice`: the message was a voice note."""
+    async def message(
+        self,
+        chat: str,
+        text: str,
+        files: Sequence[Attachment] = (),
+        voice: bool = False,
+        reply_to: str = "",
+        message: str = "",
+    ) -> None:
+        """`voice`: the message was a voice note. `reply_to`: the id of the message it replies to, whose
+        conversation it goes on in; `message`: its own id, so replying to it goes on there too."""
         uploads = [("files", (f.name, f.data, f.media_type)) for f in files]
-        form = {"chat": chat, "text": text, "voice": str(voice).lower()}
+        form = {"chat": chat, "text": text, "voice": str(voice).lower(), "reply_to": reply_to, "message": message}
         await self._request("POST", "/messages", data=form, files=uploads)
 
     async def press(self, chat: str, message: str, text: str, data: str) -> None:

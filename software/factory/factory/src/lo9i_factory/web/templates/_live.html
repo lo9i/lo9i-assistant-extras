@@ -1,0 +1,134 @@
+{% from "_macros.html" import bubble, decision_box, log_lines, test_run %}
+{# What changes while the task runs, read again every few seconds then (app.py, live). #}
+<div id="live" class="task-layout"
+     {% if live %}hx-get="tasks/{{ task.id }}/live" hx-trigger="every {{ LIVE_SECONDS }}s" hx-swap="outerHTML"{% endif %}>
+  <div class="main">
+    <div class="status-line">
+      <span class="badge status-{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
+      {% if task.stage != 'done' %}<span class="text-sm muted">at the {{ task.stage }} stage</span>{% endif %}
+      {% if live %}<span class="pulse" title="Updating as it runs"></span>{% endif %}
+      {% if task.reason %}<p class="text-sm warning">{{ task.reason }}</p>{% endif %}
+    </div>
+
+    {% if info.approvals %}
+    <section class="panel attention">
+      <h2>The agent asks</h2>
+      <p class="text-sm muted">It runs on this computer, so it waits for you before each command, network access or file outside its folder.</p>
+      {% for a in info.approvals %}
+      <form class="approval" hx-post="tasks/{{ task.id }}/approvals/{{ a.id }}">
+        <div><span class="badge">{{ a.tool }}</span> <code class="mono text-sm">{{ a.detail }}</code></div>
+        <input class="input sm" name="reason" placeholder="Why, if you deny it (optional)">
+        <button class="btn sm primary" name="allow" value="yes">Allow</button>
+        <button class="btn sm" name="allow" value="no">Deny</button>
+      </form>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if checkpoint %}
+    {% set view = stages | selectattr('checkpoint') | selectattr('checkpoint.id', 'equalto', checkpoint.id) | first %}
+    <section class="panel attention" id="checkpoint">
+      <h2>Your call: {{ CHECKPOINT_LABELS[checkpoint.kind] }}</h2>
+      {% if view and view.decision %}{{ decision_box(view.decision, open=True) }}{% endif %}
+      {% if checkpoint.kind == 'diff' and info.points | selectattr('status', 'equalto', 'open') | list %}
+      <p class="text-sm warning">Points the review left open are listed below.</p>
+      {% endif %}
+      <form class="decide" hx-post="tasks/{{ task.id }}/approve">
+        <textarea class="input" name="comment" rows="2" placeholder="A comment: optional to approve, what to change to reject"></textarea>
+        <div class="actions">
+          <button class="btn primary">Approve</button>
+          <button type="button" class="btn" hx-post="tasks/{{ task.id }}/reject" hx-include="closest form">Reject: do it again</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+
+    {% if info.changes or info.tests %}
+    <section class="panel">
+      <div class="panel-head">
+        <h2>The change</h2>
+        {% if info.editor %}<a class="btn xs" href="{{ info.editor }}">Open in editor</a>{% endif %}
+      </div>
+      {% if info.changes %}
+      <ul class="files mono text-xs">
+        {% for c in info.changes %}
+        <li><span>{{ c.path }}</span>
+          <span>{% if c.added is none %}<span class="muted">binary</span>{% else %}<span class="success">+{{ c.added }}</span> <span class="danger">−{{ c.deleted }}</span>{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if info.diff %}
+      <details class="diff">
+        <summary class="text-sm muted">The whole diff</summary>
+        <pre class="mono text-xs">{% for line in info.diff.splitlines() %}<span class="{{ 'add' if line.startswith('+') and not line.startswith('+++') else 'del' if line.startswith('-') and not line.startswith('---') else 'hunk' if line.startswith('@@') else '' }}">{{ line }}</span>
+{% endfor %}</pre>
+      </details>
+      {% endif %}
+      {% if info.tests %}
+      <h3 class="label">Tests</h3>
+      {% for r in info.tests %}{{ test_run(r) }}{% endfor %}
+      {% endif %}
+      {% if info.points %}
+      <h3 class="label">Review points</h3>
+      <ul class="points text-sm">
+        {% for p in info.points %}
+        <li class="point-{{ p.status }}"><span class="badge {{ 'success' if p.status == 'resolved' else 'warning' if p.status == 'open' else '' }}">{{ p.status }}</span>
+          {{ p.text }}{% if p.reason %}<span class="muted"> — {{ p.reason }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {# Each stage as a chat (SPEC §8), the latest open. #}
+    {% for view in stages %}
+    <details class="stage" {{ 'open' if loop.last }}>
+      <summary>
+        <span class="medium">{{ view.title }}</span>
+        <span class="badge status-{{ view.stage.status }}">{{ STAGE_STATUS_LABELS[view.stage.status] }}</span>
+      </summary>
+      {% for round in view.rounds %}
+      <div class="round">
+        <p class="label">{{ 'Before the debate' if round.number == 0 else 'Round ' ~ round.number }}</p>
+        {% for b in round.bubbles %}{{ bubble(b, review=view.stage.kind == 'review') }}{% endfor %}
+        {% if round.verdict %}
+        <div class="verdict text-sm"><span class="badge role-judge">judge</span> No agreement yet: {{ round.verdict.rationale }}</div>
+        {% endif %}
+      </div>
+      {% else %}
+      {% if not view.log %}<p class="text-sm muted">Nothing yet.</p>{% endif %}
+      {% endfor %}
+      {% if view.log %}{{ log_lines(view.log) }}{% endif %}
+      {% if view.decision and not (checkpoint and view.checkpoint and view.checkpoint.id == checkpoint.id) %}
+      {{ decision_box(view.decision) }}
+      {% endif %}
+      {% if view.checkpoint and view.checkpoint.status != 'pending' %}
+      <p class="text-sm muted">You {{ view.checkpoint.status }} it{% if view.checkpoint.comment %}: “{{ view.checkpoint.comment }}”{% endif %}.</p>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
+
+  <aside class="side">
+    <section class="panel">
+      <h2>Cost</h2>
+      <p class="total">{{ info.costs.usd | usd }}{% if info.costs.requests %} <span class="text-sm muted">+ {{ info.costs.requests }} Copilot requests</span>{% endif %}</p>
+      {% if info.costs.by_stage %}
+      <table class="mini text-xs">
+        {% for stage, c in info.costs.by_stage.items() %}<tr><td>{{ stage or 'other' }}</td><td>{{ c.usd | usd }}{% if c.requests %} · {{ c.requests }} req{% endif %}</td></tr>{% endfor %}
+      </table>
+      <table class="mini text-xs">
+        {% for role, c in info.costs.by_role.items() %}<tr><td><span class="badge role-{{ role }}">{{ role }}</span></td><td>{{ c.usd | usd }}{% if c.requests %} · {{ c.requests }} req{% endif %}</td></tr>{% endfor %}
+      </table>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <h2>Stages</h2>
+      <ol class="timeline text-sm">
+        {% for view in stages %}
+        <li class="status-{{ view.stage.status }}">{{ view.title }} <span class="muted text-xs">{{ STAGE_STATUS_LABELS[view.stage.status] }}</span></li>
+        {% endfor %}
+      </ol>
+    </section>
+  </aside>
+</div>

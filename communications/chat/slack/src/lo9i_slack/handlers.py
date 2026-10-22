@@ -1,5 +1,5 @@
-"""What the Slack channel sends lo9i from Slack: the owner's DMs, buttons pressed and slash commands
-(/new, /home, an agent's /claude <folder>).
+"""What the Slack channel sends lo9i from Slack: the owner's DMs, with the message a thread reply answers,
+buttons pressed and slash commands (/new, an agent's /claude <folder>).
 lo9i shows what follows in the DM through the stream's operations (channel.py). Only the owner (the
 user who installed the app) is heard; everyone else is ignored."""
 
@@ -21,7 +21,15 @@ _MESSAGE_SUBTYPES = {None, "file_share"}
 class Conversation(Protocol):
     """The Daemon calls the handlers need."""
 
-    async def message(self, chat: str, text: str, files: Sequence[Attachment] = (), voice: bool = False) -> None: ...
+    async def message(
+        self,
+        chat: str,
+        text: str,
+        files: Sequence[Attachment] = (),
+        voice: bool = False,
+        reply_to: str = "",
+        message: str = "",
+    ) -> None: ...
     async def press(self, chat: str, message: str, text: str, data: str) -> None: ...
     async def command(self, command: str, text: str = "") -> str: ...
 
@@ -40,8 +48,9 @@ class Handlers:
         attachments = await self._attachments(chat, event.get("files", []))
         if attachments is None:
             return
+        text = html.unescape(event.get("text", ""))
         try:
-            await self._daemon.message(event["channel"], html.unescape(event.get("text", "")), attachments)
+            await self._daemon.message(event["channel"], text, attachments, False, _replied(event), event.get("ts", ""))
         except DaemonError as e:
             await chat.send(f"⚠️ {e}")
 
@@ -82,3 +91,9 @@ class Handlers:
             and not event.get("bot_id")
             and event.get("user") == self._owner_id
         )
+
+
+def _replied(event: dict[str, Any]) -> str:
+    """A reply in a thread answers the thread's first message, whose conversation it goes on in."""
+    thread = str(event.get("thread_ts", ""))
+    return thread if thread != event.get("ts") else ""

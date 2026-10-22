@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block top_actions %}<button class="btn sm" onclick="openDialog('new-task')">+ New task</button>{% endblock %}
+{% block content %}
+<main class="page container wide">
+  {# A column per stage, plus what waits for the user. No dragging: cards move by approve and reject. #}
+  <div class="board">
+    {% for key, label in COLUMNS %}
+    <section class="column" id="column-{{ key }}">
+      <h2>{{ label }} <span class="count">{{ columns[key] | length }}</span></h2>
+      <div class="cards">
+        {% for c in columns[key] %}
+        <a href="tasks/{{ c.task.id }}" class="card">
+          <span class="card-title clamp-2">{{ c.task.title }}</span>
+          <span class="text-xs muted mono clamp-1">{{ c.task.repo | repo_name }} · #{{ c.task.id }}</span>
+          <span class="card-facts">
+            <span class="badge status-{{ c.task.status }}">{{ STATUS_LABELS[c.task.status] }}</span>
+            {% if c.approvals %}<span class="badge warning">{{ c.approvals }} to allow</span>{% endif %}
+            {% if key in ('waiting', 'done') and c.task.stage != 'done' %}<span class="badge">{{ c.task.stage }}</span>{% endif %}
+            <span class="text-xs muted">{{ c.usd | usd }}{% if c.requests %} · {{ c.requests }} req{% endif %}</span>
+          </span>
+          {% if c.task.reason %}<span class="text-xs warning clamp-2">{{ c.task.reason }}</span>{% endif %}
+        </a>
+        {% else %}
+        <p class="text-xs muted none">Nothing here.</p>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}
+{% block dialogs %}
+<dialog id="new-task" class="modal">
+  <h2>New task</h2>
+  {% with form={'run_mode': ''}, error=None %}{% include "_new_task.html" %}{% endwith %}
+</dialog>
+{% endblock %}

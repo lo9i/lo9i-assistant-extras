@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `media/video`, `productivity/calendar` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `media/video`, `productivity/calendar`, `software/factory` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -74,6 +74,17 @@ newer version later.
   project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
   was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and
   review steps (adapted from Hermes Agent's skills) are in `references/`, read when needed.
+- **factory** (`software/factory/factory`): a software factory for a task in one of your local git
+  repositories, or a new project in an empty folder. A team of models, each on the one you pick (Anthropic, OpenAI or your GitHub Copilot
+  plan), debates the spec and then the plan, and a judge decides; you approve or reject each with a
+  comment. Claude Code or Codex then builds it in a worktree of its own, the change's tests and your
+  test command run, the team reviews the diff and sends fixes back, and you approve the final diff,
+  which stays as the branch `factory/<id>-<slug>`: it never merges or pushes. The agent runs in Docker
+  with only its worktree, or on your computer asking you before each command. Every task has a spending
+  limit. You're told at each checkpoint in the web app and on your chat channel (Telegram), and answer
+  there. Its tools, a **Factory** page in the web app (the tasks as a board, each debate as a chat, the
+  diff, the costs, and Settings), and a skill. It asks for an Anthropic or an OpenAI API key, or uses
+  the assistant's Copilot sign-in. How it's built: [`software/factory/SPEC.md`](software/factory/SPEC.md).
 
 ## Versions
 

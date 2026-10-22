@@ -1,0 +1,89 @@
+{# One message of a debate, with its replies under it: questions and votes it raised, answers it got. #}
+{% macro bubble(b, review=False) %}
+{% set m = b.message %}
+<div class="bubble type-{{ m.type }} {{ 'from-user' if m.role == 'user' }}">
+  <div class="who">
+    <span class="badge role-{{ m.role }}">{{ 'you' if m.role == 'user' else m.role }}</span>
+    {% if m.model %}<span class="model mono">{{ m.model }}</span>{% endif %}
+    <span class="kind">{{ {'proposal': 'review' if review else 'proposal', 'revision': 'revised review' if review else 'revised', 'critique': 'critique', 'question': 'asks ' ~ m.to_role,
+                           'answer': 'answers', 'vote': 'votes for ' ~ m.to_role, 'comment': 'comment', 'report': 'report'}[m.type] }}</span>
+  </div>
+  {% set body = m.body %}
+  {% if m.type in ('proposal', 'revision') %}
+    <div class="prose">{{ body.proposal | markdown }}</div>
+    {% if body.risks %}<p class="label">Risks</p><ul class="text-sm">{% for r in body.risks %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+    {% if body.changes %}<p class="text-sm muted"><span class="medium">What changed:</span> {{ body.changes }}</p>{% endif %}
+  {% elif m.type == 'critique' %}
+    {% for c in body.critiques %}
+    <details class="critique" open>
+      <summary class="text-sm medium">Of the {{ c.of }}'s</summary>
+      <p class="text-sm"><span class="success">+</span> {{ c.strengths }}</p>
+      <p class="text-sm"><span class="danger">−</span> {{ c.weaknesses }}</p>
+      <p class="text-sm"><span class="muted">→</span> {{ c.suggestions }}</p>
+    </details>
+    {% endfor %}
+  {% elif m.type == 'question' %}<p class="text-sm">{{ body.question }}</p>
+  {% elif m.type == 'answer' %}<div class="prose text-sm">{{ body.answer | markdown }}</div>
+  {% elif m.type == 'vote' %}<p class="text-sm muted">{{ body.reason }}</p>
+  {% elif m.type == 'report' %}
+    {% if not body.ok %}<p class="text-sm danger">{{ body.error }}</p>{% endif %}
+    <div class="prose text-sm">{{ body.summary | markdown }}</div>
+  {% else %}<p class="text-sm">{{ body.text }}</p>
+  {% endif %}
+  {% if b.replies %}<div class="replies">{% for r in b.replies %}{{ bubble(r, review) }}{% endfor %}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{# How a stage ended: the judge's winner (with the options that lost), or its word on a diff. #}
+{% macro decision_box(d, open=False) %}
+<div class="decision">
+  <div class="who">
+    <span class="badge role-judge">judge</span><span class="model mono">{{ d.model }}</span>
+    {% if d.kind == 'winner' %}
+    <span class="kind">{{ 'merged the proposals' if d.body.winner == 'merged' else 'picked the ' ~ d.body.winner ~ "'s" }}{{ '' if d.body.agreed else ' when the rounds ran out' }}</span>
+    {% else %}
+    <span class="kind">{{ 'accepted the diff' if d.kind == 'accept' else 'sent fixes back' }}</span>
+    {% endif %}
+  </div>
+  <p class="text-sm"><span class="medium">Why:</span> {{ d.rationale }}</p>
+  {% if d.kind == 'winner' %}
+  <details class="result" {{ 'open' if open }}>
+    <summary class="text-sm medium">The decision</summary>
+    <div class="prose">{{ d.body.result | markdown }}</div>
+  </details>
+  {% if d.body.options %}
+  <details class="options">
+    <summary class="text-sm muted">The options that lost ({{ d.body.options | length }})</summary>
+    <ul class="text-sm">{% for o in d.body.options %}<li><span class="badge role-{{ o.role }}">{{ o.role }}</span> {{ o.why_not }}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+  {% elif d.body.points %}
+  <ul class="text-sm">{% for p in d.body.points %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# What the coding agent did, as its log has it. #}
+{% macro log_lines(events) %}
+<div class="log mono text-xs">
+  {% for e in events %}
+  {% if e.type == 'tool' %}<div><span class="tool">{{ e.tool }}</span> {{ e.detail }}</div>
+  {% elif e.type == 'text' %}<div class="said">{{ e.text }}</div>
+  {% elif e.type == 'start' %}<div class="muted">{{ e.agent }} · {{ e.model }} · {{ e.mode }}</div>
+  {% elif e.type == 'tests' %}<div class="tool">$ {{ e.command }}</div>
+  {% else %}<div class="muted">{{ e.text }}</div>{% endif %}
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro test_run(r) %}
+<details class="test-run">
+  <summary class="text-sm">
+    <span class="badge {{ 'success' if r.passed else 'danger' }}">{{ 'passed' if r.passed else 'failed' }}</span>
+    <span class="muted">{{ 'the change\'s tests' if r.kind == 'short' else 'all tests' }}</span>
+    <code class="mono text-xs">{{ r.command }}</code>
+    <span class="muted text-xs">{{ '%.0f' % r.seconds }} s</span>
+  </summary>
+  <pre class="mono text-xs">{{ r.output }}</pre>
+</details>
+{% endmacro %}

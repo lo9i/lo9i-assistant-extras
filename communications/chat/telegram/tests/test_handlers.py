@@ -15,15 +15,15 @@ class FakeDaemon:
     def __init__(self):
         self.messages, self.presses, self.commands = [], [], []
 
-    async def message(self, chat, text, files=(), voice=False):
-        self.messages.append((chat, text, files, voice))
+    async def message(self, chat, text, files=(), voice=False, reply_to="", message=""):
+        self.messages.append((chat, text, files, voice, reply_to, message))
 
     async def press(self, chat, message, text, data):
         self.presses.append((chat, message, text, data))
 
     async def command(self, command, text=""):
         self.commands.append((command, text))
-        return "Back home."
+        return "Your next message starts a new conversation."
 
 
 async def _handlers(tmp_path, daemon):
@@ -62,18 +62,33 @@ async def test_strangers_are_not_heard(tmp_path, bot):
 async def test_a_command_is_answered_with_lo9is_text(tmp_path, bot):
     daemon = FakeDaemon()
     handlers = await _handlers(tmp_path, daemon)
-    message = create_autospec(Message, instance=True, text="/home@lo9i_bot")
+    message = create_autospec(Message, instance=True, text="/new@lo9i_bot")
     await handlers.command(_update(effective_message=message), _context(bot))
     agent = create_autospec(Message, instance=True, text="/claude  ~/code/app ")
     await handlers.command(_update(effective_message=agent), _context(bot))
-    assert daemon.commands == [("home", ""), ("claude", "~/code/app")]
-    assert message.reply_text.call_args.args[0] == "Back home."
+    assert daemon.commands == [("new", ""), ("claude", "~/code/app")]
+    assert message.reply_text.call_args.args[0] == "Your next message starts a new conversation."
 
 
-async def test_a_message_goes_to_lo9i_with_its_chat(tmp_path, bot):
-    daemon = FakeDaemon()
-    message = create_autospec(Message, instance=True, text="hi", caption=None, voice=None, audio=None, chat_id=222)
+def _message(text: str, **fields) -> MagicMock:
+    message = create_autospec(
+        Message, instance=True, text=text, caption=None, voice=None, audio=None, chat_id=222, **fields
+    )
     message.video_note = message.photo = message.document = None
     message.reply_text = AsyncMock()
+    return message
+
+
+async def test_a_message_goes_to_lo9i_with_its_chat_and_id(tmp_path, bot):
+    daemon = FakeDaemon()
+    message = _message("hi", message_id=7, reply_to_message=None)
     await (await _handlers(tmp_path, daemon)).message(_update(effective_message=message), _context(bot))
-    assert daemon.messages == [("222", "hi", [], False)]
+    assert daemon.messages == [("222", "hi", [], False, "", "7")]
+
+
+async def test_a_reply_names_the_message_it_replies_to(tmp_path, bot):
+    daemon = FakeDaemon()
+    replied = create_autospec(Message, instance=True, message_id=5)
+    message = _message("and saturday?", message_id=8, reply_to_message=replied)
+    await (await _handlers(tmp_path, daemon)).message(_update(effective_message=message), _context(bot))
+    assert daemon.messages == [("222", "and saturday?", [], False, "5", "8")]

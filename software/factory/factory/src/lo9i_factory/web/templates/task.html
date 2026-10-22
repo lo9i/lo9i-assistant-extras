@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} · Factory{% endblock %}
+{% block content %}
+<main class="page container">
+  <a href="./" class="back">← Board</a>
+
+  <div class="task-head">
+    <div>
+      <h1>{{ task.title }}</h1>
+      <p class="facts text-xs muted">
+        <span class="mono">#{{ task.id }}</span>
+        <span class="mono" title="{{ task.repo }}">{{ task.repo | repo_name }}</span>
+        <span class="mono">{{ task.branch }}</span>
+        {% if task.run_mode %}<span>{{ task.run_mode }}</span>{% endif %}
+        <span>started {{ task.created_at | ago }}</span>
+      </p>
+    </div>
+    <div class="actions">
+      {% if task.status == 'paused' %}
+      <button class="btn sm primary" hx-post="tasks/{{ task.id }}/resume">Resume</button>
+      {% endif %}
+      {% if task.status not in ('done', 'failed', 'cancelled') %}
+      <button class="btn sm" hx-post="tasks/{{ task.id }}/cancel" hx-confirm="Stop this task? Its history stays.">Cancel</button>
+      {% endif %}
+      <button class="btn sm quiet" hx-post="tasks/{{ task.id }}/delete"
+              hx-confirm="Delete this task and its whole debate, for good? Its branch stays in the repository.">Delete</button>
+    </div>
+  </div>
+
+  <details class="brief">
+    <summary class="text-sm muted">The task as you gave it</summary>
+    <div class="prose text-sm">{{ task.description | markdown }}</div>
+  </details>
+
+  {% include "_live.html" %}
+
+  {% if task.status in ('queued', 'running', 'paused') %}
+  {# The comment box (SPEC §8): outside the part read again while the task runs, so typing isn't lost. #}
+  <form class="comment-box" hx-post="tasks/{{ task.id }}/comment">
+    <textarea class="input" name="text" rows="3" required
+              placeholder="Step into the debate: every member answers before it goes on."></textarea>
+    <button class="btn sm">Comment</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}

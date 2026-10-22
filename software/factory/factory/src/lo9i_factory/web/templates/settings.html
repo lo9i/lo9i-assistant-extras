@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Settings · Factory{% endblock %}
+{% block content %}
+<main class="page container">
+  <div class="section-head">
+    <h1>Settings</h1>
+    <p class="sub">Who's on the team, the coding agent, and the limits every task keeps to.</p>
+  </div>
+
+  <section class="panel">
+    <h2>Providers</h2>
+    <p class="text-sm">
+      {% for name in provider_names %}
+      <span class="badge {{ 'success' if providers[name] else '' }}">{{ name }}: {{ 'ready' if providers[name] else 'no key' }}</span>
+      {% endfor %}
+    </p>
+    <p class="text-xs muted">Keys are entered in the factory plugin's details in Plugins. GitHub Copilot uses the assistant's own sign-in, when its model is Copilot.</p>
+  </section>
+
+  <form class="panel form" hx-post="settings">
+    <h2>The team</h2>
+    <p class="text-xs muted">provider:model for each role: anthropic, openai or copilot, then the model's name.</p>
+    <datalist id="models">{% for m in known_models %}<option value="{{ m }}">{% endfor %}</datalist>
+    <div class="grid-2">
+      {% for role in ROLES %}
+      <label>
+        <span class="label">{{ role }}{% if s.models[role] != defaults['models.' ~ role] %} <span class="warning">· changed</span>{% endif %}</span>
+        <input class="input mono" name="models.{{ role }}" value="{{ s.models[role] }}" list="models" required>
+      </label>
+      {% endfor %}
+    </div>
+
+    <h2>The coding agent</h2>
+    <div class="grid-2">
+      <label>
+        <span class="label">Agent</span>
+        <select class="select" name="agent">
+          {% for a in AGENTS %}<option value="{{ a }}" {{ 'selected' if s.agent == a }}>{{ {'claude-code': 'Claude Code', 'codex': 'Codex'}[a] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>
+        <span class="label">Runs</span>
+        <select class="select" name="run_mode">
+          <option value="docker" {{ 'selected' if s.run_mode == 'docker' }}>In Docker, with only its worktree</option>
+          <option value="local" {{ 'selected' if s.run_mode == 'local' }}>On this computer, asking before each command</option>
+        </select>
+      </label>
+      <label class="span-2">
+        <span class="label">Editor link <span class="muted">({path} is the worktree)</span></span>
+        <input class="input mono" name="editor" value="{{ s.editor }}">
+      </label>
+    </div>
+
+    <h2>Limits</h2>
+    <div class="grid-3">
+      <label><span class="label">Debate rounds</span><input class="input" type="number" min="1" name="max_rounds" value="{{ s.max_rounds }}"></label>
+      <label><span class="label">Fix loops in a build</span><input class="input" type="number" min="0" name="max_fix_loops" value="{{ s.max_fix_loops }}"></label>
+      <label><span class="label">Max USD per task</span><input class="input" type="number" min="0.01" step="0.01" name="max_usd" value="{{ s.max_usd }}"></label>
+      <label><span class="label">Tasks at once</span><input class="input" type="number" min="1" name="max_parallel" value="{{ s.max_parallel }}"></label>
+      <label><span class="label">Full tests after a build if under (min)</span><input class="input" type="number" min="0" step="0.5" name="full_test_minutes" value="{{ s.full_test_minutes }}"></label>
+    </div>
+    <div class="actions"><button class="btn primary">Save</button></div>
+  </form>
+
+  <section class="panel">
+    <h2>Repositories</h2>
+    <p class="text-xs muted">The test command runs from the repository's root; the base branch is what a task's branch starts from (empty: what's checked out).</p>
+    {% for path, r in s.repos.items() %}
+    <form class="repo-row" hx-post="settings/repos">
+      <input type="hidden" name="path" value="{{ path }}">
+      <span class="mono text-sm" title="{{ path }}">{{ path }}</span>
+      <input class="input mono sm" name="test_command" value="{{ r.test_command }}" placeholder="test command">
+      <input class="input mono sm" name="base_branch" value="{{ r.base_branch }}" placeholder="base branch">
+      <button class="btn xs">Save</button>
+      <button class="btn xs quiet" name="remove" value="1">Remove</button>
+    </form>
+    {% endfor %}
+    <form class="repo-row" hx-post="settings/repos">
+      <input class="input mono sm" name="path" placeholder="/Users/you/code/project" required>
+      <input class="input mono sm" name="test_command" placeholder="test command, like make test">
+      <input class="input mono sm" name="base_branch" placeholder="base branch">
+      <button class="btn xs">Add</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Prompts</h2>
+    <p class="text-xs muted">What each role is told. The factory adds how each step works; these say how the role thinks.</p>
+    {% for role in ROLES %}
+    <details class="prompt">
+      <summary><span class="badge role-{{ role }}">{{ role }}</span>{% if 'prompts.' ~ role in s.changed %} <span class="text-xs warning">changed</span>{% endif %}</summary>
+      <form hx-post="settings/prompts/{{ role }}">
+        <textarea class="input mono text-sm" name="prompt" rows="10">{{ s.prompts[role] }}</textarea>
+        <div class="actions">
+          <button class="btn sm primary">Save</button>
+          {% if 'prompts.' ~ role in s.changed %}<button class="btn sm" name="reset" value="1">Reset to default</button>{% endif %}
+        </div>
+      </form>
+    </details>
+    {% endfor %}
+  </section>
+</main>
+{% endblock %}

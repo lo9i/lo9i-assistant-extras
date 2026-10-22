@@ -1,4 +1,4 @@
-"""The channel hears only the owner's DMs and buttons and sends them to lo9i; /new and /home are
+"""The channel hears only the owner's DMs and buttons and sends them to lo9i; /new and an agent's command are
 answered with lo9i's text, privately."""
 
 from unittest.mock import create_autospec
@@ -14,8 +14,8 @@ class FakeDaemon:
         self.messages, self.presses, self.commands = [], [], []
         self.down = False
 
-    async def message(self, chat, text, files=(), voice=False):
-        self.messages.append((chat, text, files))
+    async def message(self, chat, text, files=(), voice=False, reply_to="", message=""):
+        self.messages.append((chat, text, files, reply_to, message))
 
     async def press(self, chat, message, text, data):
         self.presses.append((chat, message, text, data))
@@ -24,7 +24,7 @@ class FakeDaemon:
         if self.down:
             raise DaemonUnavailableError("The assistant isn't reachable")
         self.commands.append((command, text))
-        return "Started a side conversation. /home goes back."
+        return "Your next message starts a new conversation."
 
 
 def _handlers():
@@ -35,7 +35,8 @@ def _handlers():
 
 
 def _dm(**fields):
-    return {"type": "message", "channel_type": "im", "channel": "D1", "user": "U1", "text": "a &lt; b", **fields}
+    event = {"type": "message", "channel_type": "im", "channel": "D1", "user": "U1", "text": "a &lt; b", "ts": "6.0"}
+    return event | fields
 
 
 def _press(value, user="U1", text="Which sources?"):
@@ -48,10 +49,17 @@ def _press(value, user="U1", text="Which sources?"):
     }
 
 
-async def test_the_owners_dm_goes_to_lo9i():
+async def test_the_owners_dm_goes_to_lo9i_with_its_id():
     handlers, daemon, _ = _handlers()
     await handlers.message(_dm())
-    assert daemon.messages == [("D1", "a < b", [])]
+    assert daemon.messages == [("D1", "a < b", [], "", "6.0")]
+
+
+async def test_a_reply_in_a_thread_names_the_message_it_answers():
+    handlers, daemon, _ = _handlers()
+    await handlers.message(_dm(ts="7.0", thread_ts="5.0"))
+    await handlers.message(_dm(ts="8.0", thread_ts="8.0"))  # a thread's first message replies to nothing
+    assert [(m[3], m[4]) for m in daemon.messages] == [("5.0", "7.0"), ("", "8.0")]
 
 
 async def test_others_edits_and_bots_are_ignored():
@@ -76,10 +84,10 @@ async def test_a_button_sends_the_pressed_message_and_its_data():
 
 async def test_commands_are_for_the_owner_only_and_answered_with_lo9is_text():
     handlers, daemon, _ = _handlers()
-    started = "Started a side conversation. /home goes back."
+    started = "Your next message starts a new conversation."
     assert (await handlers.command({"user_id": "U1", "command": "/new"}))["text"] == started
     assert "only answers" in (await handlers.command({"user_id": "U2", "command": "/new"}))["text"]
     await handlers.command({"user_id": "U1", "command": "/claude", "text": " ~/code/app "})
     assert daemon.commands == [("new", ""), ("claude", "~/code/app")]
     daemon.down = True
-    assert "isn't reachable" in (await handlers.command({"user_id": "U1", "command": "/home"}))["text"]
+    assert "isn't reachable" in (await handlers.command({"user_id": "U1", "command": "/new"}))["text"]

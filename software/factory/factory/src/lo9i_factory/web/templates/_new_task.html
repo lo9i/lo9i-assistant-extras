@@ -1,0 +1,32 @@
+{# The new task form; on an error it comes back with what was typed and why (app.py, new_task). #}
+<form id="new-task-form" class="form" hx-post="tasks">
+  <label>
+    <span class="label">Repository <span class="muted">(or a new, empty folder for a new project)</span></span>
+    <input class="input mono" name="repo" required placeholder="/Users/you/code/project" value="{{ form.get('repo', '') }}" list="known-repos">
+    <datalist id="known-repos">{% for r in repos or [] %}<option value="{{ r }}">{% endfor %}</datalist>
+  </label>
+  <label>
+    <span class="label">What to do</span>
+    <textarea class="input" name="description" rows="6" required placeholder="Describe the task as you'd tell a colleague.">{{ form.get('description', '') }}</textarea>
+  </label>
+  <label>
+    <span class="label">Title <span class="muted">(optional: the description's first line)</span></span>
+    <input class="input" name="title" value="{{ form.get('title', '') }}">
+  </label>
+  <div class="row">
+    <label class="check"><input type="checkbox" name="include_context" {{ 'checked' if form.get('include_context') }}> Give the team the repo's README, file tree and CLAUDE.md/AGENTS.md</label>
+  </div>
+  <label>
+    <span class="label">Run the coding agent</span>
+    <select class="select" name="run_mode">
+      <option value="" {{ 'selected' if not form.get('run_mode') }}>As in Settings{% if run_mode %} ({{ run_mode }}){% endif %}</option>
+      <option value="docker" {{ 'selected' if form.get('run_mode') == 'docker' }}>In Docker</option>
+      <option value="local" {{ 'selected' if form.get('run_mode') == 'local' }}>On this computer, asking before each command</option>
+    </select>
+  </label>
+  {% if error %}<p class="text-sm danger">{{ error }}</p>{% endif %}
+  <div class="modal-foot">
+    <button type="button" class="btn" onclick="this.closest('dialog').close()">Cancel</button>
+    <button class="btn primary">Start</button>
+  </div>
+</form>

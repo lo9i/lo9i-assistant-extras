@@ -19,7 +19,7 @@ class OperationError(Exception):
     """The channel couldn't carry out an operation; the text tells lo9i why."""
 
 
-# What the channel offers: {"command": "new", "description": "..."} each, /new, /home and each agent's.
+# What the channel offers: {"command": "new", "description": "..."} each, /new and each agent's.
 Commands = list[dict[str, str]]
 
 

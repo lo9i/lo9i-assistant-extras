@@ -1,6 +1,6 @@
-"""Telegram updates from paired accounts, sent to lo9i: messages, buttons pressed and commands (/new,
-/home, /start, an agent's /claude <folder>). lo9i shows what follows in the chat through the stream's
-operations (channel.py)."""
+"""Telegram updates from paired accounts, sent to lo9i: messages, with the message they reply to, buttons
+pressed and commands (/new, /start, an agent's /claude <folder>). lo9i shows what follows in the chat
+through the stream's operations (channel.py)."""
 
 import logging
 from collections.abc import Sequence
@@ -20,7 +20,15 @@ logger = logging.getLogger(__name__)
 class Conversation(Protocol):
     """The Daemon calls the handlers need."""
 
-    async def message(self, chat: str, text: str, files: Sequence[Attachment] = (), voice: bool = False) -> None: ...
+    async def message(
+        self,
+        chat: str,
+        text: str,
+        files: Sequence[Attachment] = (),
+        voice: bool = False,
+        reply_to: str = "",
+        message: str = "",
+    ) -> None: ...
     async def press(self, chat: str, message: str, text: str, data: str) -> None: ...
     async def command(self, command: str, text: str = "") -> str: ...
 
@@ -49,7 +57,10 @@ class Handlers:
             await message.reply_text(str(e))
             return
         text, voice = message.text or message.caption or "", bool(message.voice or message.audio)
-        await self._daemon.message(str(message.chat_id), text, attachments, voice)
+        # A reply goes on in the conversation of the message it replies to.
+        replied = message.reply_to_message
+        reply_to = str(replied.message_id) if replied is not None else ""
+        await self._daemon.message(str(message.chat_id), text, attachments, voice, reply_to, str(message.message_id))
 
     async def button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
