@@ -31,9 +31,10 @@ COPILOT_ENV = "LO9I_COPILOT_GITHUB_TOKEN"
 _OAUTH_PREFIX = "sk-ant-oat"
 # Tool inputs that say what a step is about, in the order they're looked for.
 _DETAILS = ("command", "file_path", "path", "pattern", "url", "query", "description")
-_LINE = 200
-# A tool's output is shown shortened: the whole of a file read or a long log would flood the chat.
-_OUTPUT = 2_000
+# The whole command or path, up to a safety cap.
+_LINE = 100_000
+# A tool's whole output, up to a safety cap so a huge one can't freeze the page.
+_OUTPUT = 100_000
 # Opus 4.7 and later leave their thinking out unless asked for a summary of it.
 _SHOWN_THINKING: ThinkingConfig = {"type": "adaptive", "display": "summarized"}
 # Each message from Claude Code is one JSON line, and a file it reads comes whole in one: a screenshot

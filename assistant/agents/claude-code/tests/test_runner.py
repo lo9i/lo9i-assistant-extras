@@ -62,7 +62,7 @@ def test_steps_are_its_thinking_what_it_says_and_each_tool_with_its_result():
     results = UserMessage(
         content=[
             ToolResultBlock("1", "1 failed", is_error=True),
-            ToolResultBlock("2", [{"type": "text", "text": "x" * 3000}]),
+            ToolResultBlock("2", [{"type": "text", "text": "x" * 100_010}]),
         ]
     )
     assert steps.of(said) == [
@@ -73,7 +73,7 @@ def test_steps_are_its_thinking_what_it_says_and_each_tool_with_its_result():
     ]
     failed, long = steps.of(results)
     assert failed == Step("result", "Error: 1 failed", "Bash", id="1")
-    assert long.tool == "TodoWrite" and long.text == "x" * 2000 + "\n…"
+    assert long.tool == "TodoWrite" and long.text == "x" * 100_000 + "\n…"
     assert steps.of(_result()) == []
 
 
