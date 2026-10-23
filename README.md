@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `media/video`, `productivity/calendar`, `software/factory` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/video`, `productivity/calendar`, `software/factory` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -61,6 +61,13 @@ newer version later.
   Interrupt stops what it's doing and waits for your next message.
 - **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
   GitHub token with the Copilot Requests permission, and downloads the Copilot CLI on its first task.
+- **hosts** (`connectivity/remote/hosts`): your Linux hosts, from `~/.ssh/config`. A **Hosts** page in
+  the web app lists them (search, sort, show or hide each one) with whether each answers and runs its
+  session, and opens a terminal on one in the browser. The terminal runs in [Herdr](https://herdr.dev) on the
+  host, in a session named `lo9i`, so it keeps running when the connection drops and the page reconnects to
+  it on its own; when the host has no Herdr, the page offers to install it in `~/.local/bin`. The assistant's
+  tools list the hosts, read that terminal's screen and run commands in it, where you see them; a command
+  asks you first. Needs lo9i with WebSocket pages (the `connectivity/remote` category).
 - **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
   for more), its audio as an MP3 with tags and cover, or its transcript as a text file; or let the
   assistant read the transcript to summarize or answer questions about the video. Files go to the

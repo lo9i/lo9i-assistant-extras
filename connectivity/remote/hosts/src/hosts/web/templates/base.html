@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# Links are relative to where lo9i serves this (X-Forwarded-Prefix, see app.py). #}
+  <base href="{{ request.scope.root_path }}/">
+  <title>{% block title %}Hosts{% endblock %}</title>
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {% block head %}{% endblock %}
+  <script src="{{ asset('htmx.min.js') }}"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="top">
+    <div class="container">
+      <a href="./" class="brand">hosts</a>
+      <nav>
+        <a href="./" class="{{ 'on' if nav == 'hosts' }}">Hosts</a>
+      </nav>
+    </div>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <div id="toast" class="toast" hidden></div>
+  <script>
+    // Errors outside forms come back as plain text; show them instead of failing silently.
+    document.body.addEventListener("htmx:responseError", (e) => {
+      const toast = document.getElementById("toast");
+      toast.textContent = e.detail.xhr.responseText || "Something went wrong";
+      toast.hidden = false;
+      setTimeout(() => (toast.hidden = true), 6000);
+    });
+  </script>
+</body>
+</html>
