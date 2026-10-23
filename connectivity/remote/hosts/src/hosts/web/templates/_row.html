@@ -1,0 +1,37 @@
+{# A host's row. Without `probe` it says it's checking and asks for itself again, checked (app.py's row). #}
+{% set path = 'hosts/' ~ (h.name | urlencode) %}
+<tr data-href="{{ path }}" class="{{ 'dim' if h.hidden }}"
+    {% if probe is none %}hx-get="{{ path }}/row" hx-trigger="load" hx-swap="outerHTML"{% endif %}>
+  <td class="medium" data-value="{{ h.name | lower }}">
+    <a href="{{ path }}" class="link">{{ h.name }}</a>
+    {% if h.hidden %}<span class="badge">hidden</span>{% endif %}
+  </td>
+  <td class="hide-sm mono text-xs" data-value="{{ h.address or '' }}">{{ h.address or '—' }}</td>
+  {% if probe is none %}
+  <td data-value="2"><span class="muted text-xs">Checking…</span></td>
+  <td data-value="3"><span class="muted text-xs">…</span></td>
+  {% elif probe.reachable %}
+  <td data-value="0"><span class="dot success"></span>Online</td>
+  <td data-value="{{ 0 if probe.session else 1 if probe.installed else 2 }}">
+    {% if probe.session %}<span class="success">Running</span>
+    {% elif probe.installed %}<span class="muted">Not running</span>
+    {% else %}<span class="muted" title="Herdr isn't installed there. Open its terminal to install it.">No Herdr</span>{% endif %}
+  </td>
+  {% else %}
+  <td data-value="1"><span class="dot danger"></span><span title="{{ probe.problem }}">Offline</span></td>
+  <td data-value="3"><span class="muted">—</span></td>
+  {% endif %}
+  <td class="hide-sm nowrap" data-value="{{ h.last_connected or '' }}">
+    <span class="{{ 'muted' if not h.last_connected }}" title="{{ h.last_connected or '' }}">{{ h.last_connected | ago }}</span>
+  </td>
+  <td>
+    <div class="cell-actions">
+      <a class="btn xs" href="{{ path }}">Terminal</a>
+      {% if h.hidden %}
+      <button class="btn xs quiet" hx-post="{{ path }}/show">Show</button>
+      {% else %}
+      <button class="btn xs quiet" hx-post="{{ path }}/hide" title="Leave it off this page and the assistant's list">Hide</button>
+      {% endif %}
+    </div>
+  </td>
+</tr>

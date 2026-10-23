@@ -1,0 +1,21 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. {data} is a folder for its data that updates leave alone, {bin} the scripts
+# of its own environment (built from its uv.lock), {socket} where the web page listens.
+name: hosts
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 0.1.0
+# The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
+format: 2
+description: Your Linux hosts from ~/.ssh/config, with a terminal in the web app that keeps running when the connection drops (Herdr), and tools for the assistant to run commands there
+command: "{bin}/hosts-mcp"
+env:
+  HOSTS_DB: "{data}/hosts.db"
+# Not trusted: run_command can change a host, so lo9i asks the user before each one. Listing hosts and
+# reading the terminal are read-only and run without asking.
+trusted: false
+
+# The page lo9i shows as Hosts in its web app. It gets the env above and listens on {socket}; lo9i signs
+# the user in and serves it under /hosts/ (X-Forwarded-Prefix), its terminal's WebSocket too.
+page:
+  command: "{bin}/hosts-web"
+  args: [--socket, "{socket}"]

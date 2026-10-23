@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ h.name }} — Hosts{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ asset('xterm.css') }}">{% endblock %}
+{% block body_class %}full{% endblock %}
+{% block content %}
+<main class="term-page">
+  <div class="term-bar">
+    <a href="./" class="back">← Hosts</a>
+    <span class="medium">{{ h.name }}</span>
+    <span class="muted text-xs mono hide-sm">{{ h.address or '' }}</span>
+    <span id="state" class="text-xs muted">Connecting…</span>
+    <span class="spacer"></span>
+    <span class="text-xs muted hide-sm" title="Herdr keeps it running on {{ h.name }} when the connection drops">Herdr session “lo9i” · ctrl+b q leaves it running</span>
+  </div>
+  <div class="term-wrap">
+    <div id="terminal" data-host="{{ h.name }}"></div>
+    <div id="notice" class="notice" hidden>
+      <div class="notice-box">
+        <h2 id="notice-title"></h2>
+        <p id="notice-text" class="text-sm"></p>
+        <div id="notice-actions" class="actions"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="{{ asset('xterm.js') }}"></script>
+<script src="{{ asset('addon-fit.js') }}"></script>
+<script src="{{ asset('terminal.js') }}"></script>
+{% endblock %}
