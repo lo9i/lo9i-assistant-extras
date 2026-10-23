@@ -46,6 +46,9 @@ stdout/stderr/exit-code contract and no per-call hook. Its shape (PTY panes, dae
 whose authentication is not documented, remote installs) is the opposite of the gated, per-call model the spec asks for.
 All of this is read from docs, not observed.
 
+The optional throwaway-sshd check was not run because herdr is not installed here (`command -v herdr` finds nothing), so
+every herdr property above is unverified.
+
 ## 2. Repo facts (lo9i-assistant-extras)
 
 ### 2a. Verified by reading this repository
@@ -64,12 +67,22 @@ All of this is read from docs, not observed.
 - No MCP elicitation anywhere in this repo: `grep -rni elicit` over the repository found no match outside this file.
 - CI: none in the repo. The only gate is `.githooks/pre-commit`, which needs a lo9i checkout (`LO9I_DIR`); there is none here.
 - Existing mentions of herdr or ssh in the repo: none.
-- Environment for tests:
-  - `docker`: not installed. `sshd`: not installed (`/usr/sbin/sshd` absent). `strace`: not installed. herdr: not installed.
-  - OpenSSH client 9.2p1 (Debian 12), but **`ssh` cannot start in this container**: uid 501 has no passwd entry, so `ssh -V`
-    exits 255 with "No user exists for uid 501". Fake-ssh tests work, but anything that runs the real client needs nss_wrapper or a
-    user with a passwd entry.
-  - Python here is 3.11; the plugin needs 3.12, so uv would have to download one.
+- Environment for tests, with the command run and what it printed (run as uid 501, `id` = `uid=501 gid=20(dialout)`):
+
+  | Fact | Command | Output |
+  |---|---|---|
+  | No Docker | `docker info` | `/bin/bash: line 1: docker: command not found`. `command -v docker` prints nothing, exit 1 |
+  | No sshd | `command -v sshd` ; `ls -l /usr/sbin/sshd` | nothing, exit 1 ; `ls: cannot access '/usr/sbin/sshd': No such file or directory` |
+  | No strace | `command -v strace` | nothing, exit 1 |
+  | No herdr | `command -v herdr` | nothing, exit 1 |
+  | `ssh` will not start | `ssh -V` | `No user exists for uid 501`, exit 255 (uid 501 has no passwd entry) |
+  | OpenSSH version | `dpkg -s openssh-client` ; `grep -E '^(PRETTY_NAME\|VERSION_ID)' /etc/os-release` | `Version: 1:9.2p1-2+deb12u10`, `Status: install ok installed` ; `Debian GNU/Linux 12 (bookworm)`. |
+  | Python | `python --version` ; `python3 --version` ; `command -v uv` | `python: command not found` ; `Python 3.11.2` ; `/usr/local/bin/uv` |
+
+  - OpenSSH 9.2p1 is the version dpkg reports for the installed client package; it was **not** read from `ssh -V`, which fails
+    here. The real client has therefore never been run in this container, so no `ssh -G` or stderr format was observed.
+  - Fake-ssh tests work. Anything that runs the real client needs nss_wrapper or a user with a passwd entry.
+  - The plugin needs Python >=3.12 and `python3` here is 3.11.2, so uv would have to download one.
   - Therefore the real-sshd layer cannot run here: those tests will skip visibly, and a local run with sshd is required before sign-off.
 
 ### 2b. lo9i claims: cited or unverified
@@ -106,10 +119,12 @@ not from this repo's comments:
 4. That `other/general` is in `core/repositories/categories.py`, and that `python -m assistant.core.repositories.check` accepts the new folder.
 5. Whether "trusted" can be turned on by the user later, and what it skips (all prompts, or only some).
 
-**Fallback if 1 or 2 is not confirmed**, or if the prompt is not per call: build a single always-prompting tool with no
-read-only hint and no auto-approve. The allowlist is dropped, there is no `run_readonly`, and every command, and every transfer, goes through
-the host's prompt. If the host has no per-call prompt at all, refuse everything and report it as a blocker. If 3 shows
-elicitation exists, bring it back to the user as a design choice; do not adopt it silently.
+**Fallback, stated plainly.** If PB-1 cannot run (no lo9i checkout), or its item 1 or item 2 is unconfirmed, or the prompt is
+not per call, the build uses the **single always-prompting tool**: no `read_only_hint`, no allowlist, no `run_readonly`.
+Every command and every transfer goes through the host's prompt. The split `run_readonly` / `run` design applies only after
+PB-1 passes. The user's choice in section 5 never enables the unprompted path; only a passed PB-1 does. If the host has no
+per-call prompt at all, refuse everything and report it as a blocker. If item 3 shows elicitation exists, bring it back to
+the user as a design choice; do not adopt it silently.
 
 ## 3. Spec items against herdr
 
@@ -131,31 +146,37 @@ elicitation exists, bring it back to the user as a design choice; do not adopt i
 
 ## 4. Disqualifier checklist
 
+In this table `fail` means "cannot be shown to meet our bar". It does not mean "observed to fail". Rows marked
+`fail (docs-inferred)` are inferred from herdr's documented design; none was observed, because herdr is not installed.
+
 | Disqualifier | Status | Level | Note |
 |---|---|---|---|
 | Its own always-allow mode | unknown | docs | None documented, which is not a denial. `agent.send_keys` can type into any pane, so it may answer a blocked agent's prompt: a possible bypass path |
-| A socket that is not 0600, or any listener | fail | docs | A daemon and a Unix socket exist (a listener). Its permissions are unknown |
+| A socket that is not 0600, or any listener | fail | docs | Fails on "any listener", not on a measured socket mode: a daemon and a Unix socket are documented, and the socket's permissions are unknown |
 | Session reuse we cannot tear down | unknown | docs | ControlPersist 600 and a background server are documented; teardown is not |
 | Secrets in argv or env | unknown | none | Nothing read about it |
 | Non-strict host keys | unknown | docs | "Unchanged" OpenSSH checking is documented; `StrictHostKeyChecking=yes` is not stated |
-| A local shell in the command path | fail | docs | PTY pane shell by design |
-| stdout, stderr and exit code separable | fail | docs | Inferred from the PTY design and "queue admission, not execution"; not observed |
+| A local shell in the command path | fail (docs-inferred) | docs | Inferred: PTY panes run a shell by design |
+| stdout, stderr and exit code separable | fail (docs-inferred) | docs | Inferred from the PTY design and "queue admission, not execution"; not observed |
 | Telemetry | unknown | none | Not mentioned |
-| Forwarding on by default | fail | docs | ForwardAgent follows the user's ssh config; the plugin cannot force it off through herdr |
-| PTY only | fail | docs | Yes for commands |
+| Forwarding on by default | fail (docs-inferred) | docs | herdr does not force agent forwarding on: ForwardAgent follows the user's ssh config. The row fails because the plugin cannot force it off through herdr, not because herdr enables it |
+| PTY only | fail (docs-inferred) | docs | Inferred: commands go to PTY panes |
 
-Five rows fail on docs alone and none passes. Option A (wrap herdr) would not reach its own enabling bar, so it would
-fall back to OpenSSH anyway.
+Five rows fail, all on docs alone, and none passes. Four of the five are docs-inferred; the listener row fails on the
+documented existence of a listener. Option A (wrap herdr) would not reach its own enabling bar, so it would fall back to
+OpenSSH anyway.
 
 ## 5. Recommendation
 
-**Option B**: do not wrap herdr. Build the OpenSSH plugin (`ssh -G` check, forced options, argv without a local shell, confirmation, allowlist,
-audit log, output caps) as an MCP plugin in the repo's Python style. The README warns that herdr sessions bypass this
-plugin's confirmation and logging, and the plugin never spawns or reuses herdr sockets. Option C (herdr's inventory as an
-extra source) is possible, but the catalog path and format are undocumented, so I advise against it for v1. Option D is
-wrong: it would leave the assistant with no gated access.
+**Option B**: do not wrap herdr. Build the OpenSSH plugin (`ssh -G` check, forced options, argv without a local shell,
+confirmation, allowlist, audit log, output caps) as an MCP plugin in the repo's Python style. The plugin never spawns or
+reuses herdr sockets. The README must say that herdr sessions may bypass this plugin's confirmation, forced options,
+allowlist and audit log, and that they may reuse the ssh agent or forward it, which this plugin forces off; every such
+line is worded "may", because none of it was observed. Option C (herdr's inventory as an extra source) is possible, but
+the catalog path and format are undocumented, so I advise against it for v1. Option D is wrong: it would leave the
+assistant with no gated access.
 
-### Residual risk of decision 2 (split `run_readonly` / `run`)
+### Residual risk of the split `run_readonly` / `run` design (applies only after PB-1 passes)
 
 - With `read_only_hint=True`, the host does not prompt for `run_readonly` (if PB-1 confirms it). The plugin's own allowlist
   and classifier are then the **only** gate for that tool. They must fail closed: any doubt, parse error, unknown host,
@@ -168,21 +189,39 @@ wrong: it would leave the assistant with no gated access.
   and transfers. The plugin cannot detect or prevent that; the README documents it as a residual risk.
 - The allowlist is a convenience, not a security boundary.
 
-### Decisions I need confirmed (they change the plan)
+### The one choice I need from you
 
-1. Folder: `other/general/ssh-hosts` instead of `plugins/ssh-hosts`.
-2. Confirmation: the host's per-call prompt, with a split `run_readonly` (allowlisted only, read-only hint) and `run`
-   (always asks), subject to PB-1; if PB-1 fails, the single always-prompting tool.
-3. Real-sshd tests will skip here (no sshd, docker, strace, and ssh will not start without a passwd entry).
+Choose one of **A, B, C or D** (see the plan). My recommendation is **B**. Nothing is built until you reply.
 
-## 6. After the user approves
+Defaults that follow from this, and consequences you will see. These are not questions and need no answer:
 
-1. **First step:** move this file to `other/general/ssh-hosts/DECISION.md` and remove the `plugins/ssh-hosts/` folder,
-   and `plugins/` itself if it is then empty, so no stray plugin folder remains outside the category list.
+- **Folder:** the plugin lives in `other/general/ssh-hosts`, because the repo's categories are a fixed list (README, unverified
+  in lo9i, see 2b). `plugins/ssh-hosts/` is removed. PB-1 item 4 checks the category.
+- **Tool split:** if PB-1 passes, `run_readonly` (allowlisted only, read-only hint) and `run` (always prompts). If PB-1 cannot
+  run, or its items 1 or 2 are unconfirmed, or the prompt is not per call, the single always-prompting tool is built instead
+  (section 2c). Your choice of A-D does not enable the unprompted path.
+- **Skipped tests:** the real-sshd, strace and no-route-network tests skip visibly here (no sshd, docker or strace, and ssh will
+  not start without a passwd entry). A local run with them is required before sign-off.
+
+## 6. After the user chooses
+
+1. **First step:** move this file to `other/general/ssh-hosts/DECISION.md`, then remove the `plugins/ssh-hosts/` folder, and
+   remove `plugins/` only if it is empty. Never remove any other file.
 2. Run PB-1. Stop and report if it changes the design.
 3. Build test-first, with the scoped command `cd other/general/ssh-hosts && uv run pytest`.
 
-Note for Phase 2 (tests): gate the real-sshd tests behind a pytest marker (for example `real_sshd`) and an environment
-variable (for example `SSH_HOSTS_REAL_SSHD=1`), so that when they do not run, they report as skipped with the reason
-shown (`-rs`), never as passed. A local run with real sshd, with that variable set and zero skips in that layer, is a hard
-sign-off condition. The same applies to the strace and no-route-network checks.
+Note for Phase 2 (tests):
+
+- **Can run here with a fake-ssh binary:** the policy bypass table, Confirmer fail-closed, the tool schema (no skip field),
+  frozen operation, output caps (limit-1, limit, limit+1, binary), log modes and the output canary, `run_many` semantics, and
+  timeout with no orphan and stdin closed.
+- **Option-injection tests** (a host or an argument starting with `-`) are aimed directly at `run_readonly`, as well as at the
+  classifier and the other tools. They assert that no canary file is created and that nothing is spawned.
+- **`list_tools` assertion:** `run`, `run_many`, `upload` and `download` carry no `read_only_hint`, in the style of
+  `calendar/tests/test_mcp.py:26-31`. (In the single-tool fallback, the one tool carries none.)
+- **Skip-only here:** the real-sshd layer (unknown and changed host keys, `StrictHostKeyChecking no` still rejects, `run_many`
+  with one live and one dead host, transfer round trip), the strace checks, and the no-route-network check.
+- Gate the skip-only tests behind a pytest marker (for example `real_sshd`) and an environment variable (for example
+  `SSH_HOSTS_REAL_SSHD=1`), so that when they do not run they report as skipped with the reason shown (`-rs`), never as
+  passed. A local run with real sshd, with that variable set and zero skips in that layer, is a hard sign-off condition. The
+  same applies to the strace and no-route-network checks.
