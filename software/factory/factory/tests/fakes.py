@@ -110,8 +110,6 @@ class FakeAgent:
     review point in its prompt as resolved, and says it cost $0.50. Keeps
     each job it was given."""
 
-    provider = "anthropic"
-
     def __init__(self, files: dict[str, str] | None = None, results: list | None = None) -> None:
         self.files = files if files is not None else {"cache.py": "CACHE = {}\n", "test_cache.py": "def test(): pass\n"}
         self.results = results or []

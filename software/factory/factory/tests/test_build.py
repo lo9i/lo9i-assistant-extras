@@ -170,12 +170,41 @@ def test_a_build_needs_an_agent_that_runs_the_implementers_model_and_its_key(con
     settings.update(conn, {"agent": "codex"})
     once(r, conn)
     assert "codex runs openai's models: set models.implementer to openai:<model>" in service.get_task(conn, t.id).reason
+    settings.update(conn, {"agent": "claude-code", "models.implementer": "openai:gpt-5"})
+    service.resume(conn, t.id)
+    once(r, conn)
+    reason = service.get_task(conn, t.id).reason
+    assert "set models.implementer to anthropic:<model> or copilot:<model>" in reason
 
-    settings.update(conn, {"agent": "claude-code"})
+    settings.update(conn, {"models.implementer": "anthropic:claude-sonnet-5-5"})
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     service.resume(conn, t.id)
     once(r, conn)
     assert "ANTHROPIC_API_KEY isn't set, and claude-code needs it" in service.get_task(conn, t.id).reason
+
+
+def test_claude_code_on_copilot_uses_lo9is_sign_in_and_counts_requests_not_usd(conn, project, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    monkeypatch.setenv("LO9I_COPILOT_GITHUB_TOKEN", "gho_lo9i")
+    settings.update(conn, {"models.implementer": "copilot:claude-sonnet-5.5"})
+    agent = FakeAgent(results=[Result(ok=True, summary="Added the cache", usd=0.9, input_tokens=1000, requests=3)])
+    t, r = to_build(conn, project, Team(), agent)
+    once(r, conn)
+
+    job = agent.jobs[0]
+    assert agent.made == ("claude-code", "gho_lo9i")
+    assert (job.provider, job.model, job.budget_usd) == ("copilot", "claude-sonnet-5.5", None)
+    spent = service.costs(conn, t.id)["by_role"]["implementer"]
+    assert (spent["usd"], spent["requests"]) == (0, 3)
+    assert service.pending_checkpoint(conn, t.id).kind == "diff"
+
+
+def test_claude_code_on_copilot_needs_lo9is_copilot_sign_in(conn, project, monkeypatch):
+    monkeypatch.delenv("LO9I_COPILOT_GITHUB_TOKEN", raising=False)
+    settings.update(conn, {"models.implementer": "copilot:claude-sonnet-5.5"})
+    t, r = to_build(conn, project, Team(), FakeAgent())
+    once(r, conn)
+    assert "GitHub Copilot needs lo9i's Copilot sign-in" in service.get_task(conn, t.id).reason
 
 
 def test_docker_mode_needs_docker(conn, project, monkeypatch):

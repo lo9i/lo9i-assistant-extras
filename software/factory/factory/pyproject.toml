@@ -1,6 +1,6 @@
 [project]
 name = "lo9i-factory"
-version = "1.0.1"
+version = "1.1.0"
 description = "A software factory for lo9i: models debate a task, you approve, an agent builds it"
 requires-python = ">=3.12"
 dependencies = [

@@ -16,7 +16,7 @@ in a git worktree. Result: a local branch.
 | Prompts | Defaults shipped per role, editable in the plugin's Settings page |
 | Mode | Hybrid: debate via direct API calls; implementation by an agent in a worktree |
 | Providers | Anthropic, OpenAI and GitHub Copilot; one provider:model per role, set in Settings |
-| Agent | Claude Code or Codex CLI, chosen in Settings |
+| Agent | Claude Code or Codex CLI, chosen in Settings; Claude Code on an Anthropic key or on Copilot's Claude models (through a local relay, no key) |
 | Discussion | Debate: proposals → cross-critique → revised proposals; max rounds (default 3, configurable) |
 | Final word | A judge model picks the winner and sends it to the user for approval |
 | Checkpoints | Spec, plan, final diff; approve or reject with a comment (redoes the stage) |
@@ -116,6 +116,7 @@ Install fields (all optional, at least one): `ANTHROPIC_API_KEY`, `OPENAI_API_KE
 - No limit on directed questions; the debate is still bounded by max rounds and the cost cap.
 - Kanban: no drag for now; cards move only by approve/reject.
 - Repo context (README, tree, CLAUDE.md/AGENTS.md) only when the task includes it.
+- Claude Code on Copilot (`models.implementer` = `copilot:<Claude model>`): a relay on 127.0.0.1 per build signs its requests with lo9i's Copilot sign-in; no Anthropic key. Its requests are counted, not USD, and `--max-budget-usd` isn't set. In docker mode the container reaches the relay as `host.docker.internal` (Docker Desktop); Docker Engine on Linux needs local mode.
 
 ## 10. Data and state
 

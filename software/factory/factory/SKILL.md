@@ -41,7 +41,7 @@ Don't approve or reject on the user's behalf: it's their call, every time.
 `settings` shows the model of each role (`provider:model`: anthropic, openai or copilot), the agent, the limits, the run mode and which providers have a key; `update_settings` changes them by key, and `null` sets one back to its default. The ones users ask for:
 
 - `max_usd`: what a task may spend; it pauses there. `max_parallel`: tasks at once. `max_rounds`: debate rounds.
-- `models.<role>`, `agent` (`claude-code` or `codex`, which run Anthropic's and OpenAI's models: `models.implementer` must match), `run_mode` (`docker`, the default, or `local`).
+- `models.<role>`, `agent` (`claude-code` or `codex`, which run Anthropic's and OpenAI's models: `models.implementer` must match; Claude Code also runs GitHub Copilot's Claude models, as `copilot:<model>` like `copilot:claude-sonnet-5.5`, with no key), `run_mode` (`docker`, the default, or `local`).
 - `repos.<path>`: a repository's `test_command` and `base_branch`. Offer to set the test command when a task's repository has none: without it only the change's own tests run.
 
 Costs are in `task_status`: USD for the direct APIs, requests for GitHub Copilot, per stage and per role.
