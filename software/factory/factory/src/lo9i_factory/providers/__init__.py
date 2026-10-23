@@ -91,12 +91,13 @@ class Providers:
         if name not in self._clients:
             key = self._env.get(KEYS[name], "")
             if not key:
-                raise ProviderError(_missing(name))
+                raise ProviderError(missing(name))
             self._clients[name] = _make(name, key)
         return self._clients[name]
 
 
-def _missing(name: str) -> str:
+def missing(name: str) -> str:
+    """What to do when `name` has no key."""
     if name == "copilot":
         return "GitHub Copilot needs lo9i's Copilot sign-in: choose GitHub Copilot as the assistant's model in Settings"
     return f"{KEYS[name]} isn't set: enter it in the factory plugin's details in Plugins"

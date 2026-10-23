@@ -32,7 +32,7 @@ from .agents import Agent, Job
 from .engine import Brief, StoppedError, debate, start
 from .errors import FactoryError, ValidationError
 from .models import Stage, Task
-from .providers import KEYS, ProviderError, Providers, Request, Turn
+from .providers import KEYS, ProviderError, Providers, Request, Turn, missing
 from .sandbox import Sandbox, check_docker, ensure_image
 
 TEST_TIMEOUT_SECONDS = 3600
@@ -164,15 +164,22 @@ async def _implement(
 ) -> None:
     name = s.agent
     provider, _, model = s.models["implementer"].partition(":")
-    if provider != agents.PROVIDERS[name]:
+    if provider not in agents.PROVIDERS[name]:
         wanted = agents.PROVIDERS[name]
-        raise ValidationError(f"{name} runs {wanted}'s models: set models.implementer to {wanted}:<model>")
+        raise ValidationError(
+            f"{name} runs {' or '.join(f"{p}'s" for p in wanted)} models: set models.implementer to"
+            f" {' or '.join(f'{p}:<model>' for p in wanted)}"
+        )
     key = os.environ.get(KEYS[provider], "")
     if not key:
+        if provider == "copilot":
+            raise ProviderError(missing(provider))
         raise ProviderError(
             f"{KEYS[provider]} isn't set, and {name} needs it: enter it in the factory plugin's details"
         )
-    # Claude Code says what it spent; Codex's tokens are priced here.
+    # Claude Code says what it spent; Codex's tokens are priced here. On
+    # Copilot, Claude Code's requests are counted instead: no USD, no limit.
+    copilot = provider == "copilot"
     price = None if name == "claude-code" else prices.price(s.models["implementer"], s)
     budget = meter.left(conn, task.id, s)
     job = Job(
@@ -181,12 +188,13 @@ async def _implement(
         prompt=_prompt(conn, task, stage),
         system=_system(s, sandbox),
         model=model,
-        budget_usd=budget if price is None else None,
+        budget_usd=budget if price is None and not copilot else None,
         sandbox=sandbox,
+        provider=provider,
     )
     log({"type": "start", "agent": name, "model": model, "mode": sandbox.mode})
     result = await make_agent(name, key).run(job, log, lambda: _stopped(conn, task.id))
-    usd = result.usd
+    usd = 0.0 if copilot else result.usd
     if usd is None:
         # Priced from its tokens: Codex's always; Claude Code's when it didn't say.
         known = price or prices.find(s.models["implementer"], s)
@@ -205,6 +213,7 @@ async def _implement(
             cache_read_tokens=result.cache_read_tokens,
             cache_write_tokens=result.cache_write_tokens,
             usd=usd,
+            requests=result.requests,
         )
         message_id = repo.insert_message(
             conn,

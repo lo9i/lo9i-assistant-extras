@@ -10,16 +10,23 @@
 Either way: no MCP servers but the factory's (--strict-mcp-config), no
 session saved, the task's remaining budget as its limit (--max-budget-usd),
 and its report in the shape asked for (--json-schema).
+
+It runs Anthropic's models with ANTHROPIC_API_KEY, or Copilot's Claude
+models through a relay (relay.py) with lo9i's Copilot sign-in. On Copilot
+it has no USD limit: Copilot counts requests, which its USD figures don't
+measure.
 """
 
 import json
 import sys
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from .. import db
 from ..sandbox import find
 from . import REPORT, TIMEOUT_SECONDS, Job, Log, Result, report
+from .relay import Relay
 
 # How long Claude Code waits for an MCP tool: an approval waits for the user.
 _TOOL_TIMEOUT_MS = str(3_700_000)
@@ -27,9 +34,8 @@ _DETAILS = ("command", "file_path", "notebook_path", "path", "pattern", "url", "
 
 
 class ClaudeCode:
-    provider = "anthropic"
-
     def __init__(self, api_key: str) -> None:
+        """`api_key`: Anthropic's, or lo9i's GitHub token for a job on Copilot."""
         self.api_key = api_key
 
     def argv(self, job: Job) -> list[str]:
@@ -78,13 +84,24 @@ class ClaudeCode:
             "mcp__factory__approve",
         ]
 
-    def env(self, job: Job) -> dict[str, str]:
-        env = {"ANTHROPIC_API_KEY": self.api_key, "DISABLE_AUTOUPDATER": "1"}
-        if job.sandbox.mode == "local":
+    def env(self, job: Job, relay: Relay | None = None) -> dict[str, str]:
+        """Its login: the API key, or the relay to Copilot."""
+        docker = job.sandbox.mode == "docker"
+        login = relay.claude_env(job.model, docker) if relay else {"ANTHROPIC_API_KEY": self.api_key}
+        env = {**login, "DISABLE_AUTOUPDATER": "1"}
+        if not docker:
             env["MCP_TOOL_TIMEOUT"] = _TOOL_TIMEOUT_MS
         return env
 
     async def run(self, job: Job, log: Log, should_stop: Callable[[], bool]) -> Result:
+        if job.provider != "copilot":
+            return await self._run(job, self.env(job), log, should_stop)
+        async with Relay(self.api_key).running() as relay:
+            job = replace(job, model=relay.model(job.model))
+            done = await self._run(job, self.env(job, relay), log, should_stop)
+        return replace(done, requests=relay.requests)
+
+    async def _run(self, job: Job, env: dict[str, str], log: Log, should_stop: Callable[[], bool]) -> Result:
         ended: list[dict] = []
 
         def line(text: str) -> None:
@@ -99,7 +116,7 @@ class ClaudeCode:
 
         done = await job.sandbox.run(
             self.argv(job),
-            self.env(job),
+            env,
             stdin=job.prompt,
             on_line=line,
             should_stop=should_stop,

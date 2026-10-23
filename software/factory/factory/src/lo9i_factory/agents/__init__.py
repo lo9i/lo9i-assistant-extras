@@ -54,6 +54,8 @@ class Job:
     # What's left of the task's max_usd; None when the agent can't be held to it.
     budget_usd: float | None
     sandbox: Sandbox
+    # Whose model: Claude Code runs Anthropic's, or Copilot's Claude models through a relay (relay.py).
+    provider: str = "anthropic"
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,8 @@ class Result:
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    # The premium requests Copilot counted, on Copilot.
+    requests: int = 0
     # Why it failed.
     error: str = ""
     # Stopped by the factory: the task was cancelled or paused, or ran out of time.
@@ -78,9 +82,6 @@ Log = Callable[[dict[str, Any]], None]
 
 
 class Agent(Protocol):
-    # Whose models it runs, and the key it takes.
-    provider: str
-
     async def run(self, job: Job, log: Log, should_stop: Callable[[], bool]) -> Result: ...
 
 
@@ -113,4 +114,5 @@ def make(name: str, key: str) -> Agent:
     return Codex(key)
 
 
-PROVIDERS = {"claude-code": "anthropic", "codex": "openai"}
+# Whose models each agent runs; the key it takes is that provider's (providers.KEYS).
+PROVIDERS = {"claude-code": ("anthropic", "copilot"), "codex": ("openai",)}

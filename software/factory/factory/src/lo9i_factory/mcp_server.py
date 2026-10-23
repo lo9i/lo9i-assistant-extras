@@ -330,7 +330,8 @@ def update_settings(
         Field(
             description="Setting key to new value; null resets it to its default (or removes a repo's)."
             " Keys: models.<role> (provider:model; providers anthropic, openai, copilot), prompts.<role>,"
-            " max_rounds, max_fix_loops, max_usd, max_parallel, agent (claude-code or codex),"
+            " max_rounds, max_fix_loops, max_usd, max_parallel, agent (claude-code, on anthropic or copilot, or"
+            " codex, on openai: models.implementer must match),"
             " run_mode (docker or local), editor (a URL with {path}), full_test_minutes,"
             " repos.<absolute path> ({test_command, base_branch}), prices.<provider:model> (USD per"
             " million tokens: {input, output, cache_read, cache_write}, the cache's optional)."
