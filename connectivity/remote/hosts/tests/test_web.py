@@ -4,6 +4,7 @@ import signal
 import stat
 import sys
 import tempfile
+from pathlib import Path
 
 import pytest
 import uvloop
@@ -197,3 +198,9 @@ def _ended(ws) -> dict:
         message = ws.receive()
         if message.get("text"):
             return json.loads(message["text"])
+
+
+def test_hidden_parts_stay_hidden_whatever_their_display():
+    # The terminal's notice is display: flex; without this, hiding it left "Installing…" over the terminal.
+    css = (Path(__file__).parent.parent / "src" / "hosts" / "web" / "static" / "app.css").read_text()
+    assert "[hidden] { display: none !important; }" in css
