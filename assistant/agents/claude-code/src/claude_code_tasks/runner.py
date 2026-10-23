@@ -1,6 +1,7 @@
 """Runs a task with Claude Code through the Claude Agent SDK, which ships the Claude Code CLI, so nothing
 else needs installing."""
 
+import asyncio
 import os
 from dataclasses import replace
 from typing import Any
@@ -8,6 +9,7 @@ from typing import Any
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    ClaudeSDKClient,
     ResultMessage,
     StreamEvent,
     TextBlock,
@@ -15,12 +17,11 @@ from claude_agent_sdk import (
     ToolResultBlock,
     ToolUseBlock,
     UserMessage,
-    query,
 )
 from claude_agent_sdk.types import ThinkingConfig
 
 from claude_code_tasks.relay import Relay
-from claude_code_tasks.task_folder import Outcome, Progress, Step, Task, note
+from claude_code_tasks.task_folder import Inbox, Message, Outcome, Progress, Step, Task, note
 
 # The plugin's optional field: a Claude token (`claude setup-token`, from a Pro or Max plan) or an
 # Anthropic API key.
@@ -50,34 +51,118 @@ _UNDER_LO9I = (
     "http://lo9i/system/restart`: it restarts once your reply is in, so tell the user the change applies "
     "from their next message."
 )
+# Shown when the user interrupts it, and as the result of each call it stopped.
+_INTERRUPTED = "Interrupted: waiting for your next message"
+_INTERRUPTED_CALL = "Interrupted"
 
 
-async def run(task: Task, progress: Progress) -> Outcome:
+async def run(task: Task, progress: Progress, inbox: Inbox) -> Outcome:
     """With the Claude token when there is one, else on the user's Copilot plan."""
     token, github_token = _take(TOKEN_ENV), _take(COPILOT_ENV)
     if token:
-        return await _run(task, progress, options(task, auth_env(token)))
+        return await _run(task, progress, inbox, options(task, auth_env(token)))
     if not github_token:
         raise RuntimeError(_NO_LOGIN)
     async with Relay(github_token).running() as relay:
         progress(note("Using Claude on your GitHub Copilot plan"))
-        outcome = await _run(task, progress, options(task, relay.claude_env()))
+        outcome = await _run(task, progress, inbox, options(task, relay.claude_env()))
     # Claude Code prices its calls at Anthropic's API rates, which isn't what Copilot charges.
     return replace(outcome, cost_usd=None)
 
 
-async def _run(task: Task, progress: Progress, settings: ClaudeAgentOptions) -> Outcome:
-    result: ResultMessage | None = None
-    steps = Steps()
-    async for message in query(prompt=task.prompt, options=settings):
-        for step in steps.of(message):
-            progress(step)
-        if isinstance(message, ResultMessage):
-            result = message
+async def _run(task: Task, progress: Progress, inbox: Inbox, settings: ClaudeAgentOptions) -> Outcome:
+    async with ClaudeSDKClient(settings) as client:
+        result = await Session(client, progress, inbox).answer(task.prompt)
     if result is None:
         return Outcome(ok=False, text="Claude Code ended without a result.")
     text = result.result or f"Claude Code ended with {result.subtype}."
     return Outcome(ok=not result.is_error, text=text, cost_usd=result.total_cost_usd)
+
+
+class Session:
+    """Claude Code's session for the task, kept open so the user can steer it while it works. A message
+    from the inbox goes to it at once, and it takes it between its steps, echoing it back as it does
+    (`replay-user-messages`); an interrupt stops the step in progress, and the session waits for the
+    user's next message. It ends once Claude Code has answered every message, with its last result."""
+
+    def __init__(self, client: ClaudeSDKClient, progress: Progress, inbox: Inbox) -> None:
+        self._client, self._progress, self._inbox = client, progress, inbox
+        self._steps = Steps()
+        # The messages sent that Claude Code hasn't taken yet.
+        self._untaken: list[str] = []
+        # Interrupted: it waits for the user's next message.
+        self._paused = False
+        # A turn is in progress: there's something to interrupt.
+        self._working = False
+
+    async def answer(self, prompt: str) -> ResultMessage | None:
+        await self._say(prompt)
+        listening = asyncio.create_task(self._listen())
+        answering = asyncio.create_task(self._answers())
+        try:
+            done, _ = await asyncio.wait({listening, answering}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            listening.cancel()
+            answering.cancel()
+        if listening in done:
+            listening.result()  # it only ends with an error
+        return answering.result()
+
+    async def _answers(self) -> ResultMessage | None:
+        result = None
+        async for message in self._client.receive_messages():
+            for step in self._steps.of(message):
+                self._progress(self._shown(step))
+            self._taken(message)
+            if isinstance(message, ResultMessage):
+                result = message
+                self._working = bool(self._untaken)
+                if await self._answered_all():
+                    return result
+        return result
+
+    async def _answered_all(self) -> bool:
+        """It took every message, none waits in the inbox, and it isn't waiting for the user's next one."""
+        await self._pass_on(self._inbox.take())
+        return not self._untaken and not self._paused
+
+    async def _listen(self) -> None:
+        while True:
+            await self._pass_on(await self._inbox.next())
+
+    async def _pass_on(self, messages: list[Message]) -> None:
+        for message in messages:
+            if message.kind == "interrupt":
+                await self._interrupt()
+            else:
+                self._progress(Step("user", message.text, id=message.id))
+                self._paused = False
+                await self._say(message.text)
+
+    async def _say(self, text: str) -> None:
+        self._untaken.append(text.strip())
+        self._working = True
+        await self._client.query(text)
+
+    async def _interrupt(self) -> None:
+        """Once is enough: interrupted, it does nothing until the user's next message."""
+        if self._paused:
+            return
+        self._paused = True
+        self._progress(note(_INTERRUPTED))
+        if self._working:
+            await self._client.interrupt()
+
+    def _shown(self, step: Step) -> Step:
+        """The calls an interrupt stopped end as interrupted, not with Claude Code's note to itself."""
+        return replace(step, text=_INTERRUPTED_CALL) if self._paused and step.kind == "result" else step
+
+    def _taken(self, message: object) -> None:
+        """Claude Code echoes each message it takes; its subagents' prompts come with the call they're in."""
+        if isinstance(message, UserMessage) and isinstance(message.content, str) and not message.parent_tool_use_id:
+            text = message.content.strip()
+            if text in self._untaken:
+                self._untaken.remove(text)
 
 
 def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
@@ -97,6 +182,8 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
         thinking=_SHOWN_THINKING,
         # Its words as they're written, so lo9i shows them as they come (Steps._words).
         include_partial_messages=True,
+        # Each message it takes, echoed back, so the session knows it has answered them all (Session).
+        extra_args={"replay-user-messages": None},
     )
 
 

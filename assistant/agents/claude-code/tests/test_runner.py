@@ -1,4 +1,7 @@
+import asyncio
+import json
 import os
+import signal
 
 import pytest
 from claude_agent_sdk import (
@@ -13,7 +16,7 @@ from claude_agent_sdk import (
 )
 
 from claude_code_tasks import runner
-from claude_code_tasks.task_folder import Step, Task, note
+from claude_code_tasks.task_folder import Inbox, Step, Task, note
 
 
 def _task(follow_up_of=""):
@@ -33,6 +36,65 @@ def _result(is_error=False, text="Fixed 2 tests."):
     )
 
 
+class FakeClient:
+    """Claude Code's side of the session. `replies(text)` is what it sends back for each message it's sent:
+    it echoes the message first, as with replay-user-messages; an interrupt ends the turn with an error."""
+
+    def __init__(self, replies):
+        self._replies = replies
+        self._out: asyncio.Queue = asyncio.Queue()
+        self.sent: list[str] = []
+        self.interrupts = 0
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def query(self, text):
+        self.sent.append(text)
+        for message in [UserMessage(text), *self._replies(text)]:
+            self._out.put_nowait(message)
+
+    async def interrupt(self):
+        self.interrupts += 1
+        stopped = ToolResultBlock("1", "The user doesn't want to proceed with this tool use.", is_error=True)
+        self._out.put_nowait(UserMessage([stopped]))
+        self._out.put_nowait(_result(is_error=True, text=""))
+
+    async def receive_messages(self):
+        while True:
+            yield await self._out.get()
+
+
+@pytest.fixture
+async def inbox(tmp_path):
+    opened = Inbox(tmp_path)
+    opened.open()
+    yield opened
+    opened.close()
+
+
+def _send(folder, name, message):
+    """As lo9i does: the message's file in inbox/, then SIGUSR1."""
+    (folder / "inbox" / f"{name}.json").write_text(json.dumps(message))
+    os.kill(os.getpid(), signal.SIGUSR1)
+
+
+def _fake(monkeypatch, replies):
+    seen = {}
+
+    def client(options):
+        seen["options"] = options
+        seen["client"] = FakeClient(replies)
+        return seen["client"]
+
+    monkeypatch.setattr(runner, "ClaudeSDKClient", client)
+    monkeypatch.setenv(runner.TOKEN_ENV, "sk-ant-api03-x")
+    return seen
+
+
 def test_a_new_task_starts_its_session_and_a_follow_up_resumes_it():
     env = runner.auth_env("sk-ant-api-x")
     new, follow = runner.options(_task(), env), runner.options(_task("t0"), env)
@@ -41,6 +103,7 @@ def test_a_new_task_starts_its_session_and_a_follow_up_resumes_it():
     assert new.cwd == "/repo" and new.permission_mode == "bypassPermissions"
     assert new.max_buffer_size == 64 * 1024 * 1024  # a screenshot read whole fits
     assert new.system_prompt == {"type": "preset", "preset": "claude_code", "append": runner._UNDER_LO9I}
+    assert new.extra_args == {"replay-user-messages": None}  # each message it takes comes back
 
 
 def test_a_plan_token_and_an_api_key_go_in_their_own_variables():
@@ -103,38 +166,84 @@ def test_thinking_is_shown_as_a_summary():
     assert options.thinking == {"type": "adaptive", "display": "summarized"}
 
 
-async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environment(monkeypatch):
-    seen = {}
-
-    async def query(prompt, options):
-        seen.update(prompt=prompt, env=options.env)
-        yield AssistantMessage(content=[ToolUseBlock("1", "Bash", {"command": "pytest"})], model="claude")
-        yield _result()
-
-    monkeypatch.setattr(runner, "query", query)
-    monkeypatch.setenv(runner.TOKEN_ENV, "sk-ant-api03-x")
+async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environment(monkeypatch, inbox):
+    seen = _fake(
+        monkeypatch, lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c"), _result()]
+    )
     steps = []
-    outcome = await runner.run(_task(), steps.append)
+    outcome = await runner.run(_task(), steps.append, inbox)
     assert outcome.ok and outcome.text == "Fixed 2 tests." and outcome.cost_usd == 0.42
-    assert steps == [Step("tool", tool="Bash", detail="pytest", id="1")] and seen["env"] == {
+    assert seen["client"].sent == ["fix the tests"]
+    assert steps == [Step("tool", tool="Bash", detail="pytest", id="1")] and seen["options"].env == {
         "ANTHROPIC_API_KEY": "sk-ant-api03-x"
     }
     assert runner.TOKEN_ENV not in os.environ
 
 
-async def test_an_error_result_fails_the_task_and_no_token_is_refused(monkeypatch):
-    async def query(prompt, options):
-        yield _result(is_error=True, text="")
-
-    monkeypatch.setattr(runner, "query", query)
-    monkeypatch.setenv(runner.TOKEN_ENV, "sk-ant-api03-x")
-    outcome = await runner.run(_task(), lambda _: None)
+async def test_an_error_result_fails_the_task_and_no_token_is_refused(monkeypatch, inbox):
+    _fake(monkeypatch, lambda text: [_result(is_error=True, text="")])
+    outcome = await runner.run(_task(), lambda _: None, inbox)
     assert not outcome.ok and outcome.text == "Claude Code ended with error_during_execution."
     with pytest.raises(RuntimeError, match="No login for Claude Code"):
-        await runner.run(_task(), lambda _: None)
+        await runner.run(_task(), lambda _: None, inbox)
 
 
-async def test_without_a_claude_token_it_runs_on_copilot_through_the_relay(monkeypatch):
+async def test_a_message_sent_while_it_works_goes_to_it_and_it_ends_once_it_answered_it(monkeypatch, inbox, tmp_path):
+    def replies(text):
+        if text == "fix the tests":
+            return [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c"), _result()]
+        return [AssistantMessage([TextBlock("Fixed, and the docs too.")], "c"), _result(text="Docs too.")]
+
+    seen = _fake(monkeypatch, replies)
+    steps = []
+
+    def progress(step):
+        steps.append(step)
+        if step.kind == "tool":
+            _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
+
+    outcome = await runner.run(_task(), progress, inbox)
+    assert seen["client"].sent == ["fix the tests", "and update the docs"]
+    assert steps == [
+        Step("tool", tool="Bash", detail="pytest", id="1"),
+        Step("user", "and update the docs", id="0001"),
+        Step("text", "Fixed, and the docs too."),
+    ]
+    assert outcome.ok and outcome.text == "Docs too."
+
+
+async def test_an_interrupt_stops_the_step_and_it_waits_for_the_next_message(monkeypatch, inbox, tmp_path):
+    def replies(text):
+        if text == "fix the tests":
+            return [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "sleep 600"})], "c")]  # still working
+        return [AssistantMessage([TextBlock("Done another way.")], "c"), _result(text="Another way.")]
+
+    seen = _fake(monkeypatch, replies)
+    steps = []
+
+    def progress(step):
+        steps.append(step)
+        if step.kind == "tool":
+            _send(tmp_path, "0001", {"kind": "interrupt"})
+        elif step == note(runner._INTERRUPTED):
+            # It waits rather than ending with the interrupted turn.
+            asyncio.get_running_loop().call_later(
+                0.05, _send, tmp_path, "0002", {"kind": "message", "text": "do it so"}
+            )
+
+    outcome = await runner.run(_task(), progress, inbox)
+    assert seen["client"].interrupts == 1 and seen["client"].sent == ["fix the tests", "do it so"]
+    assert steps == [
+        Step("tool", tool="Bash", detail="sleep 600", id="1"),
+        note(runner._INTERRUPTED),
+        Step("result", "Interrupted", "Bash", id="1"),
+        Step("user", "do it so", id="0002"),
+        Step("text", "Done another way."),
+    ]
+    assert outcome.ok and outcome.text == "Another way."
+
+
+async def test_without_a_claude_token_it_runs_on_copilot_through_the_relay(monkeypatch, inbox):
     seen = {}
 
     class FakeRelay:
@@ -156,16 +265,16 @@ async def test_without_a_claude_token_it_runs_on_copilot_through_the_relay(monke
         def claude_env(self):
             return {"ANTHROPIC_BASE_URL": "http://127.0.0.1:1"}
 
-    async def query(prompt, options):
+    def client(options):
         seen["env"] = options.env
-        yield _result()
+        return FakeClient(lambda text: [_result()])
 
     monkeypatch.setattr(runner, "Relay", FakeRelay)
-    monkeypatch.setattr(runner, "query", query)
+    monkeypatch.setattr(runner, "ClaudeSDKClient", client)
     monkeypatch.setenv(runner.COPILOT_ENV, "ghu_x")
     monkeypatch.delenv(runner.TOKEN_ENV, raising=False)
     steps = []
-    outcome = await runner.run(_task(), steps.append)
+    outcome = await runner.run(_task(), steps.append, inbox)
     assert outcome.ok and outcome.cost_usd is None  # Anthropic's prices aren't what Copilot charges
     assert seen == {"github_token": "ghu_x", "env": {"ANTHROPIC_BASE_URL": "http://127.0.0.1:1"}}
     assert steps == [note("Using Claude on your GitHub Copilot plan")] and runner.COPILOT_ENV not in os.environ

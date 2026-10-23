@@ -57,6 +57,8 @@ newer version later.
   them on its own in the repository you name and reports back. While the assistant's model is GitHub
   Copilot it runs on your Copilot plan, with nothing to enter; otherwise it takes a Claude token (from a
   Pro or Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
+  While it works in a conversation handed to it, what you write there reaches it between its steps, and
+  Interrupt stops what it's doing and waits for your next message.
 - **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
   GitHub token with the Copilot Requests permission, and downloads the Copilot CLI on its first task.
 - **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
