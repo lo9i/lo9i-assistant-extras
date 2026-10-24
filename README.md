@@ -56,9 +56,11 @@ newer version later.
 - **custom-email** (`communications/email/custom-email`): mail on any other server, such as your own
   domain or a work account. Its accounts take the servers you enter (SMTP host and port, IMAP host).
   Installing it also takes the accounts that were connected by hand before it existed.
-- **contacts** (`communications/contacts/contacts`): the assistant looks people up in the Contacts on
-  your Mac, by name, email or phone number: their numbers, emails, birthday and addresses. It only reads.
-  Mac only, while the assistant runs in your login session.
+- **contacts** (`communications/contacts/contacts`): the assistant looks people up in your contacts, by
+  name, email or phone number: their numbers, emails, birthday and addresses. It only reads. Given a CardDAV
+  account (iCloud with an app-specific password, Fastmail, Nextcloud), it reads that, on any computer;
+  without one, the Contacts on your Mac, while the assistant runs in your login session. Google Contacts
+  needs a sign-in it doesn't do yet.
 - **phone** (`communications/phone/phone`): the assistant calls people with the Phone app on your Mac,
   through your iPhone, with their numbers from the contacts plugin. macOS asks you to confirm each call,
   and you do the talking. Mac only, while the assistant runs in your login session.

@@ -298,9 +298,10 @@ wheels = [
 
 [[package]]
 name = "lo9i-contacts"
-version = "1.0.0"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "httpx2" },
     { name = "mcp" },
     { name = "pyobjc-framework-contacts", marker = "sys_platform == 'darwin'" },
 ]
@@ -313,6 +314,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx2", specifier = ">=2.13" },
     { name = "mcp", specifier = ">=2.2.0" },
     { name = "pyobjc-framework-contacts", marker = "sys_platform == 'darwin'", specifier = ">=11" },
 ]

@@ -40,7 +40,10 @@ def search(query: str) -> list[Contact]:
     """Contacts matching `query`: an email address, a phone number or a name. Raises ContactsError off a
     Mac or when access is denied."""
     if sys.platform != "darwin":
-        raise ContactsError("Contacts are only on a Mac.")
+        raise ContactsError(
+            "This computer isn't a Mac, so the contacts come from a CardDAV account (iCloud, Fastmail, Nextcloud): "
+            "give the contacts plugin its URL, user name and password, removing it and installing it again in Plugins."
+        )
     import Contacts  # macOS only; the dependency is installed only there
 
     store = Contacts.CNContactStore.alloc().init()

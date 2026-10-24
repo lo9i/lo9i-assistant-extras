@@ -33,3 +33,27 @@ async def test_contacts_errors_reach_the_agent(monkeypatch):
     monkeypatch.setattr(contacts, "search", search)
     _, result = await _call("find_contact", query="Ana")
     assert result.is_error and "No access to Contacts." in result.content[0].text
+
+
+async def test_with_a_carddav_account_it_reads_that_instead_of_the_mac(monkeypatch):
+    from lo9i_contacts import carddav
+
+    searched = []
+
+    async def search(self, query):
+        searched.append((self._url, query))
+        return [contacts.Contact("Ana")]
+
+    monkeypatch.setattr(carddav.CardDav, "search", search)
+    monkeypatch.setattr(contacts, "search", lambda query: [])
+    for key, value in {"URL": "https://contacts.icloud.com", "USER": "me@icloud.com", "PASSWORD": "pw"}.items():
+        monkeypatch.setenv(f"CARDDAV_{key}", value)
+    mcp_server._account.cache_clear()
+    _, result = await _call("find_contact", query="Ana")
+    assert json.loads(result.content[0].text)["name"] == "Ana"
+    assert searched == [("https://contacts.icloud.com/", "Ana")]
+    monkeypatch.setenv("CARDDAV_PASSWORD", "")
+    mcp_server._account.cache_clear()
+    _, result = await _call("find_contact", query="Ana")
+    assert result.is_error and "all three" in result.content[0].text
+    mcp_server._account.cache_clear()
