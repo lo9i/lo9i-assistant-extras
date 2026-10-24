@@ -1,6 +1,7 @@
-"""Web UI: the Hosts page (a table of the SSH config's hosts, each checked as the page loads) and a terminal
-page per host (xterm.js over a WebSocket, terminal.py) with the host's tunnels beside it (tunnels.py), which
-this process runs, so they stop with it. lo9i starts it (see server.yaml) and shows it in its web app:
+"""Web UI: the Hosts page (a table of the SSH config's hosts, each checked as the page loads, with its
+tunnels, which are switched on and off and added there too) and a terminal page per host (xterm.js over a
+WebSocket, terminal.py) with the host's tunnels beside it (tunnels.py), which this process runs, so they
+stop with it. lo9i starts it (see server.yaml) and shows it in its web app:
 
     HOSTS_DB=/path/hosts.db hosts-web --socket /path/web.sock
 
@@ -83,15 +84,17 @@ def _hosts_routes(app: FastAPI) -> None:
         every = await service.all_hosts()
         shown = every if hidden else [h for h in every if not h.hidden]
         hidden_count = sum(1 for h in every if h.hidden)
-        return _render(request, "hosts.html", hosts=shown, hidden_count=hidden_count, showing_hidden=hidden)
+        tunnels_of = await _tunnels_by_host(request)
+        return _render(
+            request, "hosts.html", hosts=shown, hidden_count=hidden_count, showing_hidden=hidden, tunnels_of=tunnels_of
+        )
 
     @app.get("/hosts/{name}/row", response_class=HTMLResponse)
     async def row(request: Request, name: str) -> HTMLResponse:
         """A host's row with what checking it found: whether it answers, and its Herdr session."""
         host = await service.host(name)
         probe = await _herdr(request).probe(name)
-        running = sum(1 for t in await service.tunnels(name) if _tunnels(request).status(t.id).on)
-        return _render(request, "_row.html", h=host, probe=probe, tunnels_on=running)
+        return _render(request, "_row.html", h=host, probe=probe, items=await _items(request, name))
 
     @app.post("/hosts/{name}/hide")
     async def hide(name: str) -> Response:
@@ -140,12 +143,17 @@ def _terminal_routes(app: FastAPI, command: Callable[[str], list[str]]) -> None:
 
 
 def _tunnel_routes(app: FastAPI) -> None:
-    """The terminal page's tunnels panel (htmx): the host's tunnels with their switches, and a form to add
-    or change one."""
+    """The tunnels (htmx): the terminal page's panel and the hosts table's cell, each with the host's tunnels
+    and their switches, and a form to add or change one (in the panel, or in the hosts page's dialog)."""
 
     @app.get("/hosts/{name}/tunnels", response_class=HTMLResponse)
     async def tunnel_list(request: Request, name: str) -> HTMLResponse:
         return await _tunnel_list(request, name)
+
+    @app.get("/hosts/{name}/tunnels/cell", response_class=HTMLResponse)
+    async def tunnel_cell(request: Request, name: str) -> HTMLResponse:
+        """The host's tunnels in its row of the hosts table, with their switches."""
+        return _render(request, "_tunnel_cell.html", h=await service.host(name), items=await _items(request, name))
 
     @app.get("/hosts/{name}/tunnels/new", response_class=HTMLResponse)
     async def new_tunnel(request: Request, name: str) -> HTMLResponse:
@@ -172,26 +180,44 @@ def _tunnel_routes(app: FastAPI) -> None:
     @app.post("/hosts/{name}/tunnels/{tunnel_id}/start", response_class=HTMLResponse)
     async def start_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
         await _tunnels(request).start(await service.tunnel(name, tunnel_id))
-        return await _tunnel_list(request, name)
+        return _changed(await _tunnel_list(request, name))
 
     @app.post("/hosts/{name}/tunnels/{tunnel_id}/stop", response_class=HTMLResponse)
     async def stop_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
         await service.tunnel(name, tunnel_id)
         await _tunnels(request).stop(tunnel_id)
-        return await _tunnel_list(request, name)
+        return _changed(await _tunnel_list(request, name))
 
     @app.delete("/hosts/{name}/tunnels/{tunnel_id}", response_class=HTMLResponse)
     async def delete_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
         await service.tunnel(name, tunnel_id)
         await _tunnels(request).stop(tunnel_id)
         await service.delete_tunnel(tunnel_id)
-        return await _tunnel_list(request, name)
+        return _changed(await _tunnel_list(request, name))
 
 
 async def _tunnel_list(request: Request, name: str) -> HTMLResponse:
     h = await service.host(name)
-    items = [(t, _tunnels(request).status(t.id)) for t in await service.tunnels(name)]
-    return _render(request, "_tunnels.html", h=h, items=items)
+    return _render(request, "_tunnels.html", h=h, items=await _items(request, name))
+
+
+async def _items(request: Request, name: str) -> list[tuple[Tunnel, Status]]:
+    """The host's tunnels, each with how it's doing."""
+    return [(t, _tunnels(request).status(t.id)) for t in await service.tunnels(name)]
+
+
+async def _tunnels_by_host(request: Request) -> dict[str, list[tuple[Tunnel, Status]]]:
+    found: dict[str, list[tuple[Tunnel, Status]]] = {}
+    for t in await service.tunnels():
+        found.setdefault(t.host, []).append((t, _tunnels(request).status(t.id)))
+    return found
+
+
+def _changed(response: HTMLResponse) -> HTMLResponse:
+    """Tells whatever shows the tunnels to read them again: the hosts table's cells switch them without
+    taking the answer, which is the terminal page's list."""
+    response.headers["HX-Trigger"] = "tunnels-changed"
+    return response
 
 
 async def _save_tunnel(request: Request, name: str, editing: Tunnel | None) -> Response:

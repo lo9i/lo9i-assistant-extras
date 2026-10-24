@@ -48,7 +48,7 @@ def _hidden(name: str) -> None:
 def test_the_table_lists_the_hosts_and_checks_each_as_it_loads(client):
     page = client.get("/", headers={"X-Forwarded-Prefix": "/hosts"}).text
     assert '<base href="/hosts/">' in page
-    assert 'id="filter"' in page and page.count("<th data-sort") == 5
+    assert 'id="filter"' in page and page.count("<th data-sort") == 6
     assert 'data-href="hosts/pi"' in page and 'hx-get="hosts/pi/row"' in page and "Checking…" in page
     assert "lo9i@lo9i-pi.local" in page and "groso@192.168.0.10:2222" in page
     assert client.get("/static/table.js", headers={"X-Forwarded-Prefix": "/hosts"}).status_code == 200
@@ -57,7 +57,7 @@ def test_the_table_lists_the_hosts_and_checks_each_as_it_loads(client):
 def test_a_checked_row_says_whether_it_answers_and_runs_the_session(client, ssh: FakeSsh):
     ssh.answers[herdr._PROBE] = answers(out=json.dumps({"sessions": [{"name": "lo9i", "running": True}]}))
     row = client.get("/hosts/pi/row").text
-    assert "Online" in row and "Running" in row and "hx-get" not in row
+    assert "Online" in row and "Running" in row and "hosts/pi/row" not in row
     ssh.answers[herdr._PROBE] = answers(127)
     assert "No Herdr" in client.get("/hosts/pi/row").text
     ssh.answers[herdr._PROBE] = answers(255, err="ssh: Could not resolve hostname lo9i-pi.local")

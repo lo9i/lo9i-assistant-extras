@@ -89,13 +89,32 @@ def test_switching_a_tunnel_on_and_off(client, spawn: FakeSpawn):
     assert spawn.started[0].terminated
 
 
-def test_the_hosts_table_says_which_hosts_have_tunnels_on(client, ssh):
+def test_the_hosts_table_shows_each_hosts_tunnels_and_switches_them(client, ssh):
     ssh.answers[herdr._PROBE] = answers(127)
+    page = client.get("/").text
+    # Before any is added: the column, Add in each row, and the dialog Add opens its form in.
+    assert ">Tunnels</th>" in page and 'hx-get="hosts/pi/tunnels/new" hx-target="#tunnel-form"' in page
+    assert '<dialog id="tunnel-dialog"' in page and '<div id="tunnel-form"></div>' in page
     _add(client)
     [t] = _saved()
-    assert "tunnel on" not in client.get("/hosts/pi/row").text
-    client.post(f"/hosts/pi/tunnels/{t.id}/start")
-    assert "1 tunnel on" in client.get("/hosts/pi/row").text
+    row = client.get("/hosts/pi/row").text
+    assert 'class="tunnel-chip"' in row and "Database" in row and "localhost:15432 → db.internal:5432 on pi" in row
+    assert f'hx-post="hosts/pi/tunnels/{t.id}/start" hx-swap="none"' in row and 'data-value="0"' in row
+    # The cell reads itself again when tunnels change, and only polls while one is on.
+    assert 'hx-trigger="tunnels-changed from:body"' in row
+    switched = client.post(f"/hosts/pi/tunnels/{t.id}/start")
+    assert switched.headers["HX-Trigger"] == "tunnels-changed"
+    cell = _until(client, "Running", "/hosts/pi/tunnels/cell")
+    assert cell.startswith('<td class="tunnels-cell" data-value="1"') and "every " in cell
+    assert f'hx-post="hosts/pi/tunnels/{t.id}/stop"' in cell and 'aria-checked="true"' in cell
+    assert "Database" in client.get("/").text  # The page shows them before its rows are checked.
+    assert client.post(f"/hosts/pi/tunnels/{t.id}/stop").headers["HX-Trigger"] == "tunnels-changed"
+    assert 'aria-checked="false"' in client.get("/hosts/pi/tunnels/cell").text
+
+
+def test_the_form_closes_its_dialog_when_cancelled(client):
+    form = client.get("/hosts/pi/tunnels/new").text
+    assert "this.closest('dialog')?.close()" in form
 
 
 def test_a_failed_tunnel_says_why_in_plain_words(client, spawn: FakeSpawn):

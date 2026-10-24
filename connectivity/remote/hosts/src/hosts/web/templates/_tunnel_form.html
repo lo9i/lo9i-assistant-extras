@@ -3,7 +3,7 @@
 {% set path = 'hosts/' ~ (h.name | urlencode) %}
 {% macro error(field) %}{% if errors[field] %}<span class="field-error">{{ errors[field] }}</span>{% endif %}{% endmacro %}
 <form class="tunnel-form" hx-post="{{ path }}/tunnels{{ '/' ~ editing.id if editing else '' }}" hx-target="#tunnel-form">
-  <h3 class="text-heading">{{ 'Edit “' ~ editing.name ~ '”' if editing else 'New tunnel' }}</h3>
+  <h3 class="text-heading">{{ 'Edit “' ~ editing.name ~ '”' if editing else 'New tunnel through ' ~ h.name }}</h3>
 
   <label class="field">
     <span>Name</span>
@@ -46,7 +46,7 @@
   </div>
 
   <div class="form-actions">
-    <button type="button" class="btn btn--sm btn--ghost" onclick="this.closest('#tunnel-form').replaceChildren()">Cancel</button>
+    <button type="button" class="btn btn--sm btn--ghost" onclick="this.closest('dialog')?.close(); this.closest('#tunnel-form')?.replaceChildren()">Cancel</button>
     <button class="btn btn--sm btn--primary">{{ 'Save' if editing else 'Add tunnel' }}</button>
   </div>
 </form>
