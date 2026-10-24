@@ -29,18 +29,25 @@ def test_a_tunnel_from_the_form():
 @pytest.mark.parametrize(
     ("fields", "wrong"),
     [
-        (("", "local", "80", "localhost", "80"), {"name"}),
-        (("x" * 41, "local", "80", "localhost", "80"), {"name"}),
-        (("Web", "tcp", "80", "localhost", "80"), {"kind"}),
+        (("", "local", "8080", "localhost", "80"), {"name"}),
+        (("x" * 41, "local", "8080", "localhost", "80"), {"name"}),
+        (("Web", "tcp", "8080", "localhost", "80"), {"kind"}),
         (("Web", "local", "0", "localhost", "65536"), {"listen_port", "target_port"}),
         (("Web", "local", "eighty", "localhost", ""), {"listen_port", "target_port"}),
         # Nothing typed becomes an ssh option or a second forward.
-        (("Web", "local", "80", "-oProxyCommand=sh", "80"), {"target_host"}),
+        (("Web", "local", "8080", "-oProxyCommand=sh", "80"), {"target_host"}),
         (("Web", "remote", "80", "a:80:b", "80"), {"target_host"}),
-        (("Web", "local", "80", "two words", "80"), {"target_host"}),
+        (("Web", "local", "8080", "two words", "80"), {"target_host"}),
+        # Under 1024 only an administrator may listen on this Mac; on the host, whoever logs in may.
+        (("Web", "local", "1000", "localhost", "3306"), {"listen_port"}),
+        (("Web", "socks", "1080", "", ""), set()),
+        (("Web", "socks", "80", "", ""), {"listen_port"}),
     ],
 )
 def test_what_to_change_is_said_by_field(fields, wrong):
+    if not wrong:
+        parse("pi", *fields)
+        return
     with pytest.raises(InvalidTunnelError) as raised:
         parse("pi", *fields)
     assert set(raised.value.errors) == wrong
@@ -213,6 +220,7 @@ async def test_a_tunnel_up_for_a_while_starts_its_waits_over(spawn: FakeSpawn, m
     [
         ("lo9i@lo9i-pi.local: Permission denied (publickey).", "didn't accept this computer's SSH key"),
         ("bind [127.0.0.1]:15432: Address already in use\nCould not request local forwarding.", "already in use"),
+        ("bind [127.0.0.1]:1000: Permission denied\nCould not request local forwarding.", "need an administrator"),
     ],
 )
 async def test_what_trying_again_wont_fix_fails_at_once(spawn: FakeSpawn, err, said):

@@ -108,6 +108,15 @@ class Status:
 STOPPED = Status("stopped")
 
 
+# Local and SOCKS tunnels listen on 127.0.0.1 of this computer, where only an administrator may take a port
+# under this one (macOS allows them on every address at once, not on one).
+_ON_THIS_MAC = ("local", "socks")
+_FIRST_OPEN_PORT = 1024
+_PRIVILEGED = "Ports under 1024 need an administrator on this Mac. Choose one from 1024 up, like 13306."
+# What ssh says when it isn't allowed to listen: "bind [127.0.0.1]:1000: Permission denied".
+_BIND_REFUSED = re.compile(r"bind \[[^\]]*\]:\d+: permission denied")
+
+
 def parse(
     host: str, name: str, kind: str, listen_port: Any, target_host: str = "", target_port: Any = None,
     id: int | None = None,
@@ -122,6 +131,8 @@ def parse(
     if kind not in KINDS:
         errors["kind"] = "Choose local, remote or SOCKS."
     listen = _port(listen_port, "listen_port", errors)
+    if kind in _ON_THIS_MAC and listen is not None and listen < _FIRST_OPEN_PORT and "listen_port" not in errors:
+        errors["listen_port"] = _PRIVILEGED
     target, to = "", None
     if kind in ("local", "remote"):
         target = (target_host or "").strip() or "localhost"
@@ -171,12 +182,14 @@ def explain(tunnel: Tunnel, err: str, code: int) -> tuple[str, bool]:
     """Why ssh stopped, in plain words, and whether trying again won't help until the user does something.
     `err` is what ssh wrote, its debug lines left out."""
     lowered = err.lower()
+    if _BIND_REFUSED.search(lowered):
+        return _PRIVILEGED, True
     if "address already in use" in lowered or "could not request local forwarding" in lowered:
         return f"Port {tunnel.listen_port} is already in use on this Mac. Choose another one.", True
     if "remote port forwarding failed" in lowered:
         return f"{tunnel.host} wouldn't open port {tunnel.listen_port}: it may be in use there, or not allowed.", True
     if "privileged port" in lowered:
-        return "Ports under 1024 need an administrator. Choose a higher one.", True
+        return _PRIVILEGED, True
     if "bad " in lowered and "specification" in lowered:
         return "ssh didn't accept this tunnel's ports or address.", True
     if "bad configuration option" in lowered or "terminating, " in lowered:
