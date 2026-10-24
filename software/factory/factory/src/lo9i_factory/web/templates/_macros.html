@@ -42,7 +42,7 @@
     {% if d.kind == 'winner' %}
     <span class="kind">{{ 'merged the proposals' if d.body.winner == 'merged' else 'picked the ' ~ d.body.winner ~ "'s" }}{{ '' if d.body.agreed else ' when the rounds ran out' }}</span>
     {% else %}
-    <span class="kind">{{ 'accepted the diff' if d.kind == 'accept' else 'sent fixes back' }}</span>
+    <span class="kind">{{ 'accepted the diff' if d.kind == 'accept' else 'asked for fixes' }}</span>
     {% endif %}
   </div>
   <p class="text-sm"><span class="medium">Why:</span> {{ d.rationale }}</p>

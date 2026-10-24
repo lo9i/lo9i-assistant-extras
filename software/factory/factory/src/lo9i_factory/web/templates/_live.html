@@ -55,6 +55,15 @@
     {% set view = stages | selectattr('checkpoint') | selectattr('checkpoint.id', 'equalto', checkpoint.id) | first %}
     <section class="panel attention" id="checkpoint">
       <h2>Your call: {{ CHECKPOINT_LABELS[checkpoint.kind] }}</h2>
+      {% if checkpoint.kind == 'diff' and not info.changes %}
+      <div class="notice text-sm">This task changed no files, so approving it changes nothing in your repository: it only closes the task.
+        To get its result written down, reject it and say what to write, and where (<code class="mono">docs/review.md</code>, say).</div>
+      {% endif %}
+      {% if checkpoint.kind == 'diff' and view and view.decision and view.decision.kind == 'fixes' %}
+      <div class="notice text-sm">The review still asks for the fixes below, but the {{ fix_loops }} round{{ 's' if fix_loops != 1 }} of fixes
+        the factory runs on its own {{ 'are' if fix_loops != 1 else 'is' }} used up, so it stopped here.
+        Approve to keep the branch as it is, or reject with a comment to send it back to the coding agent.</div>
+      {% endif %}
       {% if view and view.decision %}{{ decision_box(view.decision, open=True) }}{% endif %}
       {% if checkpoint.kind == 'diff' and info.points | selectattr('status', 'equalto', 'open') | list %}
       <p class="text-sm warning">Points the review left open are listed below.</p>

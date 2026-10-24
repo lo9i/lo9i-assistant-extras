@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from fakes import FakeAgent, Team, on_fakes, once
+from fakes import FakeAgent, Team, fixes, on_fakes, once
 from fastapi.testclient import TestClient
 
 from lo9i_factory import approvals, db, repo, service, settings
@@ -186,6 +186,23 @@ def test_a_debate_under_way_shows_where_it_stands(client, conn, project):
     assert '<span class="spinner"></span>' in live and "in this stage" in live
     assert "The proposal" in live and "An LRU in front of the search." in live
     assert "Where it stands" in live and "They disagree on the TTL" in live and "not agreed yet" in live
+
+
+def test_the_final_call_says_when_nothing_changed_and_when_the_fix_rounds_ran_out(client, conn, project):
+    settings.update(conn, {"max_fix_loops": 0})
+    team = Team({("judge", "review_verdict"): [fixes("Write the review in docs/review.md")]})
+    runner = Runner(Providers(env={}, clients={"copilot": team}), make_agent=FakeAgent(files={}))
+    t = service.create_task(conn, str(project), "Read the plan and discuss it")
+    for _ in ("spec", "plan"):
+        once(runner, conn)
+        service.approve(conn, t.id)
+    once(runner, conn)
+
+    page = client.get(f"/tasks/{t.id}").text
+    call = page[page.index('id="checkpoint"') :]
+    assert "This task changed no files, so approving it changes nothing in your repository" in call
+    assert "the 0 rounds of fixes" in call and "used up, so it stopped here" in call
+    assert "asked for fixes" in call and "Write the review in docs/review.md" in call
 
 
 def test_comments_resume_cancel_and_delete(client, conn, project):

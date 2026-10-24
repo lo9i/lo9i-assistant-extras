@@ -5,6 +5,9 @@ the checkpoint each ends at; then the build and its review (build.py).
 - PLAN: the architect, security and tester debate, the judge decides:
   CHECKPOINT 2. They start from the approved spec.
 
+The factory's only result is the branch: a task that asks for a review or
+an answer rather than code gets a document written in the repository.
+
 A stage run again after its checkpoint was rejected starts from the result
 that was rejected; the user's comment opens its thread.
 """
@@ -54,7 +57,7 @@ async def advance(
 
 
 def brief(conn: sqlite3.Connection, task: Task, stage: Stage) -> Brief:
-    parts = [f"## {task.title}\n\n{task.description}", f"The repository: {task.repo}"]
+    parts = [f"## {task.title}\n\n{task.description}", f"The repository: {task.repo}", build.DELIVERS]
     if stage.kind == "plan" and (spec := service.approved(conn, task.id, "spec")):
         parts.append(f"## The approved spec\n\n{spec}")
     for rejected in service.rejected(conn, task.id, stage):

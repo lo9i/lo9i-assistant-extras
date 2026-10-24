@@ -94,6 +94,37 @@ def test_the_agent_builds_the_plan_its_tests_run_and_the_review_accepts_it(conn,
     assert {c.path for c in service.changes(conn, t.id)} == {"cache.py", "test_cache.py"}
 
 
+def test_the_team_knows_the_branch_is_the_only_result(conn, project):
+    team, agent = Team(), FakeAgent()
+    _, r = to_build(conn, project, team, agent)
+    once(r, conn)
+
+    # The spec, the plan and the review are told there's no reply to give, only the branch.
+    for role, kind in (("architect", "proposal"), ("security", "proposal"), ("reviewer", "proposal")):
+        request = next(req for who, k, req in team.calls if (who, k) == (role, kind))
+        assert "## What the factory delivers" in request.turns[0].text
+    assert "a Markdown document the coding agent writes in the repository" in build.DELIVERS
+    # And so is the agent: what it only says, no one sees.
+    assert "goes in a file in this folder" in agent.jobs[0].system
+
+
+def test_a_build_that_changed_nothing_is_reviewed_on_what_the_agent_said(conn, project):
+    team = Team()
+    agent = FakeAgent(files={}, said="# Review of PLAN.md\n\nStep 1 must be redone.")
+    t, r = to_build(conn, project, team, agent)
+    once(r, conn)
+
+    review = next(req for role, k, req in team.calls if k == "proposal" and role == "reviewer")
+    context = review.turns[0].text
+    assert "## What changed\n\nNothing." in context
+    assert "Empty: the build changed no files, so the user would approve nothing." in context
+    assert "## What the coding agent said" in context and "Step 1 must be redone." in context
+    assert "```diff" not in context
+
+    (notice,) = notify.due(conn, service.get_task(conn, t.id))
+    assert "It changed no files: approving it only closes the task." in notice.text
+
+
 def test_the_reviews_points_go_back_to_the_agent_who_answers_each(conn, project):
     team = Team({("judge", "review_verdict"): [fixes("Add a TTL", "Bound the size")]})
     agent = FakeAgent()
