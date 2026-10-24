@@ -49,7 +49,9 @@ def test_the_table_lists_the_hosts_and_checks_each_as_it_loads(client):
     page = client.get("/", headers={"X-Forwarded-Prefix": "/hosts"}).text
     assert '<base href="/hosts/">' in page
     assert 'id="filter"' in page and page.count("<th data-sort") == 6
-    assert 'data-href="hosts/pi"' in page and 'hx-get="hosts/pi/row"' in page and "Checking…" in page
+    # At once, without waiting for any host: each is checked after, over /statuses (table.js).
+    assert 'data-host="pi"' in page and 'data-href="hosts/pi"' in page and "Checking…" in page
+    assert "data-checking" in page and "hx-get=\"hosts/pi/row\"" not in page
     assert "lo9i@lo9i-pi.local" in page and "groso@192.168.0.10:2222" in page
     assert client.get("/static/table.js", headers={"X-Forwarded-Prefix": "/hosts"}).status_code == 200
 
@@ -67,6 +69,20 @@ def test_a_checked_row_says_whether_it_answers_and_runs_the_session(client, ssh:
     # Its terminal can't connect: nothing opens it.
     assert "data-href" not in row and 'href="hosts/pi"' not in row
     assert '<button class="btn btn--sm btn--neutral" disabled title="pi is offline:' in row
+
+
+def test_each_hosts_row_comes_over_one_socket_as_its_check_ends_and_shows_at_once_next_time(client, ssh: FakeSsh):
+    ssh.answers[herdr._PROBE] = answers(out=json.dumps({"sessions": [{"name": "lo9i", "running": True}]}))
+    _hidden("nas")
+    with client.websocket_connect("/statuses") as ws:
+        [checked] = [ws.receive_json()]
+        with pytest.raises(WebSocketDisconnect):
+            ws.receive_json()  # Only the hosts shown; then it closes.
+    assert checked["host"] == "pi" and "Online" in checked["html"] and "data-checking" not in checked["html"]
+    page = client.get("/").text
+    assert "Checking…" not in page and "Online" in page  # What it found last, while it checks again.
+    with client.websocket_connect("/statuses?hidden=true") as ws:
+        assert {ws.receive_json()["host"], ws.receive_json()["host"]} == {"pi", "nas"}
 
 
 def test_hidden_hosts_leave_the_table_until_asked_for(client):

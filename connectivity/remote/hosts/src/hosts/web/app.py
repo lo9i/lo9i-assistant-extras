@@ -12,6 +12,7 @@ assistant's tools (mcp_server.py) reach the tunnels as JSON under /api/ on the s
 """
 
 import argparse
+import asyncio
 import contextlib
 import hashlib
 import os
@@ -23,15 +24,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import db, service, tunnels
 from ..db import DuplicateTunnelError
-from ..herdr import ATTACH, Herdr, HerdrError
-from ..service import UnknownHostError, UnknownTunnelError
+from ..herdr import ATTACH, Herdr, HerdrError, Probe
+from ..service import Host, UnknownHostError, UnknownTunnelError
 from ..ssh import OpenSsh, terminal_command
 from ..tunnels import InvalidTunnelError, Status, Tunnel, Tunnels
 from .terminal import Terminal, bridge
@@ -81,19 +82,40 @@ def _tunnels(request: Request) -> Tunnels:
 def _hosts_routes(app: FastAPI) -> None:
     @app.get("/", response_class=HTMLResponse)
     async def hosts(request: Request, hidden: bool = False) -> HTMLResponse:
+        """The table at once, each host with what checking it found last; the page checks them again over
+        /statuses as soon as it shows."""
         every = await service.all_hosts()
         shown = every if hidden else [h for h in every if not h.hidden]
         hidden_count = sum(1 for h in every if h.hidden)
         tunnels_of = await _tunnels_by_host(request)
         return _render(
-            request, "hosts.html", hosts=shown, hidden_count=hidden_count, showing_hidden=hidden, tunnels_of=tunnels_of
-        )
+            request, "hosts.html", hosts=shown, hidden_count=hidden_count, showing_hidden=hidden, tunnels_of=tunnels_of,
+            probes=request.app.state.probes,
+        )  # fmt: skip
+
+    @app.websocket("/statuses")
+    async def statuses(websocket: WebSocket, hidden: bool = False) -> None:
+        """Each shown host's row again as checking it ends, the quickest first. Over one connection: a request
+        per row would wait for the browser's few connections per site, behind the hosts that don't answer."""
+        await websocket.accept()
+        every = await service.all_hosts()
+        checks = [asyncio.create_task(_checked(websocket.app, h)) for h in every if hidden or not h.hidden]
+        try:
+            for check in asyncio.as_completed(checks):
+                name, html = await check
+                await websocket.send_json({"host": name, "html": html})
+            await websocket.close()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            for check in checks:
+                check.cancel()
 
     @app.get("/hosts/{name}/row", response_class=HTMLResponse)
     async def row(request: Request, name: str) -> HTMLResponse:
         """A host's row with what checking it found: whether it answers, and its Herdr session."""
         host = await service.host(name)
-        probe = await _herdr(request).probe(name)
+        probe = await _probe(request.app, name)
         return _render(request, "_row.html", h=host, probe=probe, items=await _items(request, name))
 
     @app.post("/hosts/{name}/hide")
@@ -202,8 +224,26 @@ async def _tunnel_list(request: Request, name: str) -> HTMLResponse:
 
 
 async def _items(request: Request, name: str) -> list[tuple[Tunnel, Status]]:
+    return await _items_of(_tunnels(request), name)
+
+
+async def _items_of(running: Tunnels, name: str) -> list[tuple[Tunnel, Status]]:
     """The host's tunnels, each with how it's doing."""
-    return [(t, _tunnels(request).status(t.id)) for t in await service.tunnels(name)]
+    return [(t, running.status(t.id)) for t in await service.tunnels(name)]
+
+
+async def _probe(app: FastAPI, name: str) -> Probe:
+    """Checks the host, and keeps what it found for the table's next load (app.state.probes)."""
+    probe = await app.state.herdr.probe(name)
+    app.state.probes[name] = probe
+    return probe
+
+
+async def _checked(app: FastAPI, host: Host) -> tuple[str, str]:
+    """The host's name and its row, checked."""
+    probe = await _probe(app, host.name)
+    items = await _items_of(app.state.tunnels, host.name)
+    return host.name, templates.env.get_template("_row.html").render(h=host, probe=probe, items=items)
 
 
 async def _tunnels_by_host(request: Request) -> dict[str, list[tuple[Tunnel, Status]]]:
@@ -327,6 +367,8 @@ def create_app(
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.herdr = herdr or Herdr(OpenSsh())
     app.state.tunnels = running or Tunnels()
+    # What checking each host found last, by name: the table shows it at once while it checks them again.
+    app.state.probes = {}
 
     @app.exception_handler(UnknownHostError)
     @app.exception_handler(UnknownTunnelError)

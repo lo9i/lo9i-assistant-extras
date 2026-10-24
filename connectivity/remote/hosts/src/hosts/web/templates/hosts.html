@@ -43,7 +43,7 @@
       </thead>
       <tbody>
         {% for h in hosts %}
-        {% set probe = none %}
+        {% set probe = probes.get(h.name) %}
         {% set items = tunnels_of.get(h.name, []) %}
         {% include "_row.html" %}
         {% endfor %}

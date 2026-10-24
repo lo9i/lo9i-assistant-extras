@@ -1,6 +1,7 @@
 // The hosts table, as Watchlist's tables look: the search box keeps the rows that have its words, a column's
-// header sorts by it (again to reverse it), and clicking a row opens its host. Each row is checked after the
-// page loads and comes in again (htmx), so the search and the order are applied again then.
+// header sorts by it (again to reverse it), and clicking a row opens its host. Once the page shows, every host
+// is checked again: each row comes over one WebSocket as its check ends (app.py's statuses), and the search and
+// the order are applied again to it. Rows also come in again from htmx (a tunnel switched).
 (() => {
   const table = document.getElementById("hosts");
   if (!table) return;
@@ -48,7 +49,37 @@
     if (row && !event.target.closest("a, button")) window.open(new URL(row.dataset.href, document.baseURI).href, "_blank");
   });
 
+  function replace(host, html) {
+    const row = body.querySelector(`tr[data-host="${CSS.escape(host)}"]`);
+    const template = document.createElement("template");
+    template.innerHTML = html.trim();
+    const fresh = template.content.firstElementChild;
+    if (!row || !fresh) return;
+    row.replaceWith(fresh);
+    htmx.process(fresh);
+    filter();
+    sort();
+  }
+
+  function check() {
+    const url = new URL(`statuses${location.search}`, document.baseURI);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(url);
+    socket.addEventListener("message", (event) => {
+      const { host, html } = JSON.parse(event.data);
+      replace(host, html);
+    });
+    // Without the socket (it couldn't open, or closed early), a row still checking asks for itself.
+    socket.addEventListener("close", () => {
+      for (const row of body.querySelectorAll("tr[data-checking]")) {
+        const path = `hosts/${encodeURIComponent(row.dataset.host)}/row`;
+        htmx.ajax("GET", path, { target: row, swap: "outerHTML" });
+      }
+    });
+  }
+
   search.addEventListener("input", filter);
+  check();
   document.body.addEventListener("htmx:afterSettle", () => {
     filter();
     sort();

@@ -1,10 +1,10 @@
-{# A host's row. Without `probe` it says it's checking and asks for itself again, checked (app.py's row).
-   `items` are its tunnels with how each is doing, shown and switched in their own cell. An offline host's
-   terminal can't connect, so nothing opens it: not the row, its name or Terminal. #}
+{# A host's row, with what checking it found (`probe`), the last time or now; without one it says it's checking.
+   The page checks every host again as it shows, and each row comes again over /statuses as its check ends
+   (table.js). `items` are its tunnels with how each is doing, shown and switched in their own cell. An offline
+   host's terminal can't connect, so nothing opens it: not the row, its name or Terminal. #}
 {% set path = 'hosts/' ~ (h.name | urlencode) %}
 {% set offline = probe is not none and not probe.reachable %}
-<tr {% if not offline %}data-href="{{ path }}"{% endif %} class="{{ 'dim' if h.hidden }}"
-    {% if probe is none %}hx-get="{{ path }}/row" hx-trigger="load" hx-swap="outerHTML"{% endif %}>
+<tr data-host="{{ h.name }}" {% if not offline %}data-href="{{ path }}"{% endif %} {% if probe is none %}data-checking{% endif %} class="{{ 'dim' if h.hidden }}">
   <td class="medium" data-value="{{ h.name | lower }}">
     {% if offline %}{{ h.name }}{% else %}<a href="{{ path }}" target="_blank" class="link">{{ h.name }}</a>{% endif %}
     {% if h.hidden %}<span class="pill">hidden</span>{% endif %}
