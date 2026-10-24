@@ -18,7 +18,11 @@ A plugin that works only on some systems says so with `platforms:` (`linux`, `ma
 `SKILL.md` header; lo9i doesn't list it anywhere else.
 
 Plugins share no code: each one is complete in its folder. What lo9i does for them (running a chat, a
-coding agent's tasks) is in lo9i, and they talk to it through the protocols in lo9i's `docs/`.
+coding agent's tasks) is in lo9i, and they talk to it through the protocols in lo9i's `docs/`. The code a
+protocol needs is copied into each plugin that speaks it (the channels' `daemon.py` and `runner.py`, the
+agents' `task_folder.py`); `tests/test_shared_code.py` fails when the copies differ, so a change made in
+one is made in all, and lists the differences that are meant to be there. The pre-commit hook runs it;
+by hand: `uv run --no-project --with pytest pytest tests`.
 
 Install from the app: Plugins in the web app, `/plugins` in the terminal app. **Update** downloads a
 newer version later.
