@@ -33,6 +33,24 @@
     document.addEventListener("click", (e) => {
       if (e.target.tagName === "DIALOG") e.target.close();
     });
+    // A toggle with data-keep (a stage's full discussion, the diff) stays open or closed as the user
+    // left it while a running task's page is read again every few seconds, which renders it anew.
+    // Put back on htmx:afterSwap, before the page is painted, so it doesn't flicker.
+    function keptKey(d) { return "factory:" + d.dataset.keep; }
+    function keepToggles(root) {
+      root.querySelectorAll?.("details[data-keep]").forEach((d) => {
+        const kept = sessionStorage.getItem(keptKey(d));
+        if (kept) d.open = kept === "open";
+      });
+    }
+    if (!window.keptToggles) {
+      window.keptToggles = true;
+      document.addEventListener("toggle", (e) => {
+        if (e.target.dataset?.keep) sessionStorage.setItem(keptKey(e.target), e.target.open ? "open" : "closed");
+      }, true);
+      document.addEventListener("htmx:afterSwap", (e) => keepToggles(e.target));
+    }
+    keepToggles(document);
     // Errors outside forms come back as plain text; show them instead of failing silently.
     document.body.addEventListener("htmx:responseError", (e) => {
       const toast = document.getElementById("toast");

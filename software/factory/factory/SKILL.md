@@ -3,7 +3,7 @@ name: factory
 description: The software factory (the factory MCP server) — a team of models (architect, reviewer, tester, security, and a judge) that debates a coding task in one of the user's local git repositories, stops for the user's approval at the spec, the plan and the final diff, and has a coding agent (Claude Code or Codex) build it on a branch of its own. Use it when the user wants something built, fixed or changed in a repository by the factory, asks about a factory task, approves or rejects one, or answers what a task's agent asks; and when the factory's notices say a task waits for them.
 ---
 
-The `factory` MCP server's tools are named `mcp__factory__<tool>`. If they aren't there, the server is turned off: the user turns it on in Plugins. The user also has the **Factory** page in the web app's sidebar: a board of the tasks, each task's debate as a chat, the diff, the costs, and Settings.
+The `factory` MCP server's tools are named `mcp__factory__<tool>`. If they aren't there, the server is turned off: the user turns it on in Plugins. The user also has the **Factory** page in the web app's sidebar: a board of the tasks, each task's progress and what it's doing now (its debates behind a toggle), the diff, the costs, and Settings.
 
 ## A task's life
 

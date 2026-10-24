@@ -206,10 +206,60 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .brief .prose { margin-top: 8px; border-left-width: 2px; border-color: var(--color-border); padding-left: 12px; }
 .task-layout { display: grid; grid-template-columns: minmax(0, 1fr) 17rem; gap: 16px; align-items: start; }
 .task-layout .main, .task-layout .side { display: flex; flex-direction: column; gap: 16px; }
-.status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.status-line p { flex-basis: 100%; }
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 18%, transparent); animation: pulse 1.5s infinite; }
 @keyframes pulse { 50% { opacity: 0.3; } }
+.spinner { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Something to know, not an alarm: why a task paused or failed, what stopped the agent. */
+.notice {
+  padding: 10px 12px; overflow-wrap: anywhere;
+  border: 1px solid color-mix(in srgb, var(--color-warn) 32%, transparent); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-warn) 7%, transparent); color: var(--color-text-primary);
+}
+
+/* A task's progress: its stages, then the final diff, left to right (views.steps). */
+
+.progress { padding: 14px 16px 12px; }
+.stepper { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; text-align: center; --tone: var(--color-text-faint); }
+/* The line from the step before, between the two markers. */
+.step + .step::before {
+  content: ""; position: absolute; top: 13px; right: calc(50% + 20px); width: calc(100% - 32px); height: 2px; border-radius: 1px;
+  background: color-mix(in srgb, var(--tone) 45%, transparent);
+}
+.step.upcoming::before { background: var(--color-divider); }
+.step .marker {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--tone) 70%, transparent);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  color: var(--tone); font-size: var(--font-size-xs); font-weight: 600; line-height: 1;
+}
+.step .name { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
+.step .note { min-height: 14px; font-size: 10px; line-height: 1.4; color: var(--tone); }
+.step.done { --tone: var(--color-success); }
+.step.done .name { color: var(--color-text-primary); }
+.step.running, .step.queued { --tone: var(--color-text-primary); }
+.step.waiting, .step.paused { --tone: var(--color-warn); }
+.step.failed { --tone: var(--color-danger); }
+.step.cancelled { --tone: var(--color-text-muted); }
+.step.current .name { color: var(--color-text-primary); }
+.step.current .marker { box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 16%, transparent); }
+
+/* What it's doing now, in a sentence (views.now). */
+
+.now { --tone: var(--color-text-primary); border-left: 3px solid color-mix(in srgb, var(--tone) 70%, transparent); }
+.now.state-waiting, .now.state-paused { --tone: var(--color-warn); }
+.now.state-done { --tone: var(--color-success); }
+.now.state-failed { --tone: var(--color-danger); }
+.now.state-cancelled { --tone: var(--color-text-muted); }
+.now-row { display: flex; align-items: flex-start; gap: 12px; }
+.now-icon { flex: none; display: grid; place-items: center; width: 16px; height: 24px; color: var(--tone); }
+.now-icon .spinner { width: 14px; height: 14px; }
+.now-icon .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 18%, transparent); }
+.now-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.now-text { font-size: var(--font-size-md); font-weight: 500; line-height: 1.5; }
+.now-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.now-meta .pulse { margin-top: 2px; }
 
 .panel { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
 .panel.attention { border-color: color-mix(in srgb, var(--color-warn) 50%, transparent); }
@@ -241,11 +291,28 @@ table.mini td:last-child { text-align: right; font-variant-numeric: tabular-nums
 .test-run summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .points { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 6px; }
 
-/* A stage as a chat (SPEC §8) */
+/* A stage: how it ended or where it stands, a line each; its whole debate as a chat (SPEC §8) behind a toggle. */
 
-.stage { padding: 12px 16px; }
-.stage > summary { display: flex; align-items: center; gap: 8px; }
-.stage[open] > summary { margin-bottom: 12px; }
+.stage { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+.stage.current { border-color: color-mix(in srgb, var(--color-text-primary) 22%, transparent); }
+.stage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.stage-head .muted { margin-left: auto; }
+.summary { display: flex; flex-direction: column; gap: 4px; }
+.outcome { display: flex; align-items: baseline; gap: 8px; }
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.lines li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 0; border-top-width: 1px; }
+.lines li:first-child { border-top-width: 0; }
+.lines li > .muted { flex: none; white-space: nowrap; }
+.lines .line { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lines .line.wrap { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.discussion { border-top-width: 1px; padding-top: 10px; }
+.discussion > summary { list-style: none; display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); }
+.discussion > summary::-webkit-details-marker { display: none; }
+.discussion > summary::before { content: "›"; display: inline-block; width: 10px; font-weight: 600; transition: transform 0.12s ease; }
+.discussion[open] > summary::before { transform: rotate(90deg); }
+.discussion > summary:hover { color: var(--color-text-primary); }
+.discussion[open] > summary { margin-bottom: 12px; }
+.discussion:not([open]) .when-open, .discussion[open] .when-closed { display: none; }
 .round { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 .bubble, .decision {
   display: flex; flex-direction: column; gap: 8px; padding: 12px;
@@ -321,4 +388,7 @@ dialog.modal h2 { font-size: var(--font-size-lg); font-weight: 600; letter-spaci
 }
 @media (max-width: 680px) {
   .topbar { min-height: 60px; }
+  .step .note { display: none; }
+  .now-row { flex-wrap: wrap; }
+  .now-meta { flex-basis: 100%; flex-direction: row; align-items: center; padding-left: 28px; }
 }
