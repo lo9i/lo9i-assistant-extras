@@ -17,6 +17,11 @@ A plugin folder holds one of:
 A plugin that works only on some systems says so with `platforms:` (`linux`, `macos`) in its `server.yaml` or
 `SKILL.md` header; lo9i doesn't list it anywhere else.
 
+A plugin's icon, shown beside it in the apps, is `icon:` in its `server.yaml` or `SKILL.md` header: a Lucide icon's
+name (lucide.dev), or an SVG file in its folder that only draws (lo9i's `core/repositories/icons.py` says what it
+checks; one in `currentColor` takes the theme's colour). Without one, its category's icon. The brands' logos here come
+from Simple Icons (CC0).
+
 Plugins share no code: each one is complete in its folder. What lo9i does for them (running a chat, a
 coding agent's tasks) is in lo9i, and they talk to it through the protocols in lo9i's `docs/`. The code a
 protocol needs is copied into each plugin that speaks it (the channels' `daemon.py` and `runner.py`, the

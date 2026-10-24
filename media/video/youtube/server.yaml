@@ -3,10 +3,12 @@
 # updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: youtube
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.2
+version: 1.0.3
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Download YouTube videos, their audio as MP3, and their transcripts
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: icon.svg
 fields:
   - key: YOUTUBE_DIR
     label: Download folder

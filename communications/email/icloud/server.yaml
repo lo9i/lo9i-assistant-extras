@@ -3,8 +3,10 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: icloud
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.0.1
 description: Send and read iCloud Mail
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: icon.svg
 email:
   - id: icloud
     name: iCloud Mail
