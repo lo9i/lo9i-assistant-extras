@@ -146,15 +146,15 @@ tr.dim td { color: var(--color-text-faint); }
 .cell-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .cell-actions .pill { margin-left: 8px; }
 
-/* A host's terminal: the whole frame, under its top bar, in a card. */
+/* A host's terminal, in a tab of its own: the whole window under its top bar. */
 
 body.full { height: 100vh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.term-page { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 1600px; margin: 0 auto; }
+.term-page { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; }
 .term-page .topbar { width: 100%; }
 .title { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
 .back { flex: none; font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .back:hover { color: var(--color-text-primary); }
-.term-card { position: relative; flex: 1; min-height: 0; margin: 0 16px 16px; padding: 12px 6px 6px 14px; }
+.term-card { position: relative; flex: 1; min-height: 0; margin: 0; padding: 4px 4px 4px 8px; border-radius: 0; }
 #terminal { height: 100%; }
 .notice { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--radius-lg); background: color-mix(in srgb, #000 34%, transparent); }
 .notice-box { max-width: 32rem; padding: 24px; border: 1px solid var(--surface-glass-border); border-radius: var(--radius-lg); background: var(--surface-modal-bg); box-shadow: var(--shadow-modal); backdrop-filter: blur(20px); }

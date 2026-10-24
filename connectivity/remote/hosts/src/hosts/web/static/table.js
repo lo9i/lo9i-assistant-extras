@@ -45,7 +45,7 @@
   body.addEventListener("click", (event) => {
     if (event.target.closest("a, button, input")) return;
     const row = event.target.closest("tr[data-href]");
-    if (row) location.href = new URL(row.dataset.href, document.baseURI).href;
+    if (row && !event.target.closest("a, button")) window.open(new URL(row.dataset.href, document.baseURI).href, "_blank");
   });
 
   search.addEventListener("input", filter);

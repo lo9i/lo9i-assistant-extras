@@ -3,7 +3,7 @@
 <tr data-href="{{ path }}" class="{{ 'dim' if h.hidden }}"
     {% if probe is none %}hx-get="{{ path }}/row" hx-trigger="load" hx-swap="outerHTML"{% endif %}>
   <td class="medium" data-value="{{ h.name | lower }}">
-    <a href="{{ path }}" class="link">{{ h.name }}</a>
+    <a href="{{ path }}" target="_blank" class="link">{{ h.name }}</a>
     {% if h.hidden %}<span class="pill">hidden</span>{% endif %}
   </td>
   <td class="hide-sm mono muted" data-value="{{ h.address or '' }}">{{ h.address or '—' }}</td>
@@ -26,7 +26,7 @@
   </td>
   <td>
     <div class="cell-actions">
-      <a class="btn btn--sm btn--neutral" href="{{ path }}">Terminal</a>
+      <a class="btn btn--sm btn--neutral" href="{{ path }}" target="_blank">Terminal</a>
       {% if h.hidden %}
       <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/show">Show</button>
       {% else %}
