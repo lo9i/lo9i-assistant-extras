@@ -51,7 +51,7 @@ def test_the_table_lists_the_hosts_and_checks_each_as_it_loads(client):
     assert 'id="filter"' in page and page.count("<th data-sort") == 6
     # At once, without waiting for any host: each is checked after, over /statuses (table.js).
     assert 'data-host="pi"' in page and 'data-href="hosts/pi"' in page and "Checking…" in page
-    assert "data-checking" in page and "hx-get=\"hosts/pi/row\"" not in page
+    assert "data-checking" in page and 'hx-get="hosts/pi/row"' not in page
     assert "lo9i@lo9i-pi.local" in page and "groso@192.168.0.10:2222" in page
     assert client.get("/static/table.js", headers={"X-Forwarded-Prefix": "/hosts"}).status_code == 200
 
