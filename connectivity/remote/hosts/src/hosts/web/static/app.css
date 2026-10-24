@@ -150,11 +150,12 @@ tr.dim td { color: var(--color-text-faint); }
 
 body.full { height: 100vh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .term-page { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; }
-.term-page .topbar { width: 100%; }
+.term-page .topbar { width: 100%; max-width: none; min-height: 0; padding: 4px 8px; }
+.term-page .topbar h1 { font-size: var(--font-size-lg); }
 .title { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
 .back { flex: none; font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .back:hover { color: var(--color-text-primary); }
-.term-card { position: relative; flex: 1; min-height: 0; margin: 0; padding: 4px 4px 4px 8px; border-radius: 0; }
+.term-card { position: relative; flex: 1; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; }
 #terminal { height: 100%; }
 .notice { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: var(--radius-lg); background: color-mix(in srgb, #000 34%, transparent); }
 .notice-box { max-width: 32rem; padding: 24px; border: 1px solid var(--surface-glass-border); border-radius: var(--radius-lg); background: var(--surface-modal-bg); box-shadow: var(--shadow-modal); backdrop-filter: blur(20px); }
