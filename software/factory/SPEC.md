@@ -22,7 +22,7 @@ in a git worktree. Result: a local branch.
 | Checkpoints | Spec, plan, final diff; approve or reject with a comment (redoes the stage) |
 | Notifications | Web page + Telegram (through lo9i) |
 | Concurrency | Several tasks in parallel, each in its own worktree |
-| Output | Local branch `factory/<task-id>-<slug>`; never merges or pushes |
+| Output | Local branch `factory/<task-id>-<slug>`; never merges or pushes. The branch is the only result: a task asking for a review, an analysis or an answer gets a Markdown document written in the repo (the spec names its path); a build that changed nothing is reviewed as such, on what the agent said, and sent back unless the spec asks for no change |
 | Limits | Max debate rounds and max cost (USD) per task, configurable; the task pauses when reached |
 
 ## 2. Pipeline

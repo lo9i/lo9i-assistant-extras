@@ -17,6 +17,10 @@ judge accepts it or sends back points to fix. Points go back to the agent,
 a new build, up to max_fix_loops times; then the full tests run (always,
 before the final checkpoint) and the task waits at CHECKPOINT 3 with the
 diff, the tests and the judge's word, open points included.
+
+A build that changed nothing leaves the user nothing to approve: its review
+is told so, and gets what the agent said instead, to send back what of it
+belongs in a file (a review or an answer the task asked for, say).
 """
 
 import json
@@ -44,6 +48,17 @@ REVIEW_GOAL = (
     "a review of the diff that builds the approved plan: whether it does what the spec and plan ask, correctly,"
     " safely and with tests, and if not, the points the implementer must fix"
 )
+# What every debate must know (stages.py too): there's no reply to give, only the branch.
+DELIVERS = (
+    "## What the factory delivers\n\nOnly a change on the task's own branch of the repository, which the user"
+    " approves as a diff. There is no conversation to answer in: nothing said in a debate, or in the coding"
+    " agent's report, reaches the user as the result. So when the task asks for an analysis, a review, a comparison"
+    " or an answer rather than a code change, its deliverable is a Markdown document the coding agent writes in the"
+    " repository: the spec names its path (docs/<topic>.md, say) and what goes in it, and the plan has the agent"
+    " write it there."
+)
+# Of the coding agent's own words, in a review of a build that changed nothing.
+WORDS_IN_REVIEW = 30_000
 SHORT_TESTS = {
     "type": "object",
     "properties": {
@@ -278,8 +293,10 @@ def _system(s: settings.Settings, sandbox: Sandbox) -> str:
     return (
         f"{s.prompts['implementer']}\n\nYou work in the task's own copy of the repository ({sandbox.folder}), on its"
         " own branch. Don't commit, push or switch branches: the factory commits what you change. Read the"
-        f" repository's CLAUDE.md or AGENTS.md first, if it has one. {where} Run the tests you write. When you're"
-        " done, report what you did and answer each review point you were given."
+        f" repository's CLAUDE.md or AGENTS.md first, if it has one. {where} Run the tests you write. Whatever the"
+        " plan asks you to write, a document included, goes in a file in this folder: the review and the user see"
+        " only what you change here, never what you say. When you're done, report what you did, in a few lines,"
+        " and answer each review point you were given."
     )
 
 
@@ -410,7 +427,7 @@ def _fix_loops(conn: sqlite3.Connection, task_id: int) -> int:
 
 def _review_brief(conn: sqlite3.Connection, task: Task) -> Brief:
     builds = [s for s in repo.list_stages(conn, task.id) if s.kind == "build"]
-    parts = [f"## {task.title}\n\n{task.description}"]
+    parts = [f"## {task.title}\n\n{task.description}", DELIVERS]
     if spec := service.approved(conn, task.id, "spec"):
         parts.append(f"## The approved spec\n\n{spec}")
     if plan := service.approved(conn, task.id, "plan"):
@@ -418,7 +435,20 @@ def _review_brief(conn: sqlite3.Connection, task: Task) -> Brief:
     changed = git.changed(task.worktree, task.base_commit)
     summary = "\n".join(f"- {c.path} (+{c.added if c.added is not None else '?'} -{c.deleted or 0})" for c in changed)
     parts.append(f"## What changed\n\n{summary or 'Nothing.'}")
-    parts.append(f"## The diff\n\n```diff\n{git.diff(task.worktree, task.base_commit, DIFF_CHARS)}\n```")
+    if changed:
+        parts.append(f"## The diff\n\n```diff\n{git.diff(task.worktree, task.base_commit, DIFF_CHARS)}\n```")
+    else:
+        parts.append(
+            "## The diff\n\nEmpty: the build changed no files, so the user would approve nothing. Unless the"
+            " approved spec and plan ask for no change at all, that's the point to fix: what they ask for, a"
+            " document included, must be written in the repository."
+        )
+        said = _words(task, builds[-1]) if builds else ""
+        if said:
+            parts.append(
+                "## What the coding agent said\n\nIts own words, which reach no one but this review: whatever of"
+                f" them the task asks for belongs in a file.\n\n{said}"
+            )
     reports = [m for m in repo.stage_messages(conn, builds[-1].id) if m.type == "report"] if builds else []
     if reports:
         parts.append(f"## The implementer's report\n\n{reports[-1].body['summary']}")
@@ -436,3 +466,10 @@ def _review_brief(conn: sqlite3.Connection, task: Task) -> Brief:
         )
         parts.append(f"## Review points so far, and the implementer's answers\n\n{listed}")
     return Brief(goal=REVIEW_GOAL, context="\n\n".join(parts), roles=REVIEWERS, review=True)
+
+
+def _words(task: Task, stage: Stage) -> str:
+    """What the coding agent said in a build, as its log has it: the end of
+    it, when it's long."""
+    said = "\n\n".join(e["text"] for e in read_log(task.id, stage) if e.get("type") == "text")
+    return said if len(said) <= WORDS_IN_REVIEW else "…" + said[-WORDS_IN_REVIEW:]

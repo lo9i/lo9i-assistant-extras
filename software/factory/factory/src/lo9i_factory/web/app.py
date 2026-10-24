@@ -232,6 +232,7 @@ def _task_page(request: Request, conn: sqlite3.Connection, id: int, template: st
         info=info,
         steps=views.steps(task, stages, checkpoint, len(info.approvals)),
         now=views.now(task, stages, checkpoint, info.approvals, len(info.changes), open_points),
+        fix_loops=s.max_fix_loops,
         live=task.status in ("queued", "running"),
     )
 

@@ -17,6 +17,8 @@ A task's `status` says where it is: `queued` and `running` (working), `waiting` 
 
 ## Starting a task
 
+The factory's only result is a change on a branch, which the user approves as a diff. To read something and discuss it, or to answer a question about a repository, don't start a task: do it yourself in the conversation. When the user does want the factory to write a review or an analysis, say it will be a document in the repository (the spec names where), and put that in the task.
+
 `new_task` with the repository's absolute path (`~` works) and the task as the user put it; it must be a git repository on this computer. For a **new project**, give a folder that doesn't exist yet (or an empty one), like `~/code/new-app`: the factory makes it a repository, and the task's branch starts empty. A folder with files that isn't a repository is refused: the user runs `git init` and commits them first. Keep the user's words: the team reads them. Set `include_context` when the team needs to know the repository (its README, file tree, CLAUDE.md/AGENTS.md) and the task doesn't say enough. Then say it started, and that the factory will tell them when the spec is ready.
 
 ## At a checkpoint
@@ -24,7 +26,7 @@ A task's `status` says where it is: `queued` and `running` (working), `waiting` 
 The factory's notices tell you when a task waits for the user. Then:
 
 1. `task_status`: its `checkpoint.decision` has what the judge decided (`result`), why (`rationale`) and the options that lost. For the final diff, `changes` (files, lines added and deleted), `tests` (which passed; the output of those that failed), `review_points` (open ones especially) and `open_in_editor`.
-2. Give the user the decision in a few lines, not the whole text: what it does, the one or two choices that matter, and for the diff the files, the tests and open points. On a chat channel keep it short; the whole text is on the Factory page.
+2. Give the user the decision in a few lines, not the whole text: what it does, the one or two choices that matter, and for the diff the files, the tests and open points. On a chat channel keep it short; the whole text is on the Factory page. When `changes` is empty, say so plainly: approving changes nothing in the repository, it only closes the task. When the judge's decision is `fixes`, the automatic fix rounds ran out: say the review still wants those fixes.
 3. Ask: ✅ approve or ❌ reject. On ❌, ask what to change, and call `reject` with it as the comment: the stage runs again with it. `approve` takes an optional comment.
 
 Don't approve or reject on the user's behalf: it's their call, every time.

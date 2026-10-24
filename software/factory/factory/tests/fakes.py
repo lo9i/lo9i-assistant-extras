@@ -110,9 +110,11 @@ class FakeAgent:
     review point in its prompt as resolved, and says it cost $0.50. Keeps
     each job it was given."""
 
-    def __init__(self, files: dict[str, str] | None = None, results: list | None = None) -> None:
+    def __init__(self, files: dict[str, str] | None = None, results: list | None = None, said: str = "") -> None:
         self.files = files if files is not None else {"cache.py": "CACHE = {}\n", "test_cache.py": "def test(): pass\n"}
         self.results = results or []
+        # What it says as it works, to the log.
+        self.said = said
         self.jobs: list = []
 
     def __call__(self, name: str, key: str) -> "FakeAgent":
@@ -129,6 +131,8 @@ class FakeAgent:
         for name, text in self.files.items():
             (Path(job.sandbox.worktree) / name).write_text(text + f"# build {len(self.jobs)}\n")
         log({"type": "tool", "tool": "Write", "detail": "cache.py"})
+        if self.said:
+            log({"type": "text", "text": self.said})
         if self.results:
             return self.results.pop(0)
         ids = [int(i) for i in re.findall(r"^- \[(\d+)\]", job.prompt, re.MULTILINE)]

@@ -105,6 +105,8 @@ def due(conn, task: Task) -> list[Notice]:
 
 def _diff(conn, task: Task) -> str:
     changed = service.changes(conn, task.id)
+    if not changed:
+        return " It changed no files: approving it only closes the task."
     added = sum(c.added or 0 for c in changed)
     deleted = sum(c.deleted or 0 for c in changed)
     latest = {r.kind: r for r in service.test_runs(conn, task.id)}.values()
