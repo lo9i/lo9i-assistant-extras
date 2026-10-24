@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block top_actions %}<button class="btn sm" onclick="openDialog('new-task')">+ New task</button>{% endblock %}
+{% block top_actions %}<button class="btn sm primary" onclick="openDialog('new-task')">+ New task</button>{% endblock %}
 {% block content %}
-<main class="page container wide">
+<main class="page container">
   {# A column per stage, plus what waits for the user. No dragging: cards move by approve and reject. #}
   <div class="board">
     {% for key, label in COLUMNS %}

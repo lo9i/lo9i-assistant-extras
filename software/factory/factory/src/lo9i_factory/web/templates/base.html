@@ -9,16 +9,14 @@
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   <script src="{{ asset('htmx.min.js') }}"></script>
 </head>
+{# No brand of its own: lo9i's sidebar names the page. The top bar has the tabs, as the app's pages do. #}
 <body hx-boost="true">
-  <header class="top">
-    <div class="container">
-      <a href="./" class="brand">factory</a>
-      <nav>
-        <a href="./" class="{{ 'on' if nav == 'board' }}">Board</a>
-        <a href="settings" class="{{ 'on' if nav == 'settings' }}">Settings</a>
-      </nav>
-      {% block top_actions %}{% endblock %}
-    </div>
+  <header class="topbar">
+    <nav class="tabs">
+      <a href="./" class="{{ 'active' if nav == 'board' }}">Board</a>
+      <a href="settings" class="{{ 'active' if nav == 'settings' }}">Settings</a>
+    </nav>
+    <div class="actions">{% block top_actions %}{% endblock %}</div>
   </header>
 
   {% block content %}{% endblock %}
