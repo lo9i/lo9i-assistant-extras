@@ -9,18 +9,16 @@
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   <script src="{{ asset('htmx.min.js') }}"></script>
 </head>
+{# No brand of its own: lo9i's sidebar names the page. The top bar has the tabs, as the app's pages do. #}
 <body hx-boost="true">
-  <header class="top">
-    <div class="container">
-      <a href="./" class="brand">watchlist</a>
-      <nav>
-        <a href="./" class="{{ 'on' if nav == 'home' }}">Home</a>
-        <a href="shows" class="{{ 'on' if nav == 'show' }}">Shows</a>
-        <a href="movies" class="{{ 'on' if nav == 'movie' }}">Movies</a>
-        <a href="channels" class="{{ 'on' if nav == 'channels' }}">Channels</a>
-      </nav>
-      <button class="btn sm" onclick="openDialog('add-title')">+ Add</button>
-    </div>
+  <header class="topbar">
+    <nav class="tabs">
+      <a href="./" class="{{ 'on' if nav == 'home' }}">Home</a>
+      <a href="shows" class="{{ 'on' if nav == 'show' }}">Shows</a>
+      <a href="movies" class="{{ 'on' if nav == 'movie' }}">Movies</a>
+      <a href="channels" class="{{ 'on' if nav == 'channels' }}">Channels</a>
+    </nav>
+    <div class="actions"><button class="btn sm primary" onclick="openDialog('add-title')">+ Add</button></div>
   </header>
 
   {% block content %}{% endblock %}
