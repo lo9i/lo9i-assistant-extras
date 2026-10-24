@@ -250,3 +250,71 @@ def test_a_failing_feed_is_reported_with_the_others_read(conn, http, youtube_dat
     videos, failed = service.new_uploads(conn, http)
     assert [v.id for v in videos] == ["new"]
     assert list(failed) == ["Gone"] and "404" in failed["Gone"]
+
+
+# --- Uploads stored for the home page ---
+
+
+def make_uploads_old(conn):
+    conn.execute("UPDATE uploads SET fetched_at = '2000-01-01T00:00:00+00:00'")
+    conn.commit()
+
+
+def feed_reads(asked):
+    return sum(1 for r in asked if r.url.path == "/feeds/videos.xml")
+
+
+def test_uploads_are_stored_and_read_again_once_old(conn, http, asked):
+    service.add_channel(conn, http, "@mkbhd")
+    assert service.stored_uploads(conn) == ([], {}, ["Marques Brownlee & Co"])
+    assert service.uploads_due(conn)
+    assert service.fetch_uploads(conn, http) == 1
+    videos, failed, unread = service.stored_uploads(conn, days=7)
+    assert ([v.id for v in videos], failed, unread) == (["new"], {}, [])
+    assert videos[0] == service.new_uploads(conn, http, days=7)[0][0]
+    # Shorts and older uploads are stored too, for the reads that want them.
+    assert [v.id for v in service.stored_uploads(conn, days=60, shorts=True)[0]] == ["new", "short", "old"]
+    # Still fresh: YouTube isn't asked again.
+    reads = feed_reads(asked)
+    assert not service.uploads_due(conn) and service.fetch_uploads(conn, http) == 0
+    assert feed_reads(asked) == reads
+    make_uploads_old(conn)
+    assert service.uploads_due(conn) and service.fetch_uploads(conn, http) == 1
+    assert feed_reads(asked) == reads + 1
+
+
+def test_uploads_are_read_with_a_short_timeout(conn, http, asked):
+    service.add_channel(conn, http, "@mkbhd")
+    service.fetch_uploads(conn, http)
+    feed = next(r for r in asked if r.url.path == "/feeds/videos.xml")
+    assert feed.extensions["timeout"]["read"] == service.UPLOADS_TIMEOUT
+
+
+def test_a_channel_that_fails_keeps_the_uploads_read_last(conn, http, youtube_data):
+    service.add_channel(conn, http, "@mkbhd")
+    service.fetch_uploads(conn, http)
+    del youtube_data[f"/feeds/videos.xml?channel_id={CHANNEL_ID}"]
+    del youtube_data[f"/channel/{CHANNEL_ID}/videos"]
+    make_uploads_old(conn)
+    assert service.fetch_uploads(conn, http) == 1
+    videos, failed, _ = service.stored_uploads(conn, days=7)
+    assert [v.id for v in videos] == ["new"]
+    assert list(failed) == ["Marques Brownlee & Co"] and "404" in failed["Marques Brownlee & Co"]
+    # Failing counts as read: it isn't asked again until it gets old.
+    assert not service.uploads_due(conn)
+
+
+def test_a_channel_never_read_that_fails_is_reported(conn, http):
+    service.add_channel(conn, http, "@mkbhd")
+    conn.execute("INSERT INTO channels (id, name, added_at) VALUES ('UCxxxxxxxxxxxxxxxxxxxxxx', 'Gone', 'x')")
+    conn.commit()
+    assert service.fetch_uploads(conn, http) == 2
+    videos, failed, unread = service.stored_uploads(conn)
+    assert [v.id for v in videos] == ["new"] and list(failed) == ["Gone"] and unread == []
+
+
+def test_removing_a_channel_drops_its_uploads(conn, http):
+    service.add_channel(conn, http, "@mkbhd")
+    service.fetch_uploads(conn, http)
+    service.remove_channel(conn, "@mkbhd")
+    assert conn.execute("SELECT count(*) FROM uploads").fetchone()[0] == 0

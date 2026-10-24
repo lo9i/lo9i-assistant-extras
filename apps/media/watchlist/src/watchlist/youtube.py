@@ -30,6 +30,8 @@ NS = {
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Accept-Language": "en"}
 # The cookie skips the consent page YouTube shows some countries first.
 PAGE_HEADERS = {**HEADERS, "Cookie": "SOCS=CAI"}
+# Seconds to wait for YouTube, by default.
+TIMEOUT = 15
 # How long ago an upload was, as a channel's Videos page says it: "4 days ago".
 AGO = re.compile(r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago")
 UNIT = {
@@ -79,9 +81,9 @@ def _first(patterns: list[str], page: str) -> str | None:
     return None
 
 
-def _fetch(http: httpx.Client, url: str) -> str:
+def _fetch(http: httpx.Client, url: str, timeout: float = TIMEOUT) -> str:
     try:
-        r = http.get(url, headers=PAGE_HEADERS, follow_redirects=True, timeout=15)
+        r = http.get(url, headers=PAGE_HEADERS, follow_redirects=True, timeout=timeout)
     except httpx.HTTPError as e:
         raise YoutubeError(f"couldn't reach YouTube: {e}") from None
     if r.status_code == 404:
@@ -112,22 +114,22 @@ def resolve(text: str, http: httpx.Client) -> Found:
     return Found(canonical, name or canonical, handle, thumbnail)
 
 
-def uploads(channel_id: str, http: httpx.Client) -> list[Video]:
+def uploads(channel_id: str, http: httpx.Client, timeout: float = TIMEOUT) -> list[Video]:
     """The channel's latest uploads, newest first: from its feed, or its
-    Videos page when the feed fails."""
+    Videos page when the feed fails. `timeout` is for each read of YouTube's."""
     try:
-        return _feed_uploads(channel_id, http)
+        return _feed_uploads(channel_id, http, timeout)
     except YoutubeError as feed_error:
         try:
-            return _page_uploads(channel_id, http)
+            return _page_uploads(channel_id, http, timeout)
         except YoutubeError as page_error:
             raise YoutubeError(f"{feed_error}; its Videos page failed too: {page_error}") from None
 
 
-def _feed_uploads(channel_id: str, http: httpx.Client) -> list[Video]:
+def _feed_uploads(channel_id: str, http: httpx.Client, timeout: float) -> list[Video]:
     url = f"{FEED}?channel_id={channel_id}"
     try:
-        r = http.get(url, headers=HEADERS, timeout=15)
+        r = http.get(url, headers=HEADERS, timeout=timeout)
     except httpx.HTTPError as e:
         raise YoutubeError(f"couldn't reach YouTube: {e}") from None
     if r.status_code != 200:
@@ -158,9 +160,9 @@ def _feed_uploads(channel_id: str, http: httpx.Client) -> list[Video]:
     return sorted(videos, key=lambda v: v.published, reverse=True)
 
 
-def _page_uploads(channel_id: str, http: httpx.Client) -> list[Video]:
+def _page_uploads(channel_id: str, http: httpx.Client, timeout: float) -> list[Video]:
     """From the data the channel's Videos page is drawn from (ytInitialData)."""
-    page = _fetch(http, f"https://www.youtube.com/channel/{channel_id}/videos")
+    page = _fetch(http, f"https://www.youtube.com/channel/{channel_id}/videos", timeout)
     m = re.search(r"var ytInitialData = (\{.*?\});</script>", page, re.S)
     if m is None:
         raise YoutubeError(f"the Videos page of channel {channel_id} has no list of videos")

@@ -1,4 +1,5 @@
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,21 @@ HX = {"HX-Request": "true"}
 def client(tmp_path, monkeypatch, http):
     monkeypatch.setenv("WATCHLIST_DB", str(tmp_path / "web.db"))
     monkeypatch.setenv("TMDB_API_KEY", "k")
-    return TestClient(create_app(http))
+    client = TestClient(create_app(http))
+    yield client
+    settle(client)
+
+
+def settle(client):
+    """Until the refreshes the pages started have ended."""
+    client.app.state.titles_refresh.wait(10)
+    client.app.state.uploads_refresh.wait(10)
+
+
+def timed_get(client, path):
+    start = time.monotonic()
+    r = client.get(path)
+    return r, time.monotonic() - start
 
 
 def titles():
@@ -124,6 +139,8 @@ def test_removing_from_its_page_goes_back_to_the_list(client):
 def test_following_a_channel_and_its_uploads(client):
     assert client.post("/channels", headers=HX, data={"channel": "@mkbhd"}).headers["HX-Refresh"] == "true"
     assert "Marques Brownlee &amp; Co" in client.get("/channels").text
+    assert "Reading your channels" in client.get("/uploads", headers=HX).text
+    settle(client)
     uploads = client.get("/uploads", headers=HX).text
     assert "New phone" in uploads and "yesterday" in uploads and "A short" not in uploads and "Old phone" not in uploads
     channel = client.get(f"/channels/{CHANNEL_ID}").text
@@ -135,6 +152,64 @@ def test_following_a_channel_and_its_uploads(client):
 def test_a_channel_that_cant_be_found_keeps_what_was_typed(client):
     r = client.post("/channels", headers=HX, data={"channel": "@nobody"})
     assert r.headers["HX-Retarget"] == "#add-channel" and "no page" in r.text and 'value="@nobody"' in r.text
+
+
+def test_the_home_page_doesnt_wait_for_youtube(client, gate):
+    client.post("/channels", headers=HX, data={"channel": "@mkbhd"})
+    gate.clear()  # YouTube hangs.
+    r, took = timed_get(client, "/")
+    assert took < 1 and "Reading your channels" in r.text
+    # The row asks again until the channels are read.
+    assert 'hx-get="uploads" hx-trigger="load delay:2s"' in r.text
+    assert "Reading your channels" in client.get("/uploads", headers=HX).text
+    gate.set()
+    settle(client)
+    page = client.get("/").text
+    assert "New phone" in page and "1 video from your channels" in page and 'hx-get="uploads"' not in page
+
+
+def test_the_home_page_shows_stored_uploads_and_reads_old_ones_again(client, gate, asked):
+    client.post("/channels", headers=HX, data={"channel": "@mkbhd"})
+    client.get("/")
+    settle(client)
+    reads = len(asked)
+    assert "New phone" in client.get("/").text and "New phone" in client.get("/uploads", headers=HX).text
+    assert len(asked) == reads  # Fresh: YouTube isn't asked.
+    conn = db.connect()
+    conn.execute("UPDATE uploads SET fetched_at = '2000-01-01T00:00:00+00:00'")
+    conn.commit()
+    conn.close()
+    gate.clear()
+    r, took = timed_get(client, "/")
+    # What was read last shows while it's read again.
+    assert took < 1 and "New phone" in r.text and 'hx-get="uploads"' not in r.text
+    gate.set()
+    settle(client)
+    assert any(q.url.path == "/feeds/videos.xml" for q in asked[reads:])
+
+
+def test_the_home_page_doesnt_wait_for_tmdb(client, gate, asked, tmdb_data):
+    add(client)
+    conn = db.connect()
+    conn.execute("UPDATE titles SET refreshed_at = '2000-01-01T00:00:00+00:00'")
+    conn.commit()
+    tmdb_data["/3/tv/95396"]["name"] = "Severance (renamed)"
+    gate.clear()  # TMDB hangs.
+    r, took = timed_get(client, "/")
+    assert took < 1 and "Severance" in r.text and "renamed" not in r.text
+    gate.set()
+    settle(client)
+    assert "Severance (renamed)" in client.get("/").text
+    # Refreshed a moment ago: another refresh waits (TITLES_EVERY), even for
+    # titles that got old since.
+    conn.execute("UPDATE titles SET refreshed_at = '2000-01-01T00:00:00+00:00'")
+    conn.commit()
+    conn.close()
+    asked.clear()
+    client.get("/")
+    client.get("/shows")
+    settle(client)
+    assert not [q for q in asked if q.url.host == "api.themoviedb.org"]
 
 
 def test_the_socket_is_only_the_users():

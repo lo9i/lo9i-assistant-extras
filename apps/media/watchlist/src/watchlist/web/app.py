@@ -14,17 +14,24 @@ page per title. Actions are htmx requests; one that changes what several
 parts of a page show answers HX-Refresh, so the page is read again whole.
 Handlers that reach TMDB or YouTube are plain functions, which FastAPI runs
 in a thread pool, so one slow request doesn't hold up the others.
+
+The home and list pages never wait for TMDB or YouTube: they show what's
+stored, and start a Background refresh of what got old (titles from TMDB,
+the channels' uploads), which shows the next time the page is read.
 """
 
 import argparse
 import contextlib
 import hashlib
+import logging
 import os
 import re
 import socket
 import sqlite3
-from collections.abc import Iterator
-from datetime import UTC, date, datetime
+import threading
+import time
+from collections.abc import Callable, Iterator
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -40,6 +47,8 @@ from ..models import Title
 from ..service import WatchlistError
 from ..tmdb import Tmdb
 
+log = logging.getLogger(__name__)
+
 HERE = Path(__file__).parent
 # What the daemon may send as X-Forwarded-Prefix: path segments, like /watchlist.
 PREFIX = re.compile(r"^(/[A-Za-z0-9_-]+)*$")
@@ -48,6 +57,54 @@ STATUS_LABELS = {"to_watch": "To watch", "watching": "Watching", "watched": "Wat
 ORDER = {"show": ("watching", "to_watch", "watched", "dropped"), "movie": ("to_watch", "watched", "dropped")}
 # How far back the home page shows uploads.
 UPLOAD_DAYS = 14
+# How often the pages may start a refresh of the titles from TMDB. Only the
+# titles whose copy got old are fetched (service.refresh); this keeps the ones
+# TMDB fails on from being asked for again on every page read.
+TITLES_EVERY = timedelta(hours=3)
+# How long the home page waits to ask again for uploads still being read.
+UPLOADS_POLL = "2s"
+
+
+class Background:
+    """Runs `job` in a thread, with a connection of its own: one run at a
+    time, and a new one at most `every` after the last started. Pages start
+    it and show what's stored without waiting for it."""
+
+    def __init__(self, name: str, job: Callable[[sqlite3.Connection], Any], every: timedelta = timedelta(0)):
+        self.name, self.job, self.every = name, job, every.total_seconds()
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._started: float | None = None
+
+    @property
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> bool:
+        """Whether a run started: none does while one runs, or before `every` passed."""
+        with self._lock:
+            now = time.monotonic()
+            if self.running or (self._started is not None and now - self._started < self.every):
+                return False
+            self._started = now
+            self._thread = threading.Thread(target=self._run, name=self.name, daemon=True)
+            self._thread.start()
+            return True
+
+    def wait(self, timeout: float | None = None) -> None:
+        """Until the run started last has ended."""
+        if self._thread is not None:
+            self._thread.join(timeout)
+
+    def _run(self) -> None:
+        try:
+            conn = db.connect()
+            try:
+                self.job(conn)
+            finally:
+                conn.close()
+        except Exception:
+            log.exception("%s failed", self.name)
 
 
 def asset_url(name: str) -> str:
@@ -115,6 +172,22 @@ def _http(request: Request) -> httpx.Client:
     return request.app.state.http
 
 
+def _refresh_titles(request: Request) -> None:
+    request.app.state.titles_refresh.start()
+
+
+def _uploads(request: Request, conn: sqlite3.Connection) -> dict[str, Any]:
+    """The home page's videos row as stored, after starting a read of the
+    channels whose uploads got old. While channels never read are being
+    read, the row asks for itself again (`reading`)."""
+    refresh: Background = request.app.state.uploads_refresh
+    if service.uploads_due(conn):
+        refresh.start()
+    videos, failed, unread = service.stored_uploads(conn, days=UPLOAD_DAYS)
+    reading = bool(unread) and refresh.running
+    return {"videos": videos, "failed": failed, "unread": unread, "reading": reading, "poll": UPLOADS_POLL}
+
+
 # --- Form parsing ---
 
 
@@ -160,8 +233,9 @@ def _go(request: Request, path: str) -> Response:
 def _home_routes(app: FastAPI) -> None:
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request, conn: Conn) -> HTMLResponse:
-        service.refresh(conn, _tmdb(request))
+        _refresh_titles(request)
         titles = service.list_titles(conn)
+        channels = bool(service.list_channels(conn))
         up_next = [t for t in titles if t.kind == "show" and t.status in ("watching", "watched") and next_up(t)]
         return _render(
             request,
@@ -170,15 +244,16 @@ def _home_routes(app: FastAPI) -> None:
             up_next=up_next,
             movies=[t for t in titles if t.kind == "movie" and t.status == "to_watch"],
             shows=[t for t in titles if t.kind == "show" and t.status in ("watching", "to_watch")],
-            has_channels=bool(service.list_channels(conn)),
+            has_channels=channels,
             days=UPLOAD_DAYS,
+            **(_uploads(request, conn) if channels else {}),
         )
 
     @app.get("/uploads", response_class=HTMLResponse)
     def uploads(request: Request, conn: Conn) -> HTMLResponse:
-        """The home page's videos row, read from the channels' feeds."""
-        videos, failed = service.new_uploads(conn, _http(request), days=UPLOAD_DAYS)
-        return _render(request, "_uploads.html", videos=videos, failed=failed, days=UPLOAD_DAYS)
+        """The home page's videos row, as stored: the row asks for it again
+        while channels are still being read."""
+        return _render(request, "_uploads.html", days=UPLOAD_DAYS, **_uploads(request, conn))
 
 
 # --- Movies and shows ---
@@ -186,7 +261,7 @@ def _home_routes(app: FastAPI) -> None:
 
 def _list_routes(app: FastAPI) -> None:
     def list_page(request: Request, conn: sqlite3.Connection, kind: str, status: str) -> HTMLResponse:
-        service.refresh(conn, _tmdb(request), kind=kind)
+        _refresh_titles(request)
         titles = service.list_titles(conn, kind)
         order = ORDER[kind]
         titles.sort(key=lambda t: (order.index(t.status), t.name.lower()))
@@ -345,6 +420,10 @@ def create_app(http: httpx.Client | None = None) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.http = http or httpx.Client()
     app.state.tmdb = Tmdb(os.environ.get("TMDB_API_KEY", ""), app.state.http)
+    app.state.titles_refresh = Background(
+        "titles refresh", lambda conn: service.refresh(conn, app.state.tmdb), every=TITLES_EVERY
+    )
+    app.state.uploads_refresh = Background("uploads refresh", lambda conn: service.fetch_uploads(conn, app.state.http))
 
     # Errors outside a form (a title deleted in another tab, TMDB down): the
     # page shows the message (see base.html).

@@ -37,6 +37,11 @@ ENDED = ("Ended", "Canceled")
 # change (next episode, release date); the rest rarely do.
 FRESH_FOR = timedelta(hours=12)
 FRESH_FOR_SETTLED = timedelta(days=30)
+# How old the uploads read last for the home page may get, and how long each
+# read of YouTube may take then: no page waits for it, but a channel that
+# doesn't answer shouldn't hold up the others.
+UPLOADS_FRESH_FOR = timedelta(minutes=20)
+UPLOADS_TIMEOUT = 5
 
 
 class WatchlistError(Exception):
@@ -387,9 +392,11 @@ def remove_channel(conn: sqlite3.Connection, key: str) -> Channel:
     return channel
 
 
-def channel_uploads(http: httpx.Client, channel: Channel, *, shorts: bool = False) -> list[Video]:
+def channel_uploads(
+    http: httpx.Client, channel: Channel, *, shorts: bool = False, timeout: float = youtube.TIMEOUT
+) -> list[Video]:
     try:
-        videos = youtube.uploads(channel.id, http)
+        videos = youtube.uploads(channel.id, http, timeout)
     except youtube.YoutubeError as e:
         raise RemoteError(str(e)) from None
     return [v for v in videos if shorts or not v.short]
@@ -411,3 +418,52 @@ def new_uploads(
             continue
         videos += [v for v in result if datetime.fromisoformat(v.published) >= since]
     return sorted(videos, key=lambda v: v.published, reverse=True), failed
+
+
+def _uploads_due(channels: list[Channel], stored: dict, now: datetime) -> list[Channel]:
+    return [
+        c for c in channels if c.id not in stored or now - datetime.fromisoformat(stored[c.id][2]) > UPLOADS_FRESH_FOR
+    ]
+
+
+def uploads_due(conn: sqlite3.Connection) -> bool:
+    """Whether a channel followed was never read, or was read longer ago than
+    UPLOADS_FRESH_FOR."""
+    return bool(_uploads_due(repo.list_channels(conn), repo.stored_uploads(conn), datetime.now(UTC)))
+
+
+def fetch_uploads(conn: sqlite3.Connection, http: httpx.Client) -> int:
+    """Read again, all at once, the uploads of the channels never read or
+    whose copy got old (UPLOADS_FRESH_FOR), and store them for
+    `stored_uploads`. A channel that fails keeps the uploads read last, and
+    why it failed. Returns how many channels were read."""
+    due = _uploads_due(repo.list_channels(conn), repo.stored_uploads(conn), datetime.now(UTC))
+    for c, result in _parallel(lambda c: channel_uploads(http, c, shorts=True, timeout=UPLOADS_TIMEOUT), due):
+        with conn:
+            if isinstance(result, Exception):
+                repo.save_uploads_error(conn, c.id, str(result))
+            else:
+                repo.save_uploads(conn, c.id, result)
+    return len(due)
+
+
+def stored_uploads(
+    conn: sqlite3.Connection, *, days: int = 7, shorts: bool = False
+) -> tuple[list[Video], dict[str, str], list[str]]:
+    """`new_uploads` as read last by `fetch_uploads`, without waiting for
+    YouTube: the videos, the channels whose last read failed, with why, and
+    the channels not read yet."""
+    if days < 1:
+        raise ValidationError(f"days must be at least 1, got {days}")
+    stored = repo.stored_uploads(conn)
+    since = datetime.now(UTC) - timedelta(days=days)
+    videos, failed, unread = [], {}, []
+    for c in repo.list_channels(conn):
+        if c.id not in stored:
+            unread.append(c.name)
+            continue
+        found, error, _ = stored[c.id]
+        if error:
+            failed[c.name] = error
+        videos += [v for v in found if (shorts or not v.short) and datetime.fromisoformat(v.published) >= since]
+    return sorted(videos, key=lambda v: v.published, reverse=True), failed, unread
