@@ -58,11 +58,15 @@ def test_a_checked_row_says_whether_it_answers_and_runs_the_session(client, ssh:
     ssh.answers[herdr._PROBE] = answers(out=json.dumps({"sessions": [{"name": "lo9i", "running": True}]}))
     row = client.get("/hosts/pi/row").text
     assert "Online" in row and "Running" in row and "hosts/pi/row" not in row
+    assert 'data-href="hosts/pi"' in row and '<a class="btn btn--sm btn--neutral" href="hosts/pi"' in row
     ssh.answers[herdr._PROBE] = answers(127)
     assert "No Herdr" in client.get("/hosts/pi/row").text
     ssh.answers[herdr._PROBE] = answers(255, err="ssh: Could not resolve hostname lo9i-pi.local")
     row = client.get("/hosts/pi/row").text
     assert "Offline" in row and "address couldn&#39;t be found" in row
+    # Its terminal can't connect: nothing opens it.
+    assert "data-href" not in row and 'href="hosts/pi"' not in row
+    assert '<button class="btn btn--sm btn--neutral" disabled title="pi is offline:' in row
 
 
 def test_hidden_hosts_leave_the_table_until_asked_for(client):

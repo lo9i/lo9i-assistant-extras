@@ -1,10 +1,12 @@
 {# A host's row. Without `probe` it says it's checking and asks for itself again, checked (app.py's row).
-   `items` are its tunnels with how each is doing, shown and switched in their own cell. #}
+   `items` are its tunnels with how each is doing, shown and switched in their own cell. An offline host's
+   terminal can't connect, so nothing opens it: not the row, its name or Terminal. #}
 {% set path = 'hosts/' ~ (h.name | urlencode) %}
-<tr data-href="{{ path }}" class="{{ 'dim' if h.hidden }}"
+{% set offline = probe is not none and not probe.reachable %}
+<tr {% if not offline %}data-href="{{ path }}"{% endif %} class="{{ 'dim' if h.hidden }}"
     {% if probe is none %}hx-get="{{ path }}/row" hx-trigger="load" hx-swap="outerHTML"{% endif %}>
   <td class="medium" data-value="{{ h.name | lower }}">
-    <a href="{{ path }}" target="_blank" class="link">{{ h.name }}</a>
+    {% if offline %}{{ h.name }}{% else %}<a href="{{ path }}" target="_blank" class="link">{{ h.name }}</a>{% endif %}
     {% if h.hidden %}<span class="pill">hidden</span>{% endif %}
   </td>
   <td class="hide-sm mono muted" data-value="{{ h.address or '' }}">{{ h.address or '—' }}</td>
@@ -28,7 +30,11 @@
   {% include "_tunnel_cell.html" %}
   <td>
     <div class="cell-actions">
+      {% if offline %}
+      <button class="btn btn--sm btn--neutral" disabled title="{{ h.name }} is offline: {{ probe.problem }}">Terminal</button>
+      {% else %}
       <a class="btn btn--sm btn--neutral" href="{{ path }}" target="_blank">Terminal</a>
+      {% endif %}
       {% if h.hidden %}
       <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/show">Show</button>
       {% else %}
