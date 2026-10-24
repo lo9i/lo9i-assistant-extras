@@ -3,7 +3,7 @@
 # of its own environment (built from its uv.lock), {socket} where the web page listens.
 name: hosts
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.3.1
+version: 0.3.2
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Your Linux hosts from ~/.ssh/config, with a terminal in the web app that keeps running when the connection drops (Herdr), SSH tunnels you add and switch on and off from the hosts table, and tools for the assistant to run commands there
@@ -14,6 +14,9 @@ env:
   HOSTS_DB: "{data}/hosts.db"
   # The page runs the tunnels; the tools start and stop them through it.
   HOSTS_WEB_SOCKET: "{socket}"
+# Its ssh (the tools' and the page's) gets the user's ssh agent, for keys held only there (lo9i's
+# core/mcp/ssh_agent.py); a lo9i from before it ignores this and passes none.
+ssh_agent: true
 # Not trusted: run_command can change a host, and starting a tunnel opens a port, so lo9i asks the user
 # before each one. Listing hosts and tunnels and reading the terminal are read-only and run without asking.
 trusted: false
