@@ -1,0 +1,46 @@
+{# The host picked in the table (app.py's details): what checking it found, its terminal, hiding it, and its
+   tunnels, with their switches, Add, Edit and Delete (_tunnels.html, loaded into its card, which keeps itself
+   current). An offline host's terminal can't connect, so Terminal is off then. #}
+{% set path = 'hosts/' ~ (h.name | urlencode) %}
+{% set offline = probe is not none and not probe.reachable %}
+<section class="details surface--glass" data-details="{{ h.name }}">
+  <header>
+    <h2 class="text-heading">{{ h.name }}</h2>
+    <div class="pills">
+      {# How many of its tunnels are on, kept current by its tunnels' card (_tunnels.html). #}
+      <span id="tunnels-count"></span>
+      {% if probe is none %}<span class="pill">Checking…</span>
+      {% elif probe.reachable %}<span class="pill pill--accent">Online</span>
+      {% else %}<span class="pill pill--danger" title="{{ probe.problem }}">Offline</span>{% endif %}
+    </div>
+  </header>
+  {% if offline %}<p class="text-meta">{{ probe.problem }}</p>{% endif %}
+  <dl>
+    <dt class="micro-label">Address</dt>
+    <dd class="mono">{{ h.address or '—' }}</dd>
+    <dt class="micro-label">Session</dt>
+    <dd>
+      {% if probe is none or not probe.reachable %}—
+      {% elif probe.session %}Running
+      {% elif probe.installed %}Not running
+      {% else %}No Herdr: its terminal installs it{% endif %}
+    </dd>
+    <dt class="micro-label">Last connected</dt>
+    <dd>{{ h.last_connected | ago }}</dd>
+  </dl>
+  <div class="details-actions">
+    {% if offline %}
+    <button class="btn btn--sm btn--neutral" disabled title="{{ h.name }} is offline: {{ probe.problem }}">Terminal</button>
+    {% else %}
+    <a class="btn btn--sm btn--neutral" href="{{ path }}" target="_blank">Terminal</a>
+    {% endif %}
+    {% if h.hidden %}
+    <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/show">Show</button>
+    {% else %}
+    <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/hide" title="Leave it off this page and the assistant's list">Hide</button>
+    {% endif %}
+  </div>
+</section>
+<section class="details tunnels-card surface--glass">
+  <div hx-get="{{ path }}/tunnels" hx-trigger="load" hx-swap="outerHTML"></div>
+</section>

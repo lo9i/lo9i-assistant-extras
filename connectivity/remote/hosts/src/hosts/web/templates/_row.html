@@ -1,45 +1,29 @@
-{# A host's row, with what checking it found (`probe`), the last time or now; without one it says it's checking.
-   The page checks every host again as it shows, and each row comes again over /statuses as its check ends
-   (table.js). `items` are its tunnels with how each is doing, shown and switched in their own cell. An offline
-   host's terminal can't connect, so nothing opens it: not the row, its name or Terminal. #}
-{% set path = 'hosts/' ~ (h.name | urlencode) %}
-{% set offline = probe is not none and not probe.reachable %}
-<tr data-host="{{ h.name }}" {% if not offline %}data-href="{{ path }}"{% endif %} {% if probe is none %}data-checking{% endif %} class="{{ 'dim' if h.hidden }}">
+{# A host's row in the table, with what checking it found (`probe`), the last time or now; without one it says
+   it's checking. The page checks every host again as it shows, and each row comes again over /statuses as its
+   check ends (table.js). Clicking it shows the host on the right (_details.html). `items` are its tunnels with
+   how each is doing, counted in their own cell. #}
+<tr data-host="{{ h.name }}" {% if probe is none %}data-checking{% endif %} class="{{ 'dim' if h.hidden }}">
   <td class="medium" data-value="{{ h.name | lower }}">
-    {% if offline %}{{ h.name }}{% else %}<a href="{{ path }}" target="_blank" class="link">{{ h.name }}</a>{% endif %}
+    <button class="row-button">{{ h.name }}</button>
     {% if h.hidden %}<span class="pill">hidden</span>{% endif %}
   </td>
   <td class="hide-sm mono muted" data-value="{{ h.address or '' }}">{{ h.address or '—' }}</td>
   {% if probe is none %}
   <td data-value="2"><span class="faint">Checking…</span></td>
-  <td data-value="3"><span class="faint">…</span></td>
+  <td class="hide-sm" data-value="3"><span class="faint">…</span></td>
   {% elif probe.reachable %}
   <td data-value="0"><span class="status-dot online"></span>Online</td>
-  <td data-value="{{ 0 if probe.session else 1 if probe.installed else 2 }}">
+  <td class="hide-sm" data-value="{{ 0 if probe.session else 1 if probe.installed else 2 }}">
     {% if probe.session %}<span class="pill pill--accent">Running</span>
     {% elif probe.installed %}<span class="muted">Not running</span>
     {% else %}<span class="muted" title="Herdr isn't installed there. Open its terminal to install it.">No Herdr</span>{% endif %}
   </td>
   {% else %}
   <td data-value="1"><span class="status-dot offline"></span><span title="{{ probe.problem }}">Offline</span></td>
-  <td data-value="3"><span class="faint">—</span></td>
+  <td class="hide-sm" data-value="3"><span class="faint">—</span></td>
   {% endif %}
   <td class="hide-sm nowrap" data-value="{{ h.last_connected or '' }}">
     <span class="{{ 'faint' if not h.last_connected else 'muted' }}" title="{{ h.last_connected or '' }}">{{ h.last_connected | ago }}</span>
   </td>
   {% include "_tunnel_cell.html" %}
-  <td>
-    <div class="cell-actions">
-      {% if offline %}
-      <button class="btn btn--sm btn--neutral" disabled title="{{ h.name }} is offline: {{ probe.problem }}">Terminal</button>
-      {% else %}
-      <a class="btn btn--sm btn--neutral" href="{{ path }}" target="_blank">Terminal</a>
-      {% endif %}
-      {% if h.hidden %}
-      <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/show">Show</button>
-      {% else %}
-      <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/hide" title="Leave it off this page and the assistant's list">Hide</button>
-      {% endif %}
-    </div>
-  </td>
 </tr>

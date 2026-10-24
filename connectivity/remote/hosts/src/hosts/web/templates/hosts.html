@@ -13,14 +13,14 @@
   </div>
 </header>
 
-<main class="screen">
+<main class="screen split">
   <section class="table-card surface--glass">
     <header class="toolbar">
       <div>
         <h2 class="text-heading">Your hosts</h2>
         <p class="text-meta">
           From your SSH config.{% if hidden_count %} {{ hidden_count }} hidden.{% endif %}
-          {% if hosts %}Click one to open its terminal. Its tunnels are switched on and off here.{% endif %}
+          {% if hosts %}Click one to see it on the right.{% endif %}
         </p>
       </div>
       {% if hosts %}
@@ -39,10 +39,9 @@
           <th data-sort>Name</th>
           <th data-sort class="hide-sm">Address and user</th>
           <th data-sort>Status</th>
-          <th data-sort>Session</th>
+          <th data-sort class="hide-sm">Session</th>
           <th data-sort class="hide-sm">Last connected</th>
           <th data-sort>Tunnels</th>
-          <th class="right">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -51,7 +50,7 @@
         {% set items = tunnels_of.get(h.name, []) %}
         {% include "_row.html" %}
         {% endfor %}
-        <tr class="no-match" hidden><td colspan="7" class="muted">No host matches.</td></tr>
+        <tr class="no-match" hidden><td colspan="6" class="muted">No host matches.</td></tr>
       </tbody>
     </table>
     </div>
@@ -61,9 +60,16 @@
     <p class="empty">Your SSH config (~/.ssh/config) has no hosts. Add a <span class="mono">Host</span> entry there, then reload this page.</p>
     {% endif %}
   </section>
+
+  {# The host picked: the one the address names (?host=), else the first. #}
+  <div id="details" class="column">
+    {% if selected %}
+    {% with h = selected, probe = probes.get(selected.name) %}{% include "_details.html" %}{% endwith %}
+    {% endif %}
+  </div>
 </main>
-{# Adding a tunnel from a host's row: the form (_tunnel_form.html) comes in here, and the dialog closes once
-   it's saved (the answer is empty and says tunnels-changed) or cancelled. #}
+{# Adding or changing a tunnel: the form (_tunnel_form.html) comes in here, and the dialog closes once it's saved
+   (the answer is empty and says tunnels-changed) or cancelled. #}
 <dialog id="tunnel-dialog" class="tunnel-dialog">
   <div id="tunnel-form"></div>
 </dialog>

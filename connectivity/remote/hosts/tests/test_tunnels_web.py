@@ -89,27 +89,25 @@ def test_switching_a_tunnel_on_and_off(client, spawn: FakeSpawn):
     assert spawn.started[0].terminated
 
 
-def test_the_hosts_table_shows_each_hosts_tunnels_and_switches_them(client, ssh):
+def test_the_hosts_table_counts_each_hosts_tunnels_and_the_details_switch_them(client, ssh):
     ssh.answers[herdr._PROBE] = answers(127)
     page = client.get("/").text
-    # Before any is added: the column, Add in each row, and the dialog Add opens its form in.
-    assert ">Tunnels</th>" in page and 'hx-get="hosts/pi/tunnels/new" hx-target="#tunnel-form"' in page
-    assert '<dialog id="tunnel-dialog"' in page and '<div id="tunnel-form"></div>' in page
+    # Before any is added: the column, and the dialog New tunnel and the details' Add open the form in.
+    assert ">Tunnels</th>" in page and '<dialog id="tunnel-dialog"' in page and '<div id="tunnel-form"></div>' in page
     _add(client)
     [t] = _saved()
     row = client.get("/hosts/pi/row").text
-    assert 'class="tunnel-chip"' in row and "Database" in row and "localhost:15432 → db.internal:5432 on pi" in row
-    assert f'hx-post="hosts/pi/tunnels/{t.id}/start" hx-swap="none"' in row and 'data-value="0"' in row
-    # The cell reads itself again when tunnels change, and only polls while one is on.
+    assert 'class="tunnels-cell nowrap" data-value="1"' in row and "· 1 on" not in row
     assert 'hx-trigger="tunnels-changed from:body"' in row
+    # The details' card has the tunnels, with their switches.
+    listed = client.get("/hosts/pi/tunnels").text
+    assert "Database" in listed and f'hx-post="hosts/pi/tunnels/{t.id}/start"' in listed
     switched = client.post(f"/hosts/pi/tunnels/{t.id}/start")
     assert switched.headers["HX-Trigger"] == "tunnels-changed"
-    cell = _until(client, "Running", "/hosts/pi/tunnels/cell")
-    assert cell.startswith('<td class="tunnels-cell" data-value="1"') and "every " in cell
-    assert f'hx-post="hosts/pi/tunnels/{t.id}/stop"' in cell and 'aria-checked="true"' in cell
-    assert "Database" in client.get("/").text  # The page shows them before its rows are checked.
+    cell = client.get("/hosts/pi/tunnels/cell").text
+    assert cell.startswith('<td class="tunnels-cell nowrap" data-value="1001"') and "· 1 on" in cell
     assert client.post(f"/hosts/pi/tunnels/{t.id}/stop").headers["HX-Trigger"] == "tunnels-changed"
-    assert 'aria-checked="false"' in client.get("/hosts/pi/tunnels/cell").text
+    assert "· 1 on" not in client.get("/hosts/pi/tunnels/cell").text
 
 
 def test_new_tunnel_on_the_hosts_page_picks_its_host_in_the_form(client):

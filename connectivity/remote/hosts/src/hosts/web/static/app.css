@@ -80,9 +80,32 @@ a.link:hover { text-decoration: underline; }
   -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
 }
 .table-card { overflow: hidden; }
-/* A table wider than the page scrolls sideways rather than losing its last columns (Tunnels, Actions). */
-.table-scroll { overflow-x: auto; }
-.table-scroll .data-table { min-width: 860px; }
+/* A table wider than its card scrolls sideways rather than losing its last columns. */
+.table-scroll { overflow: auto; min-height: 0; }
+.table-scroll .data-table { min-width: 520px; }
+
+/* The app's list-and-details layout (its WEB.md): the table on the left, three quarters of the width, the
+   host picked on the right; stacked on narrow screens. */
+.split { display: flex; align-items: flex-start; gap: 16px; height: calc(100vh - 76px); }
+.split .table-card { flex: 3 1 0; min-width: 0; max-height: 100%; display: flex; flex-direction: column; }
+.split .column { flex: 1 1 0; min-width: 300px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.details { flex: none; display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.details > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.details dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; align-items: baseline; }
+.details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.details-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.details .pills { display: flex; align-items: center; gap: 6px; }
+.tunnels-card { padding: 0; gap: 0; overflow: hidden; }
+.tunnels-card .empty { padding: 24px 16px; }
+.micro-label { font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-faint); }
+.pill--danger { background: color-mix(in srgb, var(--color-danger) 18%, transparent); color: var(--color-danger); }
+.row-button { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+tr.selected { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
+@media (max-width: 900px) {
+  .split { flex-direction: column; align-items: stretch; height: auto; }
+  .split .table-card, .split .column { flex: none; max-height: none; }
+}
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 24px; min-height: 66px; border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent); }
 .toolbar p { margin-top: 4px; }
 .toolbar .tools { display: flex; align-items: center; gap: 12px; }
@@ -144,24 +167,10 @@ th[data-sort] { cursor: pointer; user-select: none; }
 th[data-sort]:hover { color: var(--color-text-primary); }
 th[aria-sort="ascending"]::after { content: " ▲"; }
 th[aria-sort="descending"]::after { content: " ▼"; }
-tbody tr[data-href] { cursor: pointer; }
+tbody tr[data-host] { cursor: pointer; }
 tr.dim td { color: var(--color-text-faint); }
-.cell-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.cell-actions .pill { margin-left: 8px; }
 
-/* A host's tunnels in its row: a chip each, with its switch, then Add. */
-.tunnels-cell { min-width: 12rem; }
-.tunnel-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.tunnel-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 16rem; padding: 3px 4px 3px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-full); font-size: var(--font-size-xs); background: color-mix(in srgb, var(--color-text-primary) 4%, transparent); }
-.tunnel-chip .status-dot { margin-right: 0; }
-.tunnel-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tunnel-chip-state { color: var(--color-danger); }
-.tunnel-add { padding-inline: 8px; }
-.switch.switch--sm { flex: none; width: 28px; height: 16px; }
-.switch.switch--sm::after { width: 10px; height: 10px; }
-.switch.switch--sm[aria-checked="true"]::after { transform: translateX(12px); }
-
-/* Adding a tunnel from the table: the form in a dialog over the page. */
+/* Adding or changing a tunnel on the hosts page: the form in a dialog over the page. */
 .tunnel-dialog { width: min(28rem, calc(100vw - 32px)); padding: 0; border: 1px solid var(--surface-glass-border); border-radius: var(--radius-lg); background: var(--surface-modal-bg); color: inherit; box-shadow: var(--shadow-modal); backdrop-filter: blur(20px); }
 .tunnel-dialog::backdrop { background: color-mix(in srgb, #000 40%, transparent); }
 .tunnel-dialog .tunnel-form { border-bottom: 0; padding: 20px; }

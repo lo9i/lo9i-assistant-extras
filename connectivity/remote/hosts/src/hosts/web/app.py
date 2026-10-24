@@ -81,17 +81,24 @@ def _tunnels(request: Request) -> Tunnels:
 
 def _hosts_routes(app: FastAPI) -> None:
     @app.get("/", response_class=HTMLResponse)
-    async def hosts(request: Request, hidden: bool = False) -> HTMLResponse:
-        """The table at once, each host with what checking it found last; the page checks them again over
-        /statuses as soon as it shows."""
+    async def hosts(request: Request, hidden: bool = False, host: str = "") -> HTMLResponse:
+        """The table at once, each host with what checking it found last, and the host picked (`host`, else the
+        first) on the right; the page checks them again over /statuses as soon as it shows."""
         every = await service.all_hosts()
         shown = every if hidden else [h for h in every if not h.hidden]
         hidden_count = sum(1 for h in every if h.hidden)
         tunnels_of = await _tunnels_by_host(request)
+        selected = next((h for h in shown if h.name == host), shown[0] if shown else None)
         return _render(
             request, "hosts.html", hosts=shown, hidden_count=hidden_count, showing_hidden=hidden, tunnels_of=tunnels_of,
-            probes=request.app.state.probes,
+            probes=request.app.state.probes, selected=selected,
         )  # fmt: skip
+
+    @app.get("/hosts/{name}/details", response_class=HTMLResponse)
+    async def details(request: Request, name: str) -> HTMLResponse:
+        """The host picked in the table, with what checking it found last."""
+        probe = request.app.state.probes.get(name)
+        return _render(request, "_details.html", h=await service.host(name), probe=probe)
 
     @app.websocket("/statuses")
     async def statuses(websocket: WebSocket, hidden: bool = False) -> None:

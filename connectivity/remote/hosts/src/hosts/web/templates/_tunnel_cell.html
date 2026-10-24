@@ -1,26 +1,11 @@
-{# A host's tunnels in its row of the hosts table (app.py's tunnel_cell): each with how it's doing and its
-   switch, and Add, whose form opens in the page's dialog (hosts.html). It reads itself again whenever the
-   tunnels change (tunnels-changed, which switching one answers), and while one is on, every few seconds:
-   a tunnel that drops and comes back says so. -#}
+{# How many tunnels a host has, and how many are on, in its row (app.py's tunnel_cell). Its tunnels themselves,
+   with their switches, are in the host's details on the right. It reads itself again whenever they change
+   (tunnels-changed). -#}
 {%- set path = 'hosts/' ~ (h.name | urlencode) %}
-{%- set labels = {"stopped": "Off", "starting": "Starting…", "running": "Running", "reconnecting": "Reconnecting…", "failed": "Failed"} %}
-{%- set dots = {"running": "online", "starting": "pending", "reconnecting": "pending", "failed": "offline"} %}
-{%- set moving = items | selectattr("1.state", "in", ["starting", "reconnecting"]) | list %}
 {%- set on = items | selectattr("1.on") | list | length -%}
-<td class="tunnels-cell" data-value="{{ on }}" hx-get="{{ path }}/tunnels/cell" hx-swap="outerHTML"
-    hx-trigger="{% if on %}every {{ '2s' if moving else '10s' }} [document.visibilityState === 'visible'], {% endif %}tunnels-changed from:body">
-  <div class="tunnel-chips">
-    {% for t, s in items %}
-    <div class="tunnel-chip" title="{{ t.kind_label }}: {{ t.describe() }} · {{ labels[s.state] }}{{ ' · ' ~ s.message if s.message }}">
-      <span class="status-dot {{ dots.get(s.state, '') }}"></span>
-      <span class="tunnel-chip-name">{{ t.name }}</span>
-      {% if s.state == "failed" %}<span class="tunnel-chip-state">Failed</span>{% endif %}
-      <button class="switch switch--sm" role="switch" aria-checked="{{ 'true' if s.on else 'false' }}"
-              aria-label="{{ 'Stop' if s.on else 'Start' }} {{ t.name }}" title="{{ 'Stop' if s.on else 'Start' }}"
-              hx-post="{{ path }}/tunnels/{{ t.id }}/{{ 'stop' if s.on else 'start' }}" hx-swap="none"></button>
-    </div>
-    {% endfor %}
-    <button class="btn btn--sm btn--ghost tunnel-add" hx-get="{{ path }}/tunnels/new" hx-target="#tunnel-form" hx-swap="innerHTML"
-            title="Add a tunnel through {{ h.name }}">+ Tunnel</button>
-  </div>
+<td class="tunnels-cell nowrap" data-value="{{ on * 1000 + items | length }}" hx-get="{{ path }}/tunnels/cell" hx-swap="outerHTML"
+    hx-trigger="tunnels-changed from:body">
+  {%- if items %}
+  <span class="status-dot {{ 'online' if on }}"></span>{{ items | length }}{% if on %} <span class="muted">· {{ on }} on</span>{% endif %}
+  {%- else %}<span class="faint">—</span>{% endif -%}
 </td>

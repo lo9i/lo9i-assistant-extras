@@ -50,7 +50,7 @@ def test_the_table_lists_the_hosts_and_checks_each_as_it_loads(client):
     assert '<base href="/hosts/">' in page
     assert 'id="filter"' in page and page.count("<th data-sort") == 6
     # At once, without waiting for any host: each is checked after, over /statuses (table.js).
-    assert 'data-host="pi"' in page and 'data-href="hosts/pi"' in page and "Checking…" in page
+    assert 'data-host="pi"' in page and "Checking…" in page
     assert "data-checking" in page and 'hx-get="hosts/pi/row"' not in page
     assert "lo9i@lo9i-pi.local" in page and "groso@192.168.0.10:2222" in page
     assert client.get("/static/table.js", headers={"X-Forwarded-Prefix": "/hosts"}).status_code == 200
@@ -60,15 +60,18 @@ def test_a_checked_row_says_whether_it_answers_and_runs_the_session(client, ssh:
     ssh.answers[herdr._PROBE] = answers(out=json.dumps({"sessions": [{"name": "lo9i", "running": True}]}))
     row = client.get("/hosts/pi/row").text
     assert "Online" in row and "Running" in row and "hosts/pi/row" not in row
-    assert 'data-href="hosts/pi"' in row and '<a class="btn btn--sm btn--neutral" href="hosts/pi"' in row
+    details = client.get("/hosts/pi/details").text  # The host on the right shows what the check found.
+    assert '<span class="pill pill--accent">Online</span>' in details
+    assert '<a class="btn btn--sm btn--neutral" href="hosts/pi"' in details
     ssh.answers[herdr._PROBE] = answers(127)
     assert "No Herdr" in client.get("/hosts/pi/row").text
     ssh.answers[herdr._PROBE] = answers(255, err="ssh: Could not resolve hostname lo9i-pi.local")
     row = client.get("/hosts/pi/row").text
     assert "Offline" in row and "address couldn&#39;t be found" in row
-    # Its terminal can't connect: nothing opens it.
-    assert "data-href" not in row and 'href="hosts/pi"' not in row
-    assert '<button class="btn btn--sm btn--neutral" disabled title="pi is offline:' in row
+    # Its terminal can't connect: Terminal is off, saying why.
+    details = client.get("/hosts/pi/details").text
+    assert 'href="hosts/pi"' not in details and "address couldn&#39;t be found" in details
+    assert '<button class="btn btn--sm btn--neutral" disabled title="pi is offline:' in details
 
 
 def test_each_hosts_row_comes_over_one_socket_as_its_check_ends_and_shows_at_once_next_time(client, ssh: FakeSsh):
@@ -90,10 +93,20 @@ def test_hidden_hosts_leave_the_table_until_asked_for(client):
     assert response.headers["HX-Refresh"] == "true"
     page = client.get("/").text
     assert "hosts/nas" not in page and "1 hidden" in page and "Show hidden hosts" in page
-    page = client.get("/?hidden=true").text
+    page = client.get("/?hidden=true&host=nas").text
     assert 'hx-post="hosts/nas/show"' in page and "hidden</span>" in page
     client.post("/hosts/nas/show")
     assert "hosts/nas" in client.get("/").text
+
+
+def test_the_host_picked_shows_on_the_right_the_first_until_one_is(client):
+    page = client.get("/").text
+    assert '<div id="details" class="column">' in page and 'data-details="pi"' in page
+    assert 'hx-get="hosts/pi/tunnels" hx-trigger="load"' in page  # Its tunnels, in their own card.
+    page = client.get("/?host=nas").text
+    assert 'data-details="nas"' in page and 'data-details="pi"' not in page
+    assert 'data-details="pi"' in client.get("/?host=elsewhere").text
+    assert client.get("/hosts/elsewhere/details").status_code == 404
 
 
 def test_every_host_hidden_says_how_to_bring_them_back(client):

@@ -1,14 +1,18 @@
-// The hosts table, as Watchlist's tables look: the search box keeps the rows that have its words, a column's
-// header sorts by it (again to reverse it), and clicking a row opens its host. Once the page shows, every host
-// is checked again: each row comes over one WebSocket as its check ends (app.py's statuses), and the search and
-// the order are applied again to it. Rows also come in again from htmx (a tunnel switched).
+// The hosts table, as the app's list-and-details pages: the search box keeps the rows that have its words, a
+// column's header sorts by it (again to reverse it), and clicking a row shows its host on the right (its
+// details, from app.py's details, and its name in the address, so a reload keeps it). Once the page shows, every
+// host is checked again: each row comes over one WebSocket as its check ends (app.py's statuses), the search and
+// the order are applied again to it, and the details read again when it's the host shown. Cells also come in
+// again from htmx (a tunnel switched).
 (() => {
   const table = document.getElementById("hosts");
   if (!table) return;
   const body = table.tBodies[0];
   const search = document.getElementById("filter");
   const none = body.querySelector(".no-match");
+  const details = document.getElementById("details");
   let order = null; // { column, direction }
+  let picked = details.querySelector("[data-details]")?.dataset.details ?? null;
 
   const rows = () => [...body.rows].filter((row) => row !== none);
   const value = (row, column) => row.cells[column]?.dataset.value ?? row.cells[column]?.textContent.trim() ?? "";
@@ -43,10 +47,27 @@
     });
   }
 
+  function mark() {
+    for (const row of rows()) row.classList.toggle("selected", row.dataset.host === picked);
+  }
+
+  function show(host) {
+    const path = `hosts/${encodeURIComponent(host)}/details`;
+    htmx.ajax("GET", path, { target: details, swap: "innerHTML" });
+  }
+
+  function pick(host) {
+    picked = host;
+    mark();
+    show(host);
+    const url = new URL(location.href);
+    url.searchParams.set("host", host);
+    history.replaceState(null, "", url);
+  }
+
   body.addEventListener("click", (event) => {
-    if (event.target.closest("a, button, input")) return;
-    const row = event.target.closest("tr[data-href]");
-    if (row && !event.target.closest("a, button")) window.open(new URL(row.dataset.href, document.baseURI).href, "_blank");
+    const row = event.target.closest("tr[data-host]");
+    if (row && !event.target.closest("a, input")) pick(row.dataset.host);
   });
 
   function replace(host, html) {
@@ -57,8 +78,10 @@
     if (!row || !fresh) return;
     row.replaceWith(fresh);
     htmx.process(fresh);
+    mark();
     filter();
     sort();
+    if (host === picked) show(host);
   }
 
   function check() {
@@ -79,6 +102,7 @@
   }
 
   search.addEventListener("input", filter);
+  mark();
   check();
   document.body.addEventListener("htmx:afterSettle", () => {
     filter();
