@@ -75,8 +75,8 @@ newer version later.
   session, and opens a terminal on one in the browser. The terminal runs in [Herdr](https://herdr.dev) on the
   host, in a session named `lo9i`, so it keeps running when the connection drops and the page reconnects to
   it on its own; when the host has no Herdr, the page offers to install it in `~/.local/bin`. The assistant's
-  tools list the hosts, read that terminal's screen and run commands in it, where you see them; a command
-  asks you first. Needs lo9i with WebSocket pages (the `connectivity/remote` category).
+  tools list the hosts, read that terminal's screen and run commands in a tab of their own there (`assistant`),
+  where you see them; a command asks you first. Keys held only by your ssh agent work too. Needs lo9i with WebSocket pages (the `connectivity/remote` category).
 - **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
   for more), its audio as an MP3 with tags and cover, or its transcript as a text file; or let the
   assistant read the transcript to summarize or answer questions about the video. Files go to the

@@ -1,7 +1,9 @@
 """Herdr (herdr.dev) on a host: its terminals keep running in a background server when the connection
 drops, and attaching again (running `herdr` again) shows them as they are. lo9i uses one named session
-per host, `lo9i`: the web app's terminal attaches to it, and the assistant's commands run in its focused
-pane, the one the user sees.
+per host, `lo9i`: the web app's terminal attaches to it, and the assistant's commands run in a tab of their
+own there, labeled `assistant`, which the user sees beside theirs. Its shell is `/bin/sh`, whatever the
+user's login shell is (fish doesn't run the marker that ends a command), and the assistant types only into
+its pane, wherever the user moved the focus.
 
 Commands and their documentation: https://herdr.dev/docs/cli-reference/ and /docs/persistence-remote/.
 `herdr --session <name>` launches or attaches to a session; the API commands (`pane run`, `pane read`,
@@ -25,6 +27,7 @@ _NO_CURL = 3
 _NO_DOWNLOAD = 4
 _NO_SERVER = 5
 _NO_PANE = 6
+_NO_TAB = 7
 _STILL_RUNNING = 124
 # How much of the pane a command's output is read from.
 _ROWS = 400
@@ -44,12 +47,26 @@ installer=$(curl -fsSL --retry 2 --connect-timeout 10 {INSTALLER}) || exit {_NO_
 printf '%s\\n' "$installer" | HERDR_INSTALL_DIR="$HOME/.local/bin" sh || exit $?
 "$HOME/.local/bin/herdr" --version
 """
+# The label of the assistant's tab in lo9i's session.
+TAB = "assistant"
 # The focused pane's id in $pane, from `pane current`'s JSON, which has only that pane's.
 _CURRENT = f"""current=$(h pane current) || exit {_NO_PANE}
 pane=$(printf '%s\\n' "$current" | sed -n 's/.*"pane_id" *: *"\\([^"]*\\)".*/\\1/p')
 """
-# Starts the session's server if it isn't running, with a workspace if it has none, and says what the
-# focused pane runs.
+# assistant_pane sets $pane to the assistant's tab's pane, "" when there's no tab labeled TAB: its tab from
+# `tab list`, whose tabs have no objects inside, then its first pane from `pane list`, with each pane's `scroll`
+# object taken out.
+_FIND = """assistant_pane() {
+  tab=$(h tab list | tr -d '\\n' | grep -o '{[^{}]*"label" *: *"TAB"[^{}]*}' | head -n 1 \\
+    | sed -n 's/.*"tab_id" *: *"\\([^"]*\\)".*/\\1/p')
+  pane=""
+  [ -n "$tab" ] || return 0
+  pane=$(h pane list | tr -d '\\n' | sed 's/"scroll" *: *{[^}]*}//g' \\
+    | grep -o '{[^{}]*"tab_id" *: *"'"$tab"'"[^{}]*}' | head -n 1 | sed -n 's/.*"pane_id" *: *"\\([^"]*\\)".*/\\1/p')
+}
+""".replace("TAB", TAB)
+# Starts the session's server if it isn't running, with a workspace if it has none, opens the assistant's tab
+# (with a POSIX shell, not focused) if it isn't there, and says what its pane runs.
 _READY = (
     _PREAMBLE
     + f"""if ! h workspace list >/dev/null 2>&1; then
@@ -63,8 +80,14 @@ _READY = (
 fi
 h pane current >/dev/null 2>&1 || h workspace create --label {SESSION} --cwd "$HOME" --focus >/dev/null
 """
-    + _CURRENT
-    + """h pane process-info --pane "$pane"
+    + _FIND
+    + f"""assistant_pane
+if [ -z "$pane" ]; then
+  h tab create --label {TAB} --cwd "$HOME" --env SHELL=/bin/sh --no-focus >/dev/null || exit {_NO_PANE}
+  assistant_pane
+fi
+[ -n "$pane" ] || exit {_NO_PANE}
+h pane process-info --pane "$pane"
 """
 )
 # $1 the pane, $2 the command line, $3 the pattern of its end, $4 how long to wait (ms).
@@ -76,11 +99,19 @@ h pane read "$1" --source recent-unwrapped --lines {_ROWS}
 exit {_STILL_RUNNING}
 """
 )
-# $1 rows of scrollback to read, 0 for the screen as it is.
+# $1 rows of scrollback to read, 0 for the screen as it is; $2 "user" for the pane the user has in front, else
+# the assistant's.
 _SCREEN = (
     _PREAMBLE
+    + """if [ "$2" = user ]; then
+"""
     + _CURRENT
-    + """if [ "$1" -gt 0 ]; then
+    + "else\n"
+    + _FIND
+    + f"""  assistant_pane
+  [ -n "$pane" ] || exit {_NO_TAB}
+fi
+if [ "$1" -gt 0 ]; then
   h pane read "$pane" --source recent --lines "$1"
 else
   h pane read "$pane" --source visible
@@ -153,7 +184,8 @@ class Herdr:
             raise HerdrError(f"Herdr's installer stopped on {host}: {_last_line(result.out + result.err)}")
 
     async def run(self, host: str, command: str, timeout: float) -> CommandRun:
-        """Types the command into the focused pane of lo9i's session and waits for it to end."""
+        """Types the command into the assistant's tab in lo9i's session, opening it if it isn't there, and waits
+        for it to end."""
         pane = await self._ready_pane(host)
         tag = secrets.token_hex(4)
         line = _with_marker(command, tag)
@@ -165,9 +197,9 @@ class Herdr:
         text = json.loads(result.out)["result"]["read"]["text"]
         return _output(text, tag)
 
-    async def screen(self, host: str, rows: int = 0) -> str:
-        """What the focused pane shows, or its last `rows` rows."""
-        result = await self._ssh.run(host, _SCREEN, str(max(rows, 0)), timeout=20)
+    async def screen(self, host: str, rows: int = 0, user: bool = False) -> str:
+        """What the assistant's tab shows, or its last `rows` rows; with `user`, the pane the user has in front."""
+        result = await self._ssh.run(host, _SCREEN, str(max(rows, 0)), "user" if user else "", timeout=20)
         self._check(host, result)
         return result.out
 
@@ -179,8 +211,8 @@ class Herdr:
         if busy:
             running = busy[0].get("cmdline") or busy[0].get("name") or "a program"
             raise BusyError(
-                f"The terminal on {host} is busy running `{running}`. Wait for it to end, or ask the user to "
-                "finish it in the terminal (Hosts page), then try again."
+                f"The assistant's tab on {host} is still running `{running}`. Wait for it to end (read_screen shows "
+                "how it goes), or ask the user to stop it in that tab of the terminal (Hosts page)."
             )
         return info["pane_id"]
 
@@ -196,6 +228,8 @@ class Herdr:
             raise HerdrError(f"Herdr's session on {host} didn't start.")
         if result.code == _NO_PANE:
             raise HerdrError(f"lo9i's Herdr session on {host} has no terminal open. Open it from the Hosts page.")
+        if result.code == _NO_TAB:
+            raise HerdrError(f"lo9i's Herdr session on {host} has no {TAB} tab yet: run_command opens it.")
         if result.code not in (0, _STILL_RUNNING):
             raise HerdrError(f"Herdr failed on {host}: {_herdr_error(result.out + result.err)}")
 

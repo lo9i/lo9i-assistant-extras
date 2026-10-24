@@ -29,8 +29,8 @@ Host *
 """
 
 
-def process_info(pane: str = "w1:p1", busy: str | None = None) -> str:
-    """`pane process-info`'s answer: the shell alone, or a program in the foreground."""
+def process_info(pane: str = "w1:p2", busy: str | None = None) -> str:
+    """`pane process-info`'s answer for the assistant's pane: the shell alone, or a program in the foreground."""
     foreground = [{"pid": 10, "name": "bash", "cmdline": "/bin/bash"}]
     if busy:
         foreground = [{"pid": 11, "name": busy.split()[0], "cmdline": busy}]

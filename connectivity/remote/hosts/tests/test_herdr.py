@@ -59,6 +59,22 @@ if args[:2] == ["pane", "current"]:
     if not (state / "pane").exists():
         fail("pane_not_found", "pane not found")
     answer({"type": "pane_current", "pane": {"pane_id": "w1:p1", "terminal_id": "term_1", "focused": True}})
+# The user's tab, and the assistant's once it's made, as herdr 0.9 lists them: compact JSON, a pane's scroll an
+# object of its own.
+tabs = [{"agent_status": "unknown", "focused": True, "label": "1", "tab_id": "w1:t1", "workspace_id": "w1"}]
+panes = [{"pane_id": "w1:p1", "scroll": {"offset_from_bottom": 0}, "tab_id": "w1:t1"}]
+if (state / "tab").exists():
+    tabs.append({"agent_status": "unknown", "focused": False, "label": "assistant", "tab_id": "w1:t2"})
+    panes.append({"pane_id": "w1:p2", "scroll": {"offset_from_bottom": 0}, "tab_id": "w1:t2"})
+if args[:2] == ["tab", "list"]:
+    print(json.dumps({"id": "cli", "result": {"tabs": tabs, "type": "tab_list"}}, separators=(",", ":")))
+    sys.exit(0)
+if args[:2] == ["pane", "list"]:
+    print(json.dumps({"id": "cli", "result": {"panes": panes, "type": "pane_list"}}, separators=(",", ":")))
+    sys.exit(0)
+if args[:2] == ["tab", "create"]:
+    (state / "tab").write_text(json.dumps(args))
+    answer({"type": "tab_created", "root_pane": {"pane_id": "w1:p2"}})
 if args[:2] == ["pane", "process-info"]:
     pane = args[args.index("--pane") + 1]
     busy = (state / "busy").read_text() if (state / "busy").exists() else ""
@@ -120,13 +136,19 @@ def _log(state) -> list[list[str]]:
 # --- The scripts, run for real ---
 
 
-async def test_a_command_runs_in_the_session_started_for_it(installed):
+async def test_a_command_runs_in_the_assistants_own_tab_opened_for_it(installed):
     run = await Herdr(LocalSsh()).run("pi", "echo hello && sh -c 'exit 3'", 10)
     assert (run.output, run.exit_code, run.truncated) == ("hello", 3, False)
     commands = [args[2:4] for args in _log(installed) if args[:2] == ["--session", "lo9i"]]
     assert ["server"] in [c[:1] for c in commands]
     assert ["workspace", "create"] in commands
-    assert ["pane", "run"] in commands
+    created = json.loads((installed / "tab").read_text())
+    assert created == ["tab", "create", "--label", "assistant", "--cwd", str(installed.parent), "--env",
+                           "SHELL=/bin/sh", "--no-focus"]  # fmt: skip
+    ran = [args for args in _log(installed) if args[2:4] == ["pane", "run"]]
+    assert [args[4] for args in ran] == ["w1:p2"]  # not the focused pane, w1:p1
+    await Herdr(LocalSsh()).run("pi", "true", 10)
+    assert sum(args[2:4] == ["tab", "create"] for args in _log(installed)) == 1  # found again, not made again
 
 
 async def test_quotes_and_dollars_reach_the_shell_as_typed(installed, home):
@@ -145,24 +167,30 @@ async def test_a_busy_terminal_is_left_alone(installed):
     installed.mkdir()
     (installed / "server").touch()
     (installed / "pane").touch()
+    (installed / "tab").touch()
     (installed / "busy").write_text("vim notes.txt")
-    with pytest.raises(BusyError, match=re.escape("busy running `vim notes.txt`")):
+    with pytest.raises(BusyError, match=re.escape("still running `vim notes.txt`")):
         await Herdr(LocalSsh()).run("pi", "rm -rf /tmp/x", 10)
     assert not any(args[2:4] == ["pane", "run"] for args in _log(installed))
 
 
-async def test_the_screen_is_read_from_the_focused_pane(installed):
+async def test_the_screen_is_read_from_the_assistants_tab_or_the_users_pane(installed):
     lo9i = Herdr(LocalSsh())
     await lo9i.run("pi", "echo on screen", 10)
     assert "on screen" in await lo9i.screen("pi")
     await lo9i.screen("pi", 50)
+    await lo9i.screen("pi", user=True)
     reads = [args for args in _log(installed) if args[2:4] == ["pane", "read"]]
-    assert reads[-2][4:] == ["w1:p1", "--source", "visible"]
-    assert reads[-1][4:] == ["w1:p1", "--source", "recent", "--lines", "50"]
+    assert reads[-3][4:] == ["w1:p2", "--source", "visible"]
+    assert reads[-2][4:] == ["w1:p2", "--source", "recent", "--lines", "50"]
+    assert reads[-1][4:] == ["w1:p1", "--source", "visible"]
 
 
-async def test_no_session_means_nothing_to_read(installed):
+async def test_no_session_or_no_tab_yet_means_nothing_to_read(installed):
     with pytest.raises(HerdrError, match="has no terminal open"):
+        await Herdr(LocalSsh()).screen("pi", user=True)
+    (installed / "server").touch()
+    with pytest.raises(HerdrError, match="has no assistant tab yet: run_command opens it"):
         await Herdr(LocalSsh()).screen("pi")
 
 
@@ -204,7 +232,7 @@ async def test_a_command_still_running_gives_back_the_screen(ssh: FakeSsh, fake_
     assert (run.exit_code, run.output) == (None, "me@host:~$ sleep 999; echo ...")
     _, _, args = ssh.calls[-1]
     pane, line, ending, wait = args
-    assert pane == "w1:p1" and wait == "2000"
+    assert pane == "w1:p2" and wait == "2000"
     assert line.startswith('sleep 999; echo "[lo9i:$?:') and ending.startswith(r"^\[lo9i:[0-9]+:")
 
 

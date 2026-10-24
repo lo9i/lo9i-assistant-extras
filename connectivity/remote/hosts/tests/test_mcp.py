@@ -82,17 +82,19 @@ async def test_hidden_or_unknown_hosts_are_not_reached(ssh: FakeSsh):
 async def test_herdrs_problems_reach_the_assistant_as_errors_to_act_on(ssh: FakeSsh):
     ssh.answers[herdr._READY] = answers(out=process_info(busy="htop"))
     result = await call("run_command", {"host": "pi", "command": "uptime"})
-    assert result.is_error and "busy running `htop`" in result.content[0].text
+    assert result.is_error and "still running `htop`" in result.content[0].text
     ssh.answers[herdr._SCREEN] = answers(127)
     result = await call("read_screen", {"host": "pi"})
     assert result.is_error and "Herdr isn't installed on pi" in result.content[0].text
 
 
-async def test_the_screen_is_what_the_user_sees(ssh: FakeSsh):
+async def test_the_screen_is_the_assistants_tab_or_the_users_pane(ssh: FakeSsh):
     ssh.answers[herdr._SCREEN] = answers(out="me@pi:~$ uptime\n 10:00 up 3 days\nme@pi:~$ ")
     result = await call("read_screen", {"host": "pi", "lines": 30})
     assert "up 3 days" in result.content[0].text
-    assert ssh.calls[-1][2] == ("30",)
+    assert ssh.calls[-1][2] == ("30", "")
+    await call("read_screen", {"host": "pi", "user_pane": True})
+    assert ssh.calls[-1][2] == ("0", "user")
 
 
 # Tunnels: the tools reach them through the page, which runs them, over its socket.

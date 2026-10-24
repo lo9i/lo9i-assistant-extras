@@ -23,14 +23,14 @@ from .ssh import OpenSsh
 
 INSTRUCTIONS = """\
 The user's Linux hosts, from their SSH config, and a terminal on each that keeps running when the
-connection drops (a Herdr session named lo9i). The user sees the same terminal on the Hosts page of
-lo9i's web app, so a command run here shows there as if they had typed it.
+connection drops (a Herdr session named lo9i). Your commands run in a tab of their own there, labeled
+assistant, which the user sees beside theirs on the Hosts page of lo9i's web app.
 
-Start with list_hosts. read_screen shows what the terminal shows. run_command types a command there
-and returns its output and exit code. Commands that change a host (installing or removing software,
-editing files, restarting services, rebooting, deleting anything) need the user's OK first: say what
-you'll run and why, and run it only after they agree. Read-only commands (status, logs, disk space)
-need no OK.
+Start with list_hosts. run_command types a command in your tab and returns its output and exit code;
+read_screen shows what your tab shows, or the pane the user has in front. Commands that change a host
+(installing or removing software, editing files, restarting services, rebooting, deleting anything) need
+the user's OK first: say what you'll run and why, and run it only after they agree. Read-only commands
+(status, logs, disk space) need no OK.
 
 The user's SSH tunnels (ports forwarded through a host by this Mac) are on the same page:
 list_tunnels says which there are and how each is doing; start_tunnel and stop_tunnel switch one on
@@ -76,12 +76,12 @@ async def run_command(
     command: Annotated[str, Field(description="A shell command line (bash or sh)")],
     timeout_seconds: Annotated[int, Field(ge=1, le=_MAX_WAIT_SECONDS, description="How long to wait for it")] = 60,
 ) -> dict[str, Any]:
-    """Runs a command in the host's terminal, the Herdr session the user sees, by typing it there, and
-    returns its output and exit code. A command that changes the host (installs, removes, edits files,
-    restarts or stops services, reboots, deletes) needs the user's OK first: ask before calling this,
-    unless they asked for exactly this command. Not for programs that wait for input (editors, pagers,
-    password prompts): one still running after the timeout comes back with exit_code null and the screen
-    so far; read_screen later shows how it went."""
+    """Runs a command in the assistant's own tab of the host's terminal (the Herdr session the user sees, in a
+    tab labeled assistant, with a POSIX sh), by typing it there, and returns its output and exit code. A
+    command that changes the host (installs, removes, edits files, restarts or stops services, reboots,
+    deletes) needs the user's OK first: ask before calling this, unless they asked for exactly this command.
+    Not for programs that wait for input (editors, pagers, password prompts): one still running after the
+    timeout comes back with exit_code null and the screen so far; read_screen later shows how it went."""
     await _shown(host)
     try:
         run = await _herdr().run(host, command, timeout_seconds)
@@ -98,11 +98,15 @@ async def read_screen(
     lines: Annotated[
         int, Field(ge=0, le=2000, description="Rows of scrollback to read; 0 for the screen as it is now")
     ] = 0,
+    user_pane: Annotated[
+        bool, Field(description="Read the pane the user has in front instead of the assistant's tab")
+    ] = False,
 ) -> str:
-    """What the host's terminal (the Herdr session the user sees) shows now, as text."""
+    """What the assistant's tab of the host's terminal (the Herdr session the user sees) shows now, as text, or
+    with user_pane the pane the user has in front."""
     await _shown(host)
     try:
-        return await _herdr().screen(host, lines)
+        return await _herdr().screen(host, lines, user_pane)
     except HerdrError as e:
         raise ToolError(str(e)) from None
 
