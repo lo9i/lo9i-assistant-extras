@@ -19,12 +19,63 @@
     // Its card shows through, as the app's surfaces do.
     allowTransparency: true,
     theme: { background: "rgba(0, 0, 0, 0)", foreground: "#ffffff" },
+    // Herdr takes the mouse; option-drag selects in the browser instead, for ⌘C.
+    macOptionClickForcesSelection: true,
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
   term.open(box);
   fit.fit();
   new ResizeObserver(() => fit.fit()).observe(box);
+
+  // Herdr copies what's selected with the mouse by sending it to the terminal (OSC 52, "c;<base64>"), as it
+  // would to a terminal app; xterm.js leaves that to the page. When the browser won't let a page write to the
+  // clipboard on its own (Safari, a page not on https), ⌘C copies it instead.
+  let copied = "";
+  term.parser.registerOscHandler(52, (data) => {
+    const encoded = data.slice(data.indexOf(";") + 1);
+    if (!encoded || encoded === "?") return true; // A program asking what's in the clipboard: not answered.
+    try {
+      copied = new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)));
+    } catch {
+      return true;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(copied).catch(copyWithCommand);
+    } else {
+      copyWithCommand();
+    }
+    return true;
+  });
+
+  function copyWithCommand() {
+    const area = document.createElement("textarea");
+    area.value = copied;
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position: fixed; opacity: 0; pointer-events: none;";
+    document.body.append(area);
+    area.select();
+    let done = false;
+    try {
+      done = document.execCommand("copy");
+    } catch {}
+    area.remove();
+    term.focus();
+    if (!done) state.textContent = "Selected: ⌘C copies it";
+  }
+
+  // ⌘C with nothing selected in xterm.js copies what Herdr last copied (before xterm.js's own handler runs).
+  document.addEventListener(
+    "copy",
+    (event) => {
+      if (term.hasSelection() || !copied || !event.clipboardData) return;
+      event.clipboardData.setData("text/plain", copied);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (state.textContent.startsWith("Selected")) state.textContent = "Connected";
+    },
+    true,
+  );
 
   const encoder = new TextEncoder();
   let socket = null;
