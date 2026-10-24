@@ -177,6 +177,27 @@ def _tunnel_routes(app: FastAPI) -> None:
         """The host's tunnels in its row of the hosts table, with their switches."""
         return _render(request, "_tunnel_cell.html", h=await service.host(name), items=await _items(request, name))
 
+    @app.get("/tunnels/new", response_class=HTMLResponse)
+    async def new_tunnel_anywhere(request: Request) -> HTMLResponse:
+        """The form with the host to pick first: the hosts page's New tunnel."""
+        values = {"kind": "local", "target_host": "localhost"}
+        return _render(
+            request, "_tunnel_form.html", h=None, hosts=await _shown_hosts(), editing=None, values=values, errors={}
+        )
+
+    @app.post("/tunnels")
+    async def add_tunnel_anywhere(request: Request) -> Response:
+        hosts = await _shown_hosts()
+        body = (await request.body()).decode(errors="replace")
+        picked = (parse_qs(body).get("host") or [""])[-1]
+        if picked not in {h.name for h in hosts}:
+            values = {key: found[-1] for key, found in parse_qs(body, keep_blank_values=True).items()}
+            errors = {"host": "Pick the host it goes through."}
+            return _render(
+                request, "_tunnel_form.html", h=None, hosts=hosts, editing=None, values=values, errors=errors
+            )
+        return await _save_tunnel(request, picked, None, hosts)
+
     @app.get("/hosts/{name}/tunnels/new", response_class=HTMLResponse)
     async def new_tunnel(request: Request, name: str) -> HTMLResponse:
         values = {"kind": "local", "target_host": "localhost"}
@@ -260,9 +281,12 @@ def _changed(response: HTMLResponse) -> HTMLResponse:
     return response
 
 
-async def _save_tunnel(request: Request, name: str, editing: Tunnel | None) -> Response:
+async def _save_tunnel(
+    request: Request, name: str, editing: Tunnel | None, choosing: list[Host] | None = None
+) -> Response:
     """Saves the form's tunnel and has the list show it, or answers the form again with what to change.
-    A tunnel that's on runs again as changed."""
+    A tunnel that's on runs again as changed. `choosing`: the hosts the form offers, when it has the host
+    picked in it (the hosts page's New tunnel)."""
     host = await service.host(name)
     body = (await request.body()).decode(errors="replace")
     values = {key: found[-1] for key, found in parse_qs(body, keep_blank_values=True).items()}
@@ -279,7 +303,13 @@ async def _save_tunnel(request: Request, name: str, editing: Tunnel | None) -> R
     else:
         await _tunnels(request).restart(saved)
         return Response(headers={"HX-Trigger": "tunnels-changed"})
-    return _render(request, "_tunnel_form.html", h=host, editing=editing, values=values, errors=errors)
+    shown = None if choosing else host
+    return _render(request, "_tunnel_form.html", h=shown, hosts=choosing, editing=editing, values=values, errors=errors)
+
+
+async def _shown_hosts() -> list[Host]:
+    """The hosts the table shows: not the hidden ones."""
+    return [h for h in await service.all_hosts() if not h.hidden]
 
 
 def _api_routes(app: FastAPI) -> None:

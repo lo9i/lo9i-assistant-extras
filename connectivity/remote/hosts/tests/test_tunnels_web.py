@@ -112,6 +112,21 @@ def test_the_hosts_table_shows_each_hosts_tunnels_and_switches_them(client, ssh)
     assert 'aria-checked="false"' in client.get("/hosts/pi/tunnels/cell").text
 
 
+def test_new_tunnel_on_the_hosts_page_picks_its_host_in_the_form(client):
+    page = client.get("/").text
+    assert 'hx-get="tunnels/new" hx-target="#tunnel-form"' in page and ">New tunnel</button>" in page
+    form = client.get("/tunnels/new").text
+    assert 'hx-post="tunnels"' in form and '<select class="input" name="host"' in form
+    assert '<option value="pi" >pi</option>' in form and '<option value="nas" >nas</option>' in form
+    values = {"name": "Database", "kind": "local", "listen_port": "15432", "target_host": "db", "target_port": "5432"}
+    unpicked = client.post("/tunnels", content=urlencode(values), headers=FORM).text
+    assert "Pick the host it goes through." in unpicked and 'value="Database"' in unpicked and _saved() == []
+    wrong = client.post("/tunnels", content=urlencode(values | {"host": "pi", "listen_port": "0"}), headers=FORM).text
+    assert "A port from 1 to 65535." in wrong and '<option value="pi" selected>pi</option>' in wrong
+    saved = client.post("/tunnels", content=urlencode(values | {"host": "pi"}), headers=FORM)
+    assert saved.headers["HX-Trigger"] == "tunnels-changed" and [t.name for t in _saved("pi")] == ["Database"]
+
+
 def test_the_form_closes_its_dialog_when_cancelled(client):
     form = client.get("/hosts/pi/tunnels/new").text
     assert "this.closest('dialog')?.close()" in form

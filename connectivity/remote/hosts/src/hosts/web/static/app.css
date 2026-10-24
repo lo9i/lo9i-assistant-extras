@@ -80,6 +80,9 @@ a.link:hover { text-decoration: underline; }
   -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
 }
 .table-card { overflow: hidden; }
+/* A table wider than the page scrolls sideways rather than losing its last columns (Tunnels, Actions). */
+.table-scroll { overflow-x: auto; }
+.table-scroll .data-table { min-width: 860px; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 24px; min-height: 66px; border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent); }
 .toolbar p { margin-top: 4px; }
 .toolbar .tools { display: flex; align-items: center; gap: 12px; }

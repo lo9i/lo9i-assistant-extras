@@ -3,11 +3,14 @@
 {% block content %}
 <header class="topbar">
   <h1>Hosts</h1>
-  {% if hidden_count %}
   <div class="actions">
+    {% if hidden_count %}
     <a class="btn btn--sm btn--neutral" href="{{ './' if showing_hidden else './?hidden=true' }}">{{ 'Hide hidden hosts' if showing_hidden else 'Show hidden hosts' }}</a>
+    {% endif %}
+    {% if hosts %}
+    <button class="btn btn--sm btn--primary" hx-get="tunnels/new" hx-target="#tunnel-form" hx-swap="innerHTML">New tunnel</button>
+    {% endif %}
   </div>
-  {% endif %}
 </header>
 
 <main class="screen">
@@ -29,6 +32,7 @@
     </header>
 
     {% if hosts %}
+    <div class="table-scroll">
     <table id="hosts" class="data-table">
       <thead>
         <tr>
@@ -50,6 +54,7 @@
         <tr class="no-match" hidden><td colspan="7" class="muted">No host matches.</td></tr>
       </tbody>
     </table>
+    </div>
     {% elif hidden_count %}
     <p class="empty">Every host is hidden. <a href="./?hidden=true">Show hidden hosts</a> to bring some back.</p>
     {% else %}
