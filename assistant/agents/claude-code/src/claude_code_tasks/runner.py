@@ -3,6 +3,7 @@ else needs installing."""
 
 import asyncio
 import os
+import sys
 from dataclasses import replace
 from typing import Any
 
@@ -21,7 +22,7 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import ThinkingConfig
 
 from claude_code_tasks.relay import Relay
-from claude_code_tasks.task_folder import Inbox, Message, Outcome, Progress, Step, Task, note
+from claude_code_tasks.task_folder import Context, Inbox, Message, Outcome, Progress, Step, Task, note
 
 # The plugin's optional field: a Claude token (`claude setup-token`, from a Pro or Max plan) or an
 # Anthropic API key.
@@ -73,10 +74,22 @@ async def run(task: Task, progress: Progress, inbox: Inbox) -> Outcome:
 async def _run(task: Task, progress: Progress, inbox: Inbox, settings: ClaudeAgentOptions) -> Outcome:
     async with ClaudeSDKClient(settings) as client:
         result = await Session(client, progress, inbox).answer(task.prompt)
+        context = await _context(client) if result is not None else None
     if result is None:
         return Outcome(ok=False, text="Claude Code ended without a result.")
     text = result.result or f"Claude Code ended with {result.subtype}."
-    return Outcome(ok=not result.is_error, text=text, cost_usd=result.total_cost_usd)
+    return Outcome(ok=not result.is_error, text=text, cost_usd=result.total_cost_usd, context=context)
+
+
+async def _context(client: ClaudeSDKClient) -> Context | None:
+    """How full its context is, as /context says, against the model's whole window. None when Claude Code
+    can't say: the answer stands without it, and worker.log says why."""
+    try:
+        usage = await client.get_context_usage()
+    except Exception as e:
+        print(f"Couldn't read Claude Code's context use: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+    return Context(tokens=usage["totalTokens"], window=usage["rawMaxTokens"])
 
 
 class Session:

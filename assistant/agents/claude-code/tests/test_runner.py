@@ -16,7 +16,7 @@ from claude_agent_sdk import (
 )
 
 from claude_code_tasks import runner
-from claude_code_tasks.task_folder import Inbox, Step, Task, note
+from claude_code_tasks.task_folder import Context, Inbox, Step, Task, note
 
 
 def _task(follow_up_of=""):
@@ -40,8 +40,9 @@ class FakeClient:
     """Claude Code's side of the session. `replies(text)` is what it sends back for each message it's sent:
     it echoes the message first, as with replay-user-messages; an interrupt ends the turn with an error."""
 
-    def __init__(self, replies):
+    def __init__(self, replies, context=None):
         self._replies = replies
+        self._context = context
         self._out: asyncio.Queue = asyncio.Queue()
         self.sent: list[str] = []
         self.interrupts = 0
@@ -67,6 +68,11 @@ class FakeClient:
         while True:
             yield await self._out.get()
 
+    async def get_context_usage(self):
+        if self._context is None:
+            raise Exception("Unknown control request: get_context_usage")
+        return self._context
+
 
 @pytest.fixture
 async def inbox(tmp_path):
@@ -82,12 +88,12 @@ def _send(folder, name, message):
     os.kill(os.getpid(), signal.SIGUSR1)
 
 
-def _fake(monkeypatch, replies):
+def _fake(monkeypatch, replies, context=None):
     seen = {}
 
     def client(options):
         seen["options"] = options
-        seen["client"] = FakeClient(replies)
+        seen["client"] = FakeClient(replies, context)
         return seen["client"]
 
     monkeypatch.setattr(runner, "ClaudeSDKClient", client)
@@ -178,6 +184,20 @@ async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environme
         "ANTHROPIC_API_KEY": "sk-ant-api03-x"
     }
     assert runner.TOKEN_ENV not in os.environ
+
+
+async def test_the_outcome_says_how_full_its_context_is_once_it_answered(monkeypatch, inbox):
+    usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5}
+    _fake(monkeypatch, lambda text: [_result()], context=usage)
+    outcome = await runner.run(_task(), lambda _: None, inbox)
+    assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000)
+
+
+async def test_an_answer_stands_when_claude_code_cant_say_how_full_its_context_is(monkeypatch, inbox, capsys):
+    _fake(monkeypatch, lambda text: [_result()])
+    outcome = await runner.run(_task(), lambda _: None, inbox)
+    assert outcome.ok and outcome.text == "Fixed 2 tests." and outcome.context is None
+    assert "Couldn't read Claude Code's context use" in capsys.readouterr().err
 
 
 async def test_an_error_result_fails_the_task_and_no_token_is_refused(monkeypatch, inbox):

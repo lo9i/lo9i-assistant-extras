@@ -7,7 +7,7 @@ import signal
 import subprocess
 import sys
 
-from claude_code_tasks.task_folder import Inbox, Message, Outcome, Step, Task, note, run
+from claude_code_tasks.task_folder import Context, Inbox, Message, Outcome, Step, Task, _write_outcome, note, run
 
 _TASK = Task("t1", "/repo", "fix it", "s1", "", "2026-10-08T00:00:00+00:00")
 
@@ -33,6 +33,17 @@ async def test_an_error_ends_the_task_as_failed(tmp_path):
 
     outcome = await run(tmp_path, _TASK, runner)
     assert not outcome.ok and outcome.text == "RuntimeError: no login"
+
+
+def test_the_context_goes_in_a_file_of_its_own_so_an_older_lo9i_still_reads_the_result(tmp_path):
+    answered, failed = tmp_path / "answered", tmp_path / "failed"
+    answered.mkdir(), failed.mkdir()
+    _write_outcome(answered, Outcome(ok=True, text="Fixed.", finished_at="now", context=Context(42_000, 200_000)))
+    assert json.loads((answered / "context.json").read_text()) == {"tokens": 42_000, "window": 200_000}
+    result = json.loads((answered / "result.json").read_text())
+    assert result == {"ok": True, "text": "Fixed.", "finished_at": "now", "cost_usd": None}
+    _write_outcome(failed, Outcome(ok=False, text="no login"))
+    assert not (failed / "context.json").exists() and (failed / "result.json").exists()
 
 
 def test_the_worker_writes_its_pid_and_stops_at_once_when_already_stopped(tmp_path):

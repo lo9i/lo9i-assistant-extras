@@ -2,7 +2,8 @@
 starts the worker with the folder as its last argument; the worker writes its pid, appends each step to
 progress.log as a JSON line, and writes result.json last. Stopping the task signals the worker's process
 group, so the worker leads its own and everything it starts goes with it. While it works, what the user
-sends it comes through inbox/ (Inbox)."""
+sends it comes through inbox/ (Inbox). How full the agent's context is once it answered goes in context.json,
+just before result.json."""
 
 import asyncio
 import json
@@ -10,7 +11,7 @@ import os
 import signal
 import sys
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -31,12 +32,23 @@ class Task:
 
 
 @dataclass(frozen=True)
+class Context:
+    """How full the agent's context is: `tokens` in it, of the model's `window`."""
+
+    tokens: int
+    window: int
+
+
+@dataclass(frozen=True)
 class Outcome:
     ok: bool
     # The agent's final answer, or what went wrong.
     text: str
     finished_at: str = ""
     cost_usd: float | None = None
+    # Once it answered; None when it can't say. Written to context.json: an older lo9i reads result.json
+    # into its own fields and would fail on one it doesn't know.
+    context: Context | None = None
 
 
 @dataclass(frozen=True)
@@ -142,11 +154,20 @@ async def run(folder: Path, task: Task, runner: Runner) -> Outcome:
         outcome = Outcome(ok=False, text=f"{type(e).__name__}: {e}")
     finally:
         inbox.close()
-    return Outcome(outcome.ok, outcome.text, datetime.now(UTC).isoformat(timespec="seconds"), outcome.cost_usd)
+    return replace(outcome, finished_at=datetime.now(UTC).isoformat(timespec="seconds"))
 
 
 def _write_outcome(folder: Path, outcome: Outcome) -> None:
+    """The context first: lo9i reads it once the result tells it the task ended."""
+    if outcome.context is not None:
+        _write_whole(folder / "context.json", asdict(outcome.context))
+    result = asdict(outcome)
+    del result["context"]
+    _write_whole(folder / "result.json", result)
+
+
+def _write_whole(path: Path, data: dict) -> None:
     """Written whole and then renamed, so lo9i never reads half of it."""
-    partial = folder / "result.partial"
-    partial.write_text(json.dumps(asdict(outcome), indent=2))
-    os.replace(partial, folder / "result.json")
+    partial = path.with_suffix(".partial")
+    partial.write_text(json.dumps(data, indent=2))
+    os.replace(partial, path)
