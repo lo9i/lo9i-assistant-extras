@@ -1,0 +1,43 @@
+{# The host's tunnels with their switches (app.py's tunnel routes). It asks for itself again, often while
+   one is starting or reconnecting, and when one is saved (tunnels-changed). #}
+{% set path = 'hosts/' ~ (h.name | urlencode) %}
+{% set labels = {"stopped": "Off", "starting": "Starting…", "running": "Running", "reconnecting": "Reconnecting…", "failed": "Failed"} %}
+{% set dots = {"running": "online", "starting": "pending", "reconnecting": "pending", "failed": "offline"} %}
+{% set moving = items | selectattr("1.state", "in", ["starting", "reconnecting"]) | list %}
+{% set on = items | selectattr("1.on") | list | length %}
+<div id="tunnel-list" hx-get="{{ path }}/tunnels" hx-swap="outerHTML"
+     hx-trigger="every {{ '2s' if moving else '10s' }} [document.visibilityState === 'visible'], tunnels-changed from:body">
+  <header class="panel-head">
+    <div>
+      <h2 class="text-heading">Tunnels</h2>
+      <p class="text-meta">Ports forwarded through {{ h.name }} by this Mac. They keep running when you close this tab.</p>
+    </div>
+    <button class="btn btn--sm btn--neutral" hx-get="{{ path }}/tunnels/new" hx-target="#tunnel-form" hx-swap="innerHTML">Add</button>
+  </header>
+  {% for t, s in items %}
+  <article class="tunnel">
+    <div class="tunnel-main">
+      <div class="tunnel-title">
+        <span class="medium">{{ t.name }}</span>
+        <span class="pill">{{ t.kind_label }}</span>
+      </div>
+      <div class="mono muted">{{ t.describe() }}</div>
+      <div class="text-meta"><span class="status-dot {{ dots.get(s.state, '') }}"></span>{{ labels[s.state] }}</div>
+      {% if s.message %}<p class="text-meta tunnel-message">{{ s.message }}</p>{% endif %}
+    </div>
+    <div class="tunnel-actions">
+      <button class="switch" role="switch" aria-checked="{{ 'true' if s.on else 'false' }}"
+              aria-label="{{ 'Stop' if s.on else 'Start' }} {{ t.name }}" title="{{ 'Stop' if s.on else 'Start' }}"
+              hx-post="{{ path }}/tunnels/{{ t.id }}/{{ 'stop' if s.on else 'start' }}" hx-target="#tunnel-list" hx-swap="outerHTML"></button>
+      <div class="tunnel-links">
+        <button class="btn btn--sm btn--ghost" hx-get="{{ path }}/tunnels/{{ t.id }}/edit" hx-target="#tunnel-form" hx-swap="innerHTML">Edit</button>
+        <button class="btn btn--sm btn--ghost" hx-delete="{{ path }}/tunnels/{{ t.id }}" hx-target="#tunnel-list" hx-swap="outerHTML"
+                hx-confirm="Delete the tunnel “{{ t.name }}”?{{ ' It stops now.' if s.on else '' }}">Delete</button>
+      </div>
+    </div>
+  </article>
+  {% else %}
+  <p class="empty">No tunnels yet. Add one to reach a port on {{ h.name }} from this Mac, a port on this Mac from {{ h.name }}, or the web through {{ h.name }} (SOCKS).</p>
+  {% endfor %}
+</div>
+<span id="tunnels-count" hx-swap-oob="true">{% if on %}<span class="pill pill--accent">{{ on }} on</span>{% endif %}</span>

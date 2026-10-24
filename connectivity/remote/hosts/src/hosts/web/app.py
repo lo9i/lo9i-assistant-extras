@@ -1,12 +1,13 @@
 """Web UI: the Hosts page (a table of the SSH config's hosts, each checked as the page loads) and a terminal
-page per host (xterm.js over a WebSocket, terminal.py). lo9i starts it (see server.yaml) and shows it in
-its web app:
+page per host (xterm.js over a WebSocket, terminal.py) with the host's tunnels beside it (tunnels.py), which
+this process runs, so they stop with it. lo9i starts it (see server.yaml) and shows it in its web app:
 
     HOSTS_DB=/path/hosts.db hosts-web --socket /path/web.sock
 
 It listens only on a Unix socket that only lo9i's daemon reaches, so it has no login: the daemon lets only
 the user's paired devices through, the terminal's WebSocket too. The daemon serves it under a path
-(/hosts/) and says which in X-Forwarded-Prefix; pages link relative to it (<base> in base.html).
+(/hosts/) and says which in X-Forwarded-Prefix; pages link relative to it (<base> in base.html). The
+assistant's tools (mcp_server.py) reach the tunnels as JSON under /api/ on the same socket.
 """
 
 import argparse
@@ -15,20 +16,23 @@ import hashlib
 import os
 import re
 import socket
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import db, service
+from .. import db, service, tunnels
+from ..db import DuplicateTunnelError
 from ..herdr import ATTACH, Herdr, HerdrError
-from ..service import UnknownHostError
+from ..service import UnknownHostError, UnknownTunnelError
 from ..ssh import OpenSsh, terminal_command
+from ..tunnels import InvalidTunnelError, Status, Tunnel, Tunnels
 from .terminal import Terminal, bridge
 
 HERE = Path(__file__).parent
@@ -69,6 +73,10 @@ def _herdr(request: Request) -> Herdr:
     return request.app.state.herdr
 
 
+def _tunnels(request: Request) -> Tunnels:
+    return request.app.state.tunnels
+
+
 def _hosts_routes(app: FastAPI) -> None:
     @app.get("/", response_class=HTMLResponse)
     async def hosts(request: Request, hidden: bool = False) -> HTMLResponse:
@@ -82,7 +90,8 @@ def _hosts_routes(app: FastAPI) -> None:
         """A host's row with what checking it found: whether it answers, and its Herdr session."""
         host = await service.host(name)
         probe = await _herdr(request).probe(name)
-        return _render(request, "_row.html", h=host, probe=probe)
+        running = sum(1 for t in await service.tunnels(name) if _tunnels(request).status(t.id).on)
+        return _render(request, "_row.html", h=host, probe=probe, tunnels_on=running)
 
     @app.post("/hosts/{name}/hide")
     async def hide(name: str) -> Response:
@@ -130,6 +139,116 @@ def _terminal_routes(app: FastAPI, command: Callable[[str], list[str]]) -> None:
         await bridge(websocket, attached, name, lambda: service.connected(name))
 
 
+def _tunnel_routes(app: FastAPI) -> None:
+    """The terminal page's tunnels panel (htmx): the host's tunnels with their switches, and a form to add
+    or change one."""
+
+    @app.get("/hosts/{name}/tunnels", response_class=HTMLResponse)
+    async def tunnel_list(request: Request, name: str) -> HTMLResponse:
+        return await _tunnel_list(request, name)
+
+    @app.get("/hosts/{name}/tunnels/new", response_class=HTMLResponse)
+    async def new_tunnel(request: Request, name: str) -> HTMLResponse:
+        values = {"kind": "local", "target_host": "localhost"}
+        return _render(request, "_tunnel_form.html", h=await service.host(name), editing=None, values=values, errors={})
+
+    @app.get("/hosts/{name}/tunnels/{tunnel_id}/edit", response_class=HTMLResponse)
+    async def edit_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
+        t = await service.tunnel(name, tunnel_id)
+        values = {
+            "name": t.name, "kind": t.kind, "listen_port": t.listen_port, "target_host": t.target_host or "localhost",
+            "target_port": t.target_port or "",
+        }  # fmt: skip
+        return _render(request, "_tunnel_form.html", h=await service.host(name), editing=t, values=values, errors={})
+
+    @app.post("/hosts/{name}/tunnels")
+    async def add_tunnel(request: Request, name: str) -> Response:
+        return await _save_tunnel(request, name, None)
+
+    @app.post("/hosts/{name}/tunnels/{tunnel_id}")
+    async def change_tunnel(request: Request, name: str, tunnel_id: int) -> Response:
+        return await _save_tunnel(request, name, await service.tunnel(name, tunnel_id))
+
+    @app.post("/hosts/{name}/tunnels/{tunnel_id}/start", response_class=HTMLResponse)
+    async def start_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
+        await _tunnels(request).start(await service.tunnel(name, tunnel_id))
+        return await _tunnel_list(request, name)
+
+    @app.post("/hosts/{name}/tunnels/{tunnel_id}/stop", response_class=HTMLResponse)
+    async def stop_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
+        await service.tunnel(name, tunnel_id)
+        await _tunnels(request).stop(tunnel_id)
+        return await _tunnel_list(request, name)
+
+    @app.delete("/hosts/{name}/tunnels/{tunnel_id}", response_class=HTMLResponse)
+    async def delete_tunnel(request: Request, name: str, tunnel_id: int) -> HTMLResponse:
+        await service.tunnel(name, tunnel_id)
+        await _tunnels(request).stop(tunnel_id)
+        await service.delete_tunnel(tunnel_id)
+        return await _tunnel_list(request, name)
+
+
+async def _tunnel_list(request: Request, name: str) -> HTMLResponse:
+    h = await service.host(name)
+    items = [(t, _tunnels(request).status(t.id)) for t in await service.tunnels(name)]
+    return _render(request, "_tunnels.html", h=h, items=items)
+
+
+async def _save_tunnel(request: Request, name: str, editing: Tunnel | None) -> Response:
+    """Saves the form's tunnel and has the list show it, or answers the form again with what to change.
+    A tunnel that's on runs again as changed."""
+    host = await service.host(name)
+    body = (await request.body()).decode(errors="replace")
+    values = {key: found[-1] for key, found in parse_qs(body, keep_blank_values=True).items()}
+    try:
+        typed = tunnels.parse(
+            name, values.get("name", ""), values.get("kind", ""), values.get("listen_port"),
+            values.get("target_host", ""), values.get("target_port"), editing.id if editing else None,
+        )  # fmt: skip
+        saved = await service.save_tunnel(typed)
+    except InvalidTunnelError as e:
+        errors = e.errors
+    except DuplicateTunnelError as e:
+        errors = {"name": str(e)}
+    else:
+        await _tunnels(request).restart(saved)
+        return Response(headers={"HX-Trigger": "tunnels-changed"})
+    return _render(request, "_tunnel_form.html", h=host, editing=editing, values=values, errors=errors)
+
+
+def _api_routes(app: FastAPI) -> None:
+    """The tunnels as JSON, for the assistant's tools (mcp_server.py): this process runs them, so the tools
+    start and stop them here."""
+
+    @app.get("/api/tunnels")
+    async def api_tunnels(request: Request) -> JSONResponse:
+        return JSONResponse([described(t, _tunnels(request).status(t.id)) for t in await service.tunnels()])
+
+    @app.post("/api/hosts/{name}/tunnels/{tunnel_id}/start")
+    async def api_start(request: Request, name: str, tunnel_id: int) -> JSONResponse:
+        t = await service.tunnel(name, tunnel_id)
+        return JSONResponse(described(t, await _tunnels(request).start(t)))
+
+    @app.post("/api/hosts/{name}/tunnels/{tunnel_id}/stop")
+    async def api_stop(request: Request, name: str, tunnel_id: int) -> JSONResponse:
+        t = await service.tunnel(name, tunnel_id)
+        await _tunnels(request).stop(tunnel_id)
+        return JSONResponse(described(t, _tunnels(request).status(tunnel_id)))
+
+
+def described(t: Tunnel, status: Status) -> dict[str, Any]:
+    """A tunnel and how it's doing, for the assistant."""
+    out: dict[str, Any] = {
+        "id": t.id, "host": t.host, "name": t.name, "type": t.kind, "listen_port": t.listen_port,
+        "description": t.describe(), "state": status.state,
+    }  # fmt: skip
+    if t.kind != "socks":
+        out |= {"target_host": t.target_host, "target_port": t.target_port}
+    if status.message:
+        out["message"] = status.message
+    return out
+
+
 async def _known(websocket: WebSocket, name: str) -> bool:
     """Whether the config has the host; if not, the connection is refused."""
     try:
@@ -166,18 +285,33 @@ def attach_command(name: str) -> list[str]:
     return terminal_command(name, ATTACH)
 
 
-def create_app(herdr: Herdr | None = None, command: Callable[[str], list[str]] = attach_command) -> FastAPI:
-    """Tests pass a Herdr over a fake ssh, and a local command for the terminal."""
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+def create_app(
+    herdr: Herdr | None = None, command: Callable[[str], list[str]] = attach_command, running: Tunnels | None = None
+) -> FastAPI:
+    """Tests pass a Herdr over a fake ssh, a local command for the terminal, and tunnels over a fake ssh."""
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # No tunnel outlives the page: lo9i stopping it (or the daemon stopping) stops them all.
+        try:
+            yield
+        finally:
+            await app.state.tunnels.stop_all()
+
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.herdr = herdr or Herdr(OpenSsh())
+    app.state.tunnels = running or Tunnels()
 
     @app.exception_handler(UnknownHostError)
-    async def unknown_host(request: Request, exc: UnknownHostError) -> Response:
+    @app.exception_handler(UnknownTunnelError)
+    async def unknown(request: Request, exc: Exception) -> Response:
         return Response(str(exc), status_code=404, media_type="text/plain")
 
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.add_middleware(ForwardedPrefix)
     _hosts_routes(app)
+    _tunnel_routes(app)
+    _api_routes(app)
     _terminal_routes(app, command)
     return app
 

@@ -1,0 +1,52 @@
+{# Adding a tunnel, or changing one (`editing`). `values` are its fields as typed, `errors` what to change in
+   them, by field. Which fields show, and what they're called, follows the type (app.css, .tunnel-form). #}
+{% set path = 'hosts/' ~ (h.name | urlencode) %}
+{% macro error(field) %}{% if errors[field] %}<span class="field-error">{{ errors[field] }}</span>{% endif %}{% endmacro %}
+<form class="tunnel-form" hx-post="{{ path }}/tunnels{{ '/' ~ editing.id if editing else '' }}" hx-target="#tunnel-form">
+  <h3 class="text-heading">{{ 'Edit “' ~ editing.name ~ '”' if editing else 'New tunnel' }}</h3>
+
+  <label class="field">
+    <span>Name</span>
+    <input class="input" name="name" value="{{ values.name or '' }}" placeholder="Database" maxlength="40" required autofocus>
+    {{ error("name") }}
+  </label>
+
+  <fieldset class="field kinds">
+    <legend>Type</legend>
+    <div class="segmented">
+      {% for kind, label in [("local", "Local"), ("remote", "Remote"), ("socks", "SOCKS")] %}
+      <label><input type="radio" name="kind" value="{{ kind }}" {{ 'checked' if values.kind == kind }}><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+    <p class="text-meta for-local">A port on this Mac that reaches a port {{ h.name }} can reach (ssh -L). Only this Mac can use it.</p>
+    <p class="text-meta for-remote">A port on {{ h.name }} that reaches a port this Mac can reach (ssh -R).</p>
+    <p class="text-meta for-socks">A SOCKS proxy on this Mac whose connections leave from {{ h.name }} (ssh -D). Only this Mac can use it.</p>
+    {{ error("kind") }}
+  </fieldset>
+
+  <label class="field">
+    <span class="for-local for-socks">Port on this Mac</span>
+    <span class="for-remote">Port on {{ h.name }}</span>
+    <input class="input" name="listen_port" value="{{ values.listen_port or '' }}" inputmode="numeric" placeholder="8080">
+    {{ error("listen_port") }}
+  </label>
+
+  <div class="field-row target">
+    <label class="field">
+      <span class="for-local">To host, as {{ h.name }} sees it</span>
+      <span class="for-remote">To host, as this Mac sees it</span>
+      <input class="input" name="target_host" value="{{ values.target_host or '' }}" placeholder="localhost" autocapitalize="off" spellcheck="false">
+      {{ error("target_host") }}
+    </label>
+    <label class="field port">
+      <span>Port</span>
+      <input class="input" name="target_port" value="{{ values.target_port or '' }}" inputmode="numeric" placeholder="80">
+      {{ error("target_port") }}
+    </label>
+  </div>
+
+  <div class="form-actions">
+    <button type="button" class="btn btn--sm btn--ghost" onclick="this.closest('#tunnel-form').replaceChildren()">Cancel</button>
+    <button class="btn btn--sm btn--primary">{{ 'Save' if editing else 'Add tunnel' }}</button>
+  </div>
+</form>

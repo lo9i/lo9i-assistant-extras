@@ -3,6 +3,7 @@
 {% block head %}<link rel="stylesheet" href="{{ asset('xterm.css') }}">{% endblock %}
 {% block body_class %}full{% endblock %}
 {% block content %}
+{% set path = 'hosts/' ~ (h.name | urlencode) %}
 <main class="term-page">
   <header class="topbar">
     <div class="title">
@@ -13,20 +14,44 @@
     </div>
     <div class="actions">
       <span class="text-meta hide-sm" title="Herdr keeps it running on {{ h.name }} when the connection drops">Herdr session “lo9i” · ctrl+b q leaves it running</span>
+      <button id="tunnels-toggle" class="btn btn--sm btn--neutral" aria-controls="tunnels" aria-expanded="false">
+        Tunnels <span id="tunnels-count"></span>
+      </button>
     </div>
   </header>
-  <section class="term-card surface--glass">
-    <div id="terminal" data-host="{{ h.name }}"></div>
-    <div id="notice" class="notice" hidden>
-      <div class="notice-box">
-        <h2 id="notice-title"></h2>
-        <p id="notice-text"></p>
-        <div id="notice-actions" class="actions"></div>
+  <div class="term-body">
+    <section class="term-card surface--glass">
+      <div id="terminal" data-host="{{ h.name }}"></div>
+      <div id="notice" class="notice" hidden>
+        <div class="notice-box">
+          <h2 id="notice-title"></h2>
+          <p id="notice-text"></p>
+          <div id="notice-actions" class="actions"></div>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+    {# The host's tunnels: they run on this Mac, so they go on when the terminal disconnects. #}
+    <aside id="tunnels" class="tunnels-panel surface--glass" hidden>
+      <div hx-get="{{ path }}/tunnels" hx-trigger="load" hx-swap="outerHTML"></div>
+      <div id="tunnel-form"></div>
+    </aside>
+  </div>
 </main>
 <script src="{{ asset('xterm.js') }}"></script>
 <script src="{{ asset('addon-fit.js') }}"></script>
 <script src="{{ asset('terminal.js') }}"></script>
+<script>
+  // The tunnels panel opens and closes from the top bar, and stays as it was left next time.
+  (() => {
+    const panel = document.getElementById("tunnels");
+    const toggle = document.getElementById("tunnels-toggle");
+    const show = (open) => {
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      localStorage.setItem("hosts.tunnels", open ? "open" : "closed");
+    };
+    toggle.addEventListener("click", () => show(panel.hidden));
+    show(localStorage.getItem("hosts.tunnels") === "open");
+  })();
+</script>
 {% endblock %}
