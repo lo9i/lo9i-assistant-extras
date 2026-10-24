@@ -1,28 +1,35 @@
 {% extends "base.html" %}
-{% set nav = 'hosts' %}
 {% block title %}Hosts{% endblock %}
 {% block content %}
-<main class="page container">
-  <div class="head">
-    <div>
-      <h1>Hosts</h1>
-      <p class="sub">
-        From your SSH config.
-        {% if hidden_count %}{{ hidden_count }} hidden.{% endif %}
-      </p>
-    </div>
-    {% if hidden_count %}
-    <a class="btn sm" href="{{ './' if showing_hidden else './?hidden=true' }}">{{ 'Hide hidden hosts' if showing_hidden else 'Show hidden hosts' }}</a>
-    {% endif %}
+<header class="topbar">
+  <h1>Hosts</h1>
+  {% if hidden_count %}
+  <div class="actions">
+    <a class="btn btn--sm btn--neutral" href="{{ './' if showing_hidden else './?hidden=true' }}">{{ 'Hide hidden hosts' if showing_hidden else 'Show hidden hosts' }}</a>
   </div>
+  {% endif %}
+</header>
 
-  {% if hosts %}
-  <div class="search-box">
-    <input id="filter" class="input" type="search" placeholder="Search hosts…" autocomplete="off" aria-label="Search hosts">
-  </div>
+<main class="screen">
+  <section class="table-card surface--glass">
+    <header class="toolbar">
+      <div>
+        <h2 class="text-heading">Your hosts</h2>
+        <p class="text-meta">
+          From your SSH config.{% if hidden_count %} {{ hidden_count }} hidden.{% endif %}
+          {% if hosts %}Click one to open its terminal.{% endif %}
+        </p>
+      </div>
+      {% if hosts %}
+      <div class="tools">
+        <input id="filter" class="input search" type="search" placeholder="Search hosts…" autocomplete="off" aria-label="Search hosts">
+        <span class="pill">{{ hosts | length }}</span>
+      </div>
+      {% endif %}
+    </header>
 
-  <div class="table-wrap">
-    <table id="hosts">
+    {% if hosts %}
+    <table id="hosts" class="data-table">
       <thead>
         <tr>
           <th data-sort>Name</th>
@@ -41,12 +48,12 @@
         <tr class="no-match" hidden><td colspan="6" class="muted">No host matches.</td></tr>
       </tbody>
     </table>
-  </div>
-  {% elif hidden_count %}
-  <div class="empty">Every host is hidden. <a href="./?hidden=true">Show hidden hosts</a> to bring some back.</div>
-  {% else %}
-  <div class="empty">Your SSH config (~/.ssh/config) has no hosts. Add a <span class="mono">Host</span> entry there, then reload this page.</div>
-  {% endif %}
+    {% elif hidden_count %}
+    <p class="empty">Every host is hidden. <a href="./?hidden=true">Show hidden hosts</a> to bring some back.</p>
+    {% else %}
+    <p class="empty">Your SSH config (~/.ssh/config) has no hosts. Add a <span class="mono">Host</span> entry there, then reload this page.</p>
+    {% endif %}
+  </section>
 </main>
 <script src="{{ asset('table.js') }}"></script>
 {% endblock %}

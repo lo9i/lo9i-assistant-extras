@@ -10,16 +10,8 @@
   {% block head %}{% endblock %}
   <script src="{{ asset('htmx.min.js') }}"></script>
 </head>
+{# No header of its own: lo9i's sidebar names the page, and each page has its top bar, as the app's do. #}
 <body class="{% block body_class %}{% endblock %}">
-  <header class="top">
-    <div class="container">
-      <a href="./" class="brand">hosts</a>
-      <nav>
-        <a href="./" class="{{ 'on' if nav == 'hosts' }}">Hosts</a>
-      </nav>
-    </div>
-  </header>
-
   {% block content %}{% endblock %}
 
   <div id="toast" class="toast" hidden></div>

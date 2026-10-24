@@ -4,24 +4,27 @@
 {% block body_class %}full{% endblock %}
 {% block content %}
 <main class="term-page">
-  <div class="term-bar">
-    <a href="./" class="back">← Hosts</a>
-    <span class="medium">{{ h.name }}</span>
-    <span class="muted text-xs mono hide-sm">{{ h.address or '' }}</span>
-    <span id="state" class="text-xs muted">Connecting…</span>
-    <span class="spacer"></span>
-    <span class="text-xs muted hide-sm" title="Herdr keeps it running on {{ h.name }} when the connection drops">Herdr session “lo9i” · ctrl+b q leaves it running</span>
-  </div>
-  <div class="term-wrap">
+  <header class="topbar">
+    <div class="title">
+      <a href="./" class="back">← Hosts</a>
+      <h1>{{ h.name }}</h1>
+      <span class="mono muted hide-sm">{{ h.address or '' }}</span>
+      <span id="state" class="text-meta">Connecting…</span>
+    </div>
+    <div class="actions">
+      <span class="text-meta hide-sm" title="Herdr keeps it running on {{ h.name }} when the connection drops">Herdr session “lo9i” · ctrl+b q leaves it running</span>
+    </div>
+  </header>
+  <section class="term-card surface--glass">
     <div id="terminal" data-host="{{ h.name }}"></div>
     <div id="notice" class="notice" hidden>
       <div class="notice-box">
         <h2 id="notice-title"></h2>
-        <p id="notice-text" class="text-sm"></p>
+        <p id="notice-text"></p>
         <div id="notice-actions" class="actions"></div>
       </div>
     </div>
-  </div>
+  </section>
 </main>
 <script src="{{ asset('xterm.js') }}"></script>
 <script src="{{ asset('addon-fit.js') }}"></script>

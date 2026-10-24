@@ -16,7 +16,9 @@
     cursorBlink: true,
     fontSize: 14,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, "DejaVu Sans Mono", monospace',
-    theme: { background: "#0a0a0a", foreground: "#fafafa" },
+    // Its card shows through, as the app's surfaces do.
+    allowTransparency: true,
+    theme: { background: "rgba(0, 0, 0, 0)", foreground: "#ffffff" },
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
@@ -133,7 +135,7 @@
 
   function button(label, onClick, kind = "") {
     const element = document.createElement("button");
-    element.className = `btn sm ${kind}`;
+    element.className = `btn btn--sm ${kind ? `btn--${kind}` : "btn--neutral"}`;
     element.textContent = label;
     element.addEventListener("click", onClick);
     return element;
@@ -141,7 +143,7 @@
 
   function link(label, href) {
     const element = document.createElement("a");
-    element.className = "btn sm";
+    element.className = "btn btn--sm btn--neutral";
     element.textContent = label;
     element.href = href;
     return element;
