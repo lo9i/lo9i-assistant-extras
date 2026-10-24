@@ -100,7 +100,7 @@ Install fields (all optional, at least one): `ANTHROPIC_API_KEY`, `OPENAI_API_KE
 ## 8. UI
 
 - Home: kanban board, one column per stage (spec, plan, build, review, done; plus waiting-for-you).
-- Task view: debate as a chat, one bubble per agent with role + model badge; directed questions shown as replies.
+- Task view: summary first. A progress stepper (spec → plan → build → review & tests → final diff), a "now" sentence of what's happening (derived from saved state, no model call), and per stage its outcome in short (the judge's decision, or the latest proposals and open points). The debate stays available as a chat behind a per-stage toggle: one bubble per agent with role + model badge; directed questions shown as replies.
 - Live: messages stream in real time (SSE/htmx).
 - Checkpoint panel: judge decision + rationale, losing options expandable, approve/reject (with comment).
 - Diff: summary (files, +/-) and a link to open the worktree/branch in the editor.

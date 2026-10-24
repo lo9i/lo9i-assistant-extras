@@ -26,7 +26,7 @@
   {% elif m.type == 'answer' %}<div class="prose text-sm">{{ body.answer | markdown }}</div>
   {% elif m.type == 'vote' %}<p class="text-sm muted">{{ body.reason }}</p>
   {% elif m.type == 'report' %}
-    {% if not body.ok %}<p class="text-sm danger">{{ body.error }}</p>{% endif %}
+    {% if not body.ok %}<div class="notice text-sm">{{ body.error or 'It stopped, and gave no reason.' }}</div>{% endif %}
     <div class="prose text-sm">{{ body.summary | markdown }}</div>
   {% else %}<p class="text-sm">{{ body.text }}</p>
   {% endif %}
@@ -47,12 +47,12 @@
   </div>
   <p class="text-sm"><span class="medium">Why:</span> {{ d.rationale }}</p>
   {% if d.kind == 'winner' %}
-  <details class="result" {{ 'open' if open }}>
+  <details class="result" {{ 'open' if open }} data-keep="decision-{{ d.id }}{{ '-checkpoint' if open }}">
     <summary class="text-sm medium">The decision</summary>
     <div class="prose">{{ d.body.result | markdown }}</div>
   </details>
   {% if d.body.options %}
-  <details class="options">
+  <details class="options" data-keep="options-{{ d.id }}">
     <summary class="text-sm muted">The options that lost ({{ d.body.options | length }})</summary>
     <ul class="text-sm">{% for o in d.body.options %}<li><span class="badge role-{{ o.role }}">{{ o.role }}</span> {{ o.why_not }}</li>{% endfor %}</ul>
   </details>
@@ -77,7 +77,7 @@
 {% endmacro %}
 
 {% macro test_run(r) %}
-<details class="test-run">
+<details class="test-run" data-keep="test-{{ r.id }}">
   <summary class="text-sm">
     <span class="badge {{ 'success' if r.passed else 'danger' }}">{{ 'passed' if r.passed else 'failed' }}</span>
     <span class="muted">{{ 'the change\'s tests' if r.kind == 'short' else 'all tests' }}</span>

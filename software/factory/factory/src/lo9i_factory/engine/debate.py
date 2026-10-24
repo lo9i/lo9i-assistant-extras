@@ -70,6 +70,20 @@ async def debate(conn: sqlite3.Connection, providers: Providers, stage_id: int, 
     return await _Debate(conn, providers, stage, brief).run()
 
 
+def next_step(stage: Stage, members: int) -> tuple[int, str]:
+    """The round and step a debate of `members` runs now, from where its
+    stage got to; ("judge") once the judge has decided too. The task's page
+    reads it to say what's going on."""
+    steps = SOLO_STEPS if members < 2 else STEPS if stage.round <= 1 else STEPS[1:]
+    if stage.round == 0:
+        return 1, steps[0]
+    if stage.step is None:
+        return stage.round, steps[0]
+    if stage.step == "judge":
+        return stage.round, "judge"
+    return stage.round, steps[steps.index(stage.step) + 1]
+
+
 def start(conn: sqlite3.Connection, stage: Stage) -> None:
     """The task is running, in this stage. Raises StoppedError for a task
     that isn't queued or running already."""
@@ -118,14 +132,7 @@ class _Debate:
                     repo.update_stage(self.conn, self.stage_id, {"round": round, "step": step})
 
     def _next(self) -> tuple[int, str]:
-        """The step to run now, from where the stage got to."""
-        stage = repo.get_stage(self.conn, self.stage_id)
-        steps = SOLO_STEPS if len(self.roles) < 2 else STEPS if stage.round <= 1 else STEPS[1:]
-        if stage.round == 0:
-            return 1, steps[0]
-        if stage.step is None:
-            return stage.round, steps[0]
-        return stage.round, steps[steps.index(stage.step) + 1]
+        return next_step(repo.get_stage(self.conn, self.stage_id), len(self.roles))
 
     def _check(self) -> None:
         status = service.get_task(self.conn, self.task_id).status

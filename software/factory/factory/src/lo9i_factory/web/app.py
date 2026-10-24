@@ -10,8 +10,10 @@ pages link relative to it (<base> in base.html).
 
 The board (SPEC §8) has a column per stage plus what waits for the user;
 cards move only by approve and reject, never by dragging. A task's page
-shows its debate as a chat, the judge's decision at a checkpoint with the
-buttons to approve or reject it, the diff and the tests, and what it cost.
+shows its progress across the stages and, in a sentence, what it's doing
+now; the judge's decision at a checkpoint with the buttons to approve or
+reject it; each stage's outcome in short, its debate as a chat behind a
+toggle; the diff and the tests, and what it cost.
 Settings has the models, limits, prompts and repositories.
 
 Live: lo9i's daemon hands a page's answers on whole, so the page can't
@@ -75,7 +77,19 @@ STAGE_STATUS_LABELS = {
     "failed": "Failed",
     "cancelled": "Cancelled",
 }
-CHECKPOINT_LABELS = {"spec": "the spec", "plan": "the plan", "diff": "the final diff"}
+# Under each step of a task's progress (views.steps).
+STEP_NOTES = {
+    "done": "Done",
+    "running": "Working on it",
+    "queued": "Starting",
+    "waiting": "Your call",
+    "paused": "Paused",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "upcoming": "",
+}
+# Beside each point of a debate (views.points).
+POINT_LABELS = {"open": "open", "answered": "answered", "revised": "revised since"}
 
 # Models write Markdown. Raw HTML in it is shown as text, never run.
 _markdown = MarkdownIt("commonmark", {"html": False}).enable("table").enable("strikethrough")
@@ -119,10 +133,18 @@ templates.env.globals |= {
     "RUN_MODES": RUN_MODES,
     "STATUS_LABELS": STATUS_LABELS,
     "STAGE_STATUS_LABELS": STAGE_STATUS_LABELS,
-    "CHECKPOINT_LABELS": CHECKPOINT_LABELS,
+    "CHECKPOINT_LABELS": views.CHECKPOINT_LABELS,
+    "STEP_NOTES": STEP_NOTES,
+    "POINT_LABELS": POINT_LABELS,
     "LIVE_SECONDS": LIVE_SECONDS,
 }
-templates.env.filters |= {"markdown": markdown, "ago": ago, "usd": usd, "repo_name": repo_name}
+templates.env.filters |= {
+    "markdown": markdown,
+    "ago": ago,
+    "usd": usd,
+    "repo_name": repo_name,
+    "one_line": views.one_line,
+}
 
 
 def get_conn() -> Iterator[sqlite3.Connection]:
@@ -196,14 +218,20 @@ def _board_routes(app: FastAPI) -> None:
 def _task_page(request: Request, conn: sqlite3.Connection, id: int, template: str) -> HTMLResponse:
     task = service.get_task(conn, id)
     s = settings.load(conn)
+    stages = views.stages(conn, task)
+    checkpoint = service.pending_checkpoint(conn, id)
+    info = views.overview(conn, task, s.editor_url(task.worktree) if task.worktree else None)
+    open_points = len([p for p in info.points if p["status"] == "open"])
     return _render(
         request,
         template,
         nav="board",
         task=task,
-        stages=views.stages(conn, task),
-        checkpoint=service.pending_checkpoint(conn, id),
-        info=views.overview(conn, task, s.editor_url(task.worktree) if task.worktree else None),
+        stages=stages,
+        checkpoint=checkpoint,
+        info=info,
+        steps=views.steps(task, stages, checkpoint, len(info.approvals)),
+        now=views.now(task, stages, checkpoint, info.approvals, len(info.changes), open_points),
         live=task.status in ("queued", "running"),
     )
 

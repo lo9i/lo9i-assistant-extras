@@ -145,6 +145,49 @@ def test_a_running_task_reads_its_live_part_again(client, conn, project):
     assert client.get(f"/tasks/{t.id}/live", headers=HX).headers["HX-Refresh"] == "true"
 
 
+def test_a_task_shows_its_progress_and_hides_the_debate_behind_a_toggle(client, conn, project, runner):
+    t = service.create_task(conn, str(project), "Add a search cache")
+    once(runner, conn)
+    service.approve(conn, t.id)
+    once(runner, conn)
+
+    page = client.get(f"/tasks/{t.id}").text
+    # The steps, then what it's doing now, then your call: above the stages.
+    assert '<li class="step done">' in page and '<li class="step waiting current">' in page
+    assert "Review &amp; tests" in page and "Final diff" in page
+    assert '<p class="now-text">Waiting for your approval of the plan</p>' in page
+    assert page.index('class="stepper"') < page.index('class="panel now') < page.index('id="checkpoint"')
+    assert page.index('id="checkpoint"') < page.index('<section class="stage')
+    # The spec's outcome in short; every debate collapsed, kept so across refreshes.
+    spec = page[page.index(f'id="stage-{service.stages(conn, t.id)[0].id}"') :]
+    assert "picked the architect" in spec and "You approved it." in spec
+    assert f'<details class="discussion" data-keep="discussion-{service.stages(conn, t.id)[0].id}">' in page
+    assert (
+        "Show the full discussion" in page and '<details class="discussion" data-keep="discussion-1" open' not in page
+    )
+    assert "sessionStorage" in page and "htmx:afterSwap" in page
+
+
+def test_a_debate_under_way_shows_where_it_stands(client, conn, project):
+    t = service.create_task(conn, str(project), "Add a search cache")
+    with conn:
+        stage = service.stages(conn, t.id)[0].id
+        repo.update_stage(conn, stage, {"status": "approved"})
+        stage = repo.insert_stage(conn, t.id, "plan")
+        repo.update_stage(conn, stage, {"status": "running", "started_at": repo.now(), "round": 2})
+        repo.update_task(conn, t.id, {"stage": "plan", "status": "running"})
+        repo.insert_message(conn, task_id=t.id, stage_id=stage, round=1, role="architect", type="proposal",
+                            body={"proposal": "## Cache\n\nAn LRU in front of the search.", "risks": []})  # fmt: skip
+        repo.insert_decision(conn, task_id=t.id, stage_id=stage, round=1, model="m", kind="continue",
+                             rationale="They disagree on the TTL")  # fmt: skip
+
+    live = client.get(f"/tasks/{t.id}/live", headers=HX).text
+    assert "Round 2 of the plan: the architect, security agent and tester are critiquing" in live
+    assert '<span class="spinner"></span>' in live and "in this stage" in live
+    assert "The proposal" in live and "An LRU in front of the search." in live
+    assert "Where it stands" in live and "They disagree on the TTL" in live and "not agreed yet" in live
+
+
 def test_comments_resume_cancel_and_delete(client, conn, project):
     t = service.create_task(conn, str(project), "x")
     assert client.post(f"/tasks/{t.id}/comment", headers=HX, data={"text": "Only the search page"}).status_code == 200

@@ -3,12 +3,38 @@
 <div id="live" class="task-layout"
      {% if live %}hx-get="tasks/{{ task.id }}/live" hx-trigger="every {{ LIVE_SECONDS }}s" hx-swap="outerHTML"{% endif %}>
   <div class="main">
-    <div class="status-line">
-      <span class="badge status-{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
-      {% if task.stage != 'done' %}<span class="text-sm muted">at the {{ task.stage }} stage</span>{% endif %}
-      {% if live %}<span class="pulse" title="Updating as it runs"></span>{% endif %}
-      {% if task.reason %}<p class="text-sm warning">{{ task.reason }}</p>{% endif %}
-    </div>
+    {# Its progress, a step per stage and the final diff. #}
+    <section class="panel progress">
+      <ol class="stepper">
+        {% for s in steps %}
+        <li class="step {{ s.state }}{{ ' current' if s.state not in ('done', 'upcoming') }}">
+          <span class="marker">
+            {%- if s.state == 'done' %}✓{% elif s.state == 'running' %}<span class="spinner"></span>
+            {%- elif s.state == 'failed' %}!{% elif s.state == 'paused' %}‖{% elif s.state == 'cancelled' %}×{% else %}{{ loop.index }}{% endif -%}
+          </span>
+          <span class="name">{{ s.label }}</span>
+          <span class="note">{{ STEP_NOTES[s.state] }}{% if s.runs > 1 %}{{ ' · ' if STEP_NOTES[s.state] }}run {{ s.runs }}{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    {# What it's doing now, in a sentence (views.now). #}
+    <section class="panel now state-{{ now.state }}">
+      <div class="now-row">
+        <span class="now-icon">{% if now.state == 'running' %}<span class="spinner"></span>{% else %}<span class="dot"></span>{% endif %}</span>
+        <div class="now-body">
+          <p class="now-text">{{ now.text }}</p>
+          {% if now.detail %}<p class="text-sm muted clamp-2">{{ now.detail }}</p>{% endif %}
+        </div>
+        <div class="now-meta">
+          <span class="badge status-{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
+          {% if now.clock %}<span class="text-xs muted">{{ now.clock }}</span>{% endif %}
+          {% if live %}<span class="pulse" title="Updating as it runs"></span>{% endif %}
+        </div>
+      </div>
+      {% if task.reason %}<div class="notice text-sm">{{ task.reason }}</div>{% endif %}
+    </section>
 
     {% if info.approvals %}
     <section class="panel attention">
@@ -58,7 +84,7 @@
       </ul>
       {% endif %}
       {% if info.diff %}
-      <details class="diff">
+      <details class="diff" data-keep="diff-{{ task.id }}">
         <summary class="text-sm muted">The whole diff</summary>
         <pre class="mono text-xs">{% for line in info.diff.splitlines() %}<span class="{{ 'add' if line.startswith('+') and not line.startswith('+++') else 'del' if line.startswith('-') and not line.startswith('---') else 'hunk' if line.startswith('@@') else '' }}">{{ line }}</span>
 {% endfor %}</pre>
@@ -80,32 +106,95 @@
     </section>
     {% endif %}
 
-    {# Each stage as a chat (SPEC §8), the latest open. #}
-    {% for view in stages %}
-    <details class="stage" {{ 'open' if loop.last }}>
-      <summary>
-        <span class="medium">{{ view.title }}</span>
+    {# Each stage, the latest first: how it ended or where it stands, and its whole debate behind a toggle. #}
+    {% for view in stages | reverse %}
+    {% set kind = view.stage.kind %}
+    <section class="stage{{ ' current' if view.stage.status in ('running', 'waiting') }}" id="stage-{{ view.stage.id }}">
+      <div class="stage-head">
+        <h2>{{ view.title }}</h2>
         <span class="badge status-{{ view.stage.status }}">{{ STAGE_STATUS_LABELS[view.stage.status] }}</span>
-      </summary>
-      {% for round in view.rounds %}
-      <div class="round">
-        <p class="label">{{ 'Before the debate' if round.number == 0 else 'Round ' ~ round.number }}</p>
-        {% for b in round.bubbles %}{{ bubble(b, review=view.stage.kind == 'review') }}{% endfor %}
-        {% if round.verdict %}
-        <div class="verdict text-sm"><span class="badge role-judge">judge</span> No agreement yet: {{ round.verdict.rationale }}</div>
-        {% endif %}
+        {% if view.clock %}<span class="text-xs muted">{{ view.clock }}</span>{% endif %}
       </div>
+
+      {% if view.decision %}
+        {% if checkpoint and view.checkpoint and view.checkpoint.id == checkpoint.id %}
+        <p class="text-sm muted">The judge's decision is above, for your call.</p>
+        {% else %}
+        {{ decision_box(view.decision) }}
+        {% endif %}
+      {% elif kind == 'build' %}
+        {% set report = view.report %}
+        {% set runs = info.tests | selectattr('stage_id', 'equalto', view.stage.id) | list %}
+        {% if report and report.body.ok %}
+        <p class="outcome text-sm"><span class="badge role-implementer">implementer</span> <span>{{ report.body.summary | one_line(240) }}</span></p>
+        {% elif report %}
+        <div class="notice text-sm">The coding agent stopped: {{ report.body.error or 'it gave no reason' }}</div>
+        {% endif %}
+        {% if runs %}
+        <p class="actions">{% for r in runs %}<span class="badge {{ 'success' if r.passed else 'warning' }}">{{ 'the change\'s tests' if r.kind == 'short' else 'all tests' }} {{ 'passed' if r.passed else 'failed' }}</span>{% endfor %}</p>
+        {% endif %}
+        {% if not report and not runs %}
+        <p class="text-sm muted">{{ {'pending': 'Not started yet.', 'running': 'Nothing to show yet: what it is doing is at the top.'}.get(view.stage.status, 'Nothing to show.') }}</p>
+        {% endif %}
       {% else %}
-      {% if not view.log %}<p class="text-sm muted">Nothing yet.</p>{% endif %}
-      {% endfor %}
-      {% if view.log %}{{ log_lines(view.log) }}{% endif %}
-      {% if view.decision and not (checkpoint and view.checkpoint and view.checkpoint.id == checkpoint.id) %}
-      {{ decision_box(view.decision) }}
+        {% set proposals = view.proposals %}
+        {% set points = view.points %}
+        {% if proposals %}
+        <div class="summary">
+          <h3 class="label">{{ 'Latest reviews' if kind == 'review' else 'Latest proposals' if proposals | length > 1 else 'The proposal' }}</h3>
+          <ul class="lines text-sm">
+            {% for m in proposals %}
+            <li><span class="badge role-{{ m.role }}">{{ m.role }}</span>
+              <span class="line" title="{{ m.body.proposal | one_line(600) }}">{{ m.body.proposal | one_line }}</span>
+              {% if m.type == 'revision' %}<span class="text-xs muted">revised</span>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if points %}
+        <div class="summary">
+          <h3 class="label">Where it stands</h3>
+          <ul class="lines text-sm">
+            {% for p in points %}
+            <li><span class="badge role-{{ p.who }}">{{ 'you' if p.who == 'user' else p.who }}</span>
+              {% if p.kind == 'question' %}<span class="text-xs muted">asks the {{ p.about }}</span>
+              {% elif p.kind == 'critique' %}<span class="text-xs muted">on the {{ p.about }}'s</span>
+              {% elif p.kind == 'verdict' %}<span class="text-xs muted">not agreed yet</span>{% endif %}
+              <span class="line{{ ' wrap' if p.kind == 'verdict' }}" title="{{ p.text }}">{{ p.text }}</span>
+              <span class="badge {{ 'warning' if p.status == 'open' else 'success' if p.status == 'answered' else '' }}">{{ POINT_LABELS[p.status] }}</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if not proposals and not points %}
+        <p class="text-sm muted">{{ {'pending': 'Not started yet.', 'running': 'Nothing yet: the team is writing.'}.get(view.stage.status, 'Nothing was said.') }}</p>
+        {% endif %}
       {% endif %}
+
       {% if view.checkpoint and view.checkpoint.status != 'pending' %}
       <p class="text-sm muted">You {{ view.checkpoint.status }} it{% if view.checkpoint.comment %}: “{{ view.checkpoint.comment }}”{% endif %}.</p>
       {% endif %}
-    </details>
+
+      {% if view.messages or view.log or view.verdicts %}
+      <details class="discussion" data-keep="discussion-{{ view.stage.id }}">
+        <summary class="text-sm">
+          <span class="when-closed">Show the full {{ 'log' if kind == 'build' else 'discussion' }}</span>
+          <span class="when-open">Hide the full {{ 'log' if kind == 'build' else 'discussion' }}</span>
+          {% if view.messages %}<span class="text-xs muted">{{ view.messages | length }} message{{ 's' if view.messages | length != 1 }}</span>{% endif %}
+        </summary>
+        {% for round in view.rounds %}
+        <div class="round">
+          <p class="label">{{ 'Before the debate' if round.number == 0 else 'Round ' ~ round.number }}</p>
+          {% for b in round.bubbles %}{{ bubble(b, review=kind == 'review') }}{% endfor %}
+          {% if round.verdict %}
+          <div class="verdict text-sm"><span class="badge role-judge">judge</span> No agreement yet: {{ round.verdict.rationale }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if view.log %}{{ log_lines(view.log) }}{% endif %}
+      </details>
+      {% endif %}
+    </section>
     {% endfor %}
   </div>
 
