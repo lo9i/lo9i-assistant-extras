@@ -5,6 +5,7 @@
   <td class="medium" data-value="{{ h.name | lower }}">
     <a href="{{ path }}" target="_blank" class="link">{{ h.name }}</a>
     {% if h.hidden %}<span class="pill">hidden</span>{% endif %}
+    {% if tunnels_on %}<span class="pill pill--accent" title="Its terminal's page has them">{{ tunnels_on }} tunnel{{ 's' if tunnels_on != 1 }} on</span>{% endif %}
   </td>
   <td class="hide-sm mono muted" data-value="{{ h.address or '' }}">{{ h.address or '—' }}</td>
   {% if probe is none %}

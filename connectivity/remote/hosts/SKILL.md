@@ -18,3 +18,11 @@ The tools are in the `hosts` MCP server, named `mcp__hosts__<tool>`. If they are
 4. Commands that wait for input (editors, pagers like `less`, `sudo` asking for a password) don't fit `run_command`: use `--no-pager`, `-y` or `| cat` where they help. One still running after `timeout_seconds` comes back with `still_running` and the screen so far; `read_screen` later shows how it went. When it asks for a password, ask the user to type it in the terminal on the Hosts page.
 5. "The terminal is busy": a program runs in it. Ask the user to finish it there, or wait.
 6. "Herdr isn't installed": the user installs it from the host's terminal on the Hosts page (one button). "Can't reach": say why in plain words; the host may be off or on another network.
+
+## Tunnels
+
+The user sets up SSH tunnels on a host's page (Tunnels, beside its terminal): ssh on this Mac forwards a port (local: a port on this Mac reaches one the host can reach; remote: a port on the host reaches one this Mac can reach; socks: a SOCKS proxy on this Mac through the host). Local and SOCKS ports listen on 127.0.0.1 only.
+
+- `list_tunnels` says which there are and their state: running, starting, reconnecting (the connection dropped; it tries again on its own), failed (with a message saying what the user has to change), or stopped.
+- `start_tunnel` / `stop_tunnel` switch one on or off, by host and tunnel name; lo9i asks the user first. A started tunnel takes a few seconds to come up: `list_tunnels` again to see.
+- Only the user adds, changes or deletes tunnels, on the page. "The Hosts page isn't running": the tunnels run in it, so ask the user to turn the hosts plugin off and on in Plugins.

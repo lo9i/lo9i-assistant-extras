@@ -1,20 +1,23 @@
 """MCP server over stdio: the user's SSH hosts, and their Herdr session (herdr.py), the same terminal the
-user sees on the Hosts page. lo9i starts it (see server.yaml) with HOSTS_DB set:
+user sees on the Hosts page, and the SSH tunnels the user set up there, which that page runs (page.py).
+lo9i starts it (see server.yaml) with HOSTS_DB and HOSTS_WEB_SOCKET set:
 
-    HOSTS_DB=/path/hosts.db hosts-mcp
+    HOSTS_DB=/path/hosts.db HOSTS_WEB_SOCKET=/path/page.sock hosts-mcp
 """
 
 import asyncio
 from functools import cache
 from typing import Annotated, Any
+from urllib.parse import quote
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import db, service
+from . import db, page, service
 from .herdr import Herdr, HerdrError, Probe
+from .page import PageError
 from .service import Host, UnknownHostError
 from .ssh import OpenSsh
 
@@ -28,6 +31,10 @@ and returns its output and exit code. Commands that change a host (installing or
 editing files, restarting services, rebooting, deleting anything) need the user's OK first: say what
 you'll run and why, and run it only after they agree. Read-only commands (status, logs, disk space)
 need no OK.
+
+The user's SSH tunnels (ports forwarded through a host by this Mac) are on the same page:
+list_tunnels says which there are and how each is doing; start_tunnel and stop_tunnel switch one on
+or off. Only the user adds or changes them, on the Hosts page.
 """
 
 mcp = MCPServer("hosts", instructions=INSTRUCTIONS)
@@ -107,6 +114,65 @@ def _host(h: Host, probe: Probe | None) -> dict[str, Any]:
         if probe.problem:
             out["problem"] = probe.problem
     return out
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def list_tunnels(
+    host: Annotated[str | None, Field(description="Only this host's (a name from list_hosts)")] = None,
+) -> list[dict[str, Any]]:
+    """The SSH tunnels the user set up on the Hosts page, which ssh on this Mac runs: name, type (local:
+    a port on this Mac reaches target_host:target_port as the host sees it; remote: a port on the host
+    reaches target_host:target_port as this Mac sees it; socks: a SOCKS proxy on this Mac through the host),
+    and state (stopped, starting, running, reconnecting or failed), with a message saying why when it
+    isn't running as it should."""
+    return await _tunnels(host)
+
+
+@mcp.tool()
+async def start_tunnel(
+    host: Annotated[str, Field(description="The host's name from list_hosts")],
+    tunnel: Annotated[str, Field(description="The tunnel's name from list_tunnels")],
+) -> dict[str, Any]:
+    """Switches on one of the user's tunnels, as its switch on the Hosts page does: it keeps running, and
+    reconnects when the connection drops, until stopped. Gives back its state; list_tunnels a few seconds
+    later says whether it came up."""
+    t = await _tunnel(host, tunnel)
+    return await _page("POST", f"/api/hosts/{quote(host, safe='')}/tunnels/{t['id']}/start")
+
+
+@mcp.tool()
+async def stop_tunnel(
+    host: Annotated[str, Field(description="The host's name from list_hosts")],
+    tunnel: Annotated[str, Field(description="The tunnel's name from list_tunnels")],
+) -> dict[str, Any]:
+    """Switches off one of the user's tunnels: its ssh stops, and whatever used its port loses it."""
+    t = await _tunnel(host, tunnel)
+    return await _page("POST", f"/api/hosts/{quote(host, safe='')}/tunnels/{t['id']}/stop")
+
+
+async def _tunnels(host: str | None) -> list[dict[str, Any]]:
+    """The tunnels of the hosts the user shows, or of one of them."""
+    if host is not None:
+        await _shown(host)
+    shown = {h.name for h in await service.shown_hosts()}
+    found = await _page("GET", "/api/tunnels")
+    return [t for t in found if t["host"] in shown and host in (None, t["host"])]
+
+
+async def _tunnel(host: str, name: str) -> dict[str, Any]:
+    found = await _tunnels(host)
+    for t in found:
+        if t["name"] == name:
+            return t
+    known = ", ".join(t["name"] for t in found) or "none"
+    raise ToolError(f"{host} has no tunnel named {name!r}. Its tunnels are: {known}.")
+
+
+async def _page(method: str, path: str) -> Any:
+    try:
+        return await page.call(method, path)
+    except PageError as e:
+        raise ToolError(str(e)) from None
 
 
 def main() -> None:

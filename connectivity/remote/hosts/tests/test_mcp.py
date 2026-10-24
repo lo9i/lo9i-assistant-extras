@@ -1,11 +1,17 @@
+import asyncio
 import json
+import shutil
+import tempfile
 
 import pytest
-from conftest import FakeSsh, answers, matched, process_info
+import uvicorn
+from conftest import FakeSpawn, FakeSsh, answers, matched, process_info, settled
 from mcp import Client
 
 from hosts import db, herdr, mcp_server
 from hosts.mcp_server import mcp
+from hosts.tunnels import Tunnel
+from hosts.web.app import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -87,3 +93,82 @@ async def test_the_screen_is_what_the_user_sees(ssh: FakeSsh):
     result = await call("read_screen", {"host": "pi", "lines": 30})
     assert "up 3 days" in result.content[0].text
     assert ssh.calls[-1][2] == ("30",)
+
+
+# Tunnels: the tools reach them through the page, which runs them, over its socket.
+
+
+@pytest.fixture
+async def page(fake_herdr, spawn: FakeSpawn, monkeypatch):
+    folder = tempfile.mkdtemp(dir="/tmp")  # A socket's path must be short.
+    path = f"{folder}/page.sock"
+    monkeypatch.setenv("HOSTS_WEB_SOCKET", path)
+    server = uvicorn.Server(
+        uvicorn.Config(create_app(fake_herdr, running=spawn.tunnels()), uds=path, log_level="warning")
+    )
+    serving = asyncio.create_task(server.serve())
+    await settled(lambda: server.started)
+    yield
+    server.should_exit = True
+    await serving
+    shutil.rmtree(folder)
+
+
+def _tunnel(host: str, name: str, kind: str = "local", port: int = 15432) -> Tunnel:
+    target = ("", None) if kind == "socks" else ("localhost", 5432)
+    conn = db.connect()
+    try:
+        return db.save_tunnel(conn, Tunnel(None, host, name, kind, port, *target))
+    finally:
+        conn.close()
+
+
+async def test_listing_tunnels_needs_no_approval_but_switching_one_does():
+    async with Client(mcp) as client:
+        tools = {t.name: t for t in (await client.list_tools()).tools}
+    assert tools["list_tunnels"].annotations.read_only_hint
+    for name in ("start_tunnel", "stop_tunnel"):
+        assert not (tools[name].annotations and tools[name].annotations.read_only_hint)
+
+
+async def test_the_assistant_lists_starts_and_stops_the_users_tunnels(page, spawn: FakeSpawn):
+    _tunnel("pi", "Database")
+    _tunnel("pi", "Proxy", "socks", 1080)
+    _tunnel("nas", "Web", port=8080)
+    listed = (await call("list_tunnels", {"host": "pi"})).structured_content["result"]
+    assert [(t["name"], t["type"], t["state"]) for t in listed] == [
+        ("Database", "local", "stopped"),
+        ("Proxy", "socks", "stopped"),
+    ]
+    assert listed[0]["description"] == "localhost:15432 → localhost:5432 on pi"
+
+    started = payload(await call("start_tunnel", {"host": "pi", "tunnel": "Database"}))
+    assert started["name"] == "Database" and started["state"] in ("starting", "running")
+    await settled(lambda: len(spawn.started) == 1)
+    assert "127.0.0.1:15432:localhost:5432" in spawn.commands[0]
+    await asyncio.sleep(0.05)
+    every = (await call("list_tunnels", {})).structured_content["result"]
+    assert {t["name"]: t["state"] for t in every} == {"Web": "stopped", "Database": "running", "Proxy": "stopped"}
+
+    stopped = payload(await call("stop_tunnel", {"host": "pi", "tunnel": "Database"}))
+    assert stopped["state"] == "stopped" and spawn.started[0].terminated
+
+
+async def test_only_the_shown_hosts_tunnels_and_ones_by_their_names(page, spawn: FakeSpawn):
+    _tunnel("pi", "Database")
+    _tunnel("nas", "Web")
+    conn = db.connect()
+    db.set_hidden(conn, "nas", True)
+    conn.close()
+    assert [t["name"] for t in (await call("list_tunnels", {})).structured_content["result"]] == ["Database"]
+    result = await call("start_tunnel", {"host": "nas", "tunnel": "Web"})
+    assert result.is_error and "The hosts are: pi." in result.content[0].text
+    result = await call("start_tunnel", {"host": "pi", "tunnel": "Nope"})
+    assert result.is_error and "pi has no tunnel named 'Nope'. Its tunnels are: Database." in result.content[0].text
+    assert spawn.commands == []
+
+
+async def test_without_the_page_the_assistant_hears_how_to_get_it_back(monkeypatch):
+    monkeypatch.setenv("HOSTS_WEB_SOCKET", "/tmp/nothing-listens-here.sock")
+    result = await call("list_tunnels", {})
+    assert result.is_error and "The Hosts page isn't running" in result.content[0].text

@@ -1,14 +1,17 @@
-"""SSH as the tests see it: a fake that answers each of herdr.py's scripts as a host would, and an SSH config
-of their own (HOSTS_SSH_CONFIG, which `ssh -G` reads offline). Nothing here reaches a network."""
+"""SSH as the tests see it: a fake that answers each of herdr.py's scripts as a host would, a fake of the
+tunnels' ssh processes, and an SSH config of their own (HOSTS_SSH_CONFIG, which `ssh -G` reads offline).
+Nothing here reaches a network."""
 
+import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 import pytest
 
 from hosts import herdr
 from hosts.ssh import Result
+from hosts.tunnels import Tunnels
 
 CONFIG = """\
 # Two names for the Pi; the first is the one shown.
@@ -71,6 +74,79 @@ def ssh() -> FakeSsh:
 @pytest.fixture
 def fake_herdr(ssh: FakeSsh) -> herdr.Herdr:
     return herdr.Herdr(ssh)
+
+
+class FakeProcess:
+    """A tunnel's ssh: writes `lines` to stderr, then exits with `code`, or runs until stopped (None)."""
+
+    def __init__(self, lines: Sequence[str] = (), code: int | None = None) -> None:
+        self.stderr = asyncio.StreamReader()
+        for line in lines:
+            self.stderr.feed_data(f"{line}\n".encode())
+        self.returncode: int | None = None
+        self.terminated = False
+        self._exited = asyncio.Event()
+        if code is not None:
+            self.exit(code)
+
+    def exit(self, code: int) -> None:
+        if self.returncode is None:
+            self.returncode = code
+            self.stderr.feed_eof()
+            self._exited.set()
+
+    async def wait(self) -> int:
+        await self._exited.wait()
+        assert self.returncode is not None
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.exit(-15)
+
+    def kill(self) -> None:
+        self.exit(-9)
+
+
+# What ssh -v says once a local or SOCKS tunnel is up, and a remote one.
+UP = "debug1: Entering interactive session."
+REMOTE_UP = "debug1: remote forward success for: listen 9000, connect localhost:3000"
+
+
+@dataclass
+class FakeSpawn:
+    """Starts the next of `processes` for each try (ones that run until stopped once they're used up);
+    records each command line. Waits between tries are recorded, not waited."""
+
+    processes: list[Callable[[], FakeProcess]] = field(default_factory=list)
+    commands: list[list[str]] = field(default_factory=list)
+    started: list[FakeProcess] = field(default_factory=list)
+    waits: list[float] = field(default_factory=list)
+
+    async def __call__(self, args: Sequence[str]) -> FakeProcess:
+        self.commands.append(list(args))
+        process = self.processes.pop(0)() if self.processes else FakeProcess([UP])
+        self.started.append(process)
+        return process
+
+    async def sleep(self, seconds: float) -> None:
+        self.waits.append(seconds)
+        await asyncio.sleep(0)
+
+    def tunnels(self, settle_seconds: float = 30) -> Tunnels:
+        return Tunnels(self, self.sleep, settle_seconds)
+
+
+async def settled(check: Callable[[], bool], seconds: float = 2) -> None:
+    """Lets the tunnels' tasks run until `check` holds."""
+    async with asyncio.timeout(seconds):
+        while not check():
+            await asyncio.sleep(0.001)
+
+
+@pytest.fixture
+def spawn() -> FakeSpawn:
+    return FakeSpawn()
 
 
 @pytest.fixture(autouse=True)

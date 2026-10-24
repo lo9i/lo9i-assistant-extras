@@ -29,6 +29,7 @@ _PROBLEMS = (
     ("permission denied", "it didn't accept this computer's SSH key."),
     ("too many authentication failures", "it didn't accept this computer's SSH key."),
     ("connection closed", "it closed the connection."),
+    ("closed by remote host", "it closed the connection."),
     ("connection reset", "the connection was cut."),
     ("broken pipe", "the connection was cut."),
 )
@@ -75,12 +76,15 @@ def terminal_command(host: str, script: str) -> list[str]:
     return ["ssh", *ssh_options(), *_TERMINAL, "--", host, remote(script)]
 
 
-def problem(err: str) -> str:
-    """Why ssh failed, in plain words, from what it wrote."""
+def problem(err: str, otherwise: str | None = None) -> str:
+    """Why ssh failed, in plain words, from what it wrote: `otherwise` if it's none of the usual problems,
+    or its last line."""
     lowered = err.lower()
     for found, said in _PROBLEMS:
         if found in lowered:
             return said
+    if otherwise is not None:
+        return otherwise
     lines = [line.strip() for line in err.splitlines() if line.strip()]
     return lines[-1] if lines else "the connection failed."
 
