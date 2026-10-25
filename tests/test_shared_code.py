@@ -130,3 +130,20 @@ def test_every_accepted_difference_is_still_there():
     """So an accepted difference that was made the same again leaves the list."""
     found = {(group, name) for group, files in SHARED.items() for name in differences(group, [ROOT / f for f in files])}
     assert set(ACCEPTED) <= found, f"These no longer differ; take them out of ACCEPTED: {set(ACCEPTED) - found}"
+
+
+# The pages' script that takes the web app's theme (lo9i's core/mcp/install.py), in each plugin with a page: the
+# same file everywhere, since it isn't Python whose definitions could be compared.
+THEME_SCRIPTS = [
+    "connectivity/remote/hosts/src/hosts/web/static/theme.js",
+    "apps/finance/expenses/src/expenses/web/static/theme.js",
+    "apps/media/watchlist/src/watchlist/web/static/theme.js",
+    "software/factory/factory/src/lo9i_factory/web/static/theme.js",
+]
+
+
+def test_every_page_takes_the_web_apps_theme_with_the_same_script():
+    first, *others = [(ROOT / path).read_text() for path in THEME_SCRIPTS]
+    assert all(other == first for other in others), "The pages' theme.js copies differ: make them the same."
+    pages = {str(p.relative_to(ROOT)).split("/src/")[0] for p in ROOT.glob("*/*/*/src/*/web/templates/base.html")}
+    assert pages == {path.split("/src/")[0] for path in THEME_SCRIPTS}, "A page without theme.js, or one gone."
