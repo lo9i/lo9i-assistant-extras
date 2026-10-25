@@ -28,33 +28,56 @@
   </div>
   {% include "_add_bill.html" %}
 
-  <div class="list">
-    {% for b in bills %}
-    {% set m = b.period or b.due_date[:7] %}
-    {% if filters.scope == 'month' and (loop.first or m != (loop.previtem.period or loop.previtem.due_date[:7])) %}
-    <h3 class="muted small">{{ m | month_name }}</h3>
-    {% endif %}
-    <div class="row {{ b.status }}" id="bill-{{ b.id }}">
-      <div class="main">
-        <div class="title">{{ bill_label(b, obligations) }}
-          {% if b.asset_id %}<span class="muted">· {{ assets.get(b.asset_id, b.asset_id) }}</span>{% endif %}
+  {# A card per asset with its bills, then one for those of no asset (app.py's _bill_cards). #}
+  <div class="cards">
+    {% for c in cards %}
+    <article class="card bill-card{{ ' quiet' if not c.bills }}" id="card-{{ c.key }}">
+      <header class="card-head">
+        <div class="main">
+          <div class="title">{{ c.name }}
+            {% if c.asset %}<span class="tag">{{ c.asset.kind }}</span>{% endif %}
+          </div>
+          {% if not c.asset and c.key == 'none' %}<div class="muted small">Not tied to an asset</div>{% endif %}
         </div>
-        <div class="muted small">
-          Due {{ b.due_date }}{% if b.period %} · {{ b.period | month_name }}{% endif %} · {{ b.category }}{% if b.provider and b.obligation_id %} · {{ b.provider }}{% endif %}
+        {% if c.bills %}
+        <div class="card-total">
+          <strong>{{ c.totals.total | money }}</strong>
+          {% if c.totals.pending and c.totals.paid %}<span class="small warn">{{ c.totals.pending | money }} pending</span>
+          {% elif c.totals.pending %}<span class="small muted">pending</span>
+          {% else %}<span class="small ok">paid</span>{% endif %}
         </div>
-      </div>
-      <div class="amount">{{ b.amount | money }}{% if b.estimated %}<span class="est" title="Estimated from the last real bill">est.</span>{% endif %}</div>
-      <div class="actions">
-        {% if b.status == 'pending' %}
-        <button class="primary small" hx-post="bills/{{ b.id }}/status" hx-vals='{"status": "paid"}' hx-include="#filters" hx-target="#month" hx-swap="outerHTML">Mark paid</button>
-        {% else %}
-        <button class="ghost small ok" title="Mark as pending" hx-post="bills/{{ b.id }}/status" hx-vals='{"status": "pending"}' hx-include="#filters" hx-target="#month" hx-swap="outerHTML">Paid ✓</button>
         {% endif %}
-        <button class="ghost small" hx-get="bills/{{ b.id }}/edit" hx-include="#filters" hx-target="#bill-{{ b.id }}" hx-swap="outerHTML">Edit</button>
+      </header>
+
+      <div class="list">
+        {% for g in c.months %}
+        {% set now = g.month == this_month %}
+        <div class="month{{ ' now' if now }}">
+        <h3><span>{{ g.month | month_name }}{% if now %} · this month{% endif %}</span>{% if c.months | length > 1 %}<span>{{ g.total | money }}</span>{% endif %}</h3>
+        {% for b in g.bills %}
+        {% set d = due(b, today) %}
+        <div class="row bill {{ b.status }}{{ ' due-' ~ d[0] if d }}" id="bill-{{ b.id }}">
+          <div class="title"><span class="status-dot {{ b.status }}" title="{{ b.status | capitalize }}"></span>{{ bill_label(b, obligations) }}{% if d %}<span class="due-tag">{{ d[1] }}</span>{% endif %}</div>
+          <div class="amount">{{ b.amount | money }}{% if b.estimated %}<span class="est" title="Estimated from the last real bill">est.</span>{% endif %}</div>
+          <div class="muted small meta">
+            Due {{ b.due_date }}{% if b.period %} · {{ b.period | month_name }}{% endif %} · {{ b.category }}{% if b.provider and b.obligation_id %} · {{ b.provider }}{% endif %}
+          </div>
+          <div class="actions">
+            {% if b.status == 'pending' %}
+            <button class="primary small" hx-post="bills/{{ b.id }}/status" hx-vals='{"status": "paid"}' hx-include="#filters" hx-target="#month" hx-swap="outerHTML">Mark paid</button>
+            {% else %}
+            <button class="ghost small ok" title="Mark as pending" hx-post="bills/{{ b.id }}/status" hx-vals='{"status": "pending"}' hx-include="#filters" hx-target="#month" hx-swap="outerHTML">Paid ✓</button>
+            {% endif %}
+            <button class="ghost small" hx-get="bills/{{ b.id }}/edit" hx-include="#filters" hx-target="#bill-{{ b.id }}" hx-swap="outerHTML">Edit</button>
+          </div>
+        </div>
+        {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No bills here.</p>
+        {% endfor %}
       </div>
-    </div>
-    {% else %}
-    <p class="empty">No bills here.</p>
+    </article>
     {% endfor %}
   </div>
 </section>
