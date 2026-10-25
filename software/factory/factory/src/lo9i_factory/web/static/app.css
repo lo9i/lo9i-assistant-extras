@@ -89,7 +89,7 @@ input[type="checkbox"] { accent-color: var(--color-accent); }
 
 /* The top bar, as the app's (TopBar.svelte): the tabs, the page's actions on the right. */
 
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; padding: 16px 16px 0; max-width: 1600px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 50px; padding: 0 16px; max-width: 1600px; margin: 0 auto; }
 .topbar .actions { flex: none; display: flex; align-items: center; gap: 12px; }
 .tabs { display: inline-flex; gap: 4px; width: fit-content; padding: 3px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
 .tabs a { border-radius: var(--radius-sm); padding: 6px 10px; font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted); transition: background 0.12s ease, color 0.12s ease; }
@@ -410,7 +410,7 @@ dialog.modal h2 { font-size: var(--font-size-lg); font-weight: 600; letter-spaci
   .approval, .repo-row { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 680px) {
-  .topbar { min-height: 60px; }
+  .topbar { min-height: 44px; }
   .step .note { display: none; }
   .now-row { flex-wrap: wrap; }
   .now-meta { flex-basis: 100%; flex-direction: row; align-items: center; padding-left: 28px; }

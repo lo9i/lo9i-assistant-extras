@@ -90,7 +90,7 @@ a.link:hover { text-decoration: underline; }
 
 /* The top bar, as the app's (TopBar.svelte): the page's title, its actions on the right. */
 
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; padding: 16px 16px 0; max-width: 1600px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 50px; padding: 0 16px; max-width: 1600px; margin: 0 auto; }
 .topbar h1 { min-width: 0; font-size: var(--font-size-xl); font-weight: 600; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar .actions { flex: none; display: flex; align-items: center; gap: 12px; }
 .screen { max-width: 1600px; margin: 0 auto; padding: 0 16px 16px; }
@@ -278,7 +278,7 @@ body.full { height: 100vh; min-height: 0; display: flex; flex-direction: column;
 }
 
 @media (max-width: 680px) {
-  .topbar { min-height: 60px; }
+  .topbar { min-height: 44px; }
   .topbar h1 { font-size: var(--font-size-lg); }
   .hide-sm { display: none; }
   .search { width: 100%; }

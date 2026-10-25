@@ -83,7 +83,7 @@ button { cursor: pointer; background: none; }
 
 /* The top bar, as the app's (TopBar.svelte): the tabs, the page's actions on the right. */
 
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; padding: 16px 16px 0; max-width: 1600px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 50px; padding: 0 16px; max-width: 1600px; margin: 0 auto; }
 .topbar .actions { flex: none; display: flex; align-items: center; gap: 12px; margin-top: 0; }
 
 /* The app's segmented tabs: the pages in the top bar, and a list's statuses. */
@@ -296,7 +296,7 @@ dialog.modal h2 { font-size: var(--font-size-lg); font-weight: 600; letter-spaci
 .htmx-swapping { opacity: 0; }
 
 @media (max-width: 680px) {
-  .topbar { min-height: 60px; }
+  .topbar { min-height: 44px; }
   .poster-card { width: 10rem; }
   .video-card { width: 18rem; }
   .hide-sm { display: none; }

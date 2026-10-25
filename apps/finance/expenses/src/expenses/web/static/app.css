@@ -70,7 +70,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 16px; }
 
 /* The top bar, as the app's (TopBar.svelte), with the app's segmented tabs. */
 
-.topbar { display: flex; align-items: center; min-height: 76px; padding: 16px 16px 0; max-width: 1600px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; min-height: 50px; padding: 0 16px; max-width: 1600px; margin: 0 auto; }
 .topbar nav { display: inline-flex; flex-wrap: wrap; gap: 4px; width: fit-content; padding: 3px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
 .topbar nav a { border-radius: var(--radius-sm); padding: 6px 10px; font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted); text-decoration: none; transition: background 0.12s ease, color 0.12s ease; }
 .topbar nav a:hover { color: var(--color-text-primary); }
@@ -224,7 +224,7 @@ form.inline { display: flex; gap: 8px; }
 }
 
 @media (max-width: 680px) {
-  .topbar { min-height: 60px; }
+  .topbar { min-height: 44px; }
 }
 @media (max-width: 520px) {
   .tiles { grid-template-columns: 1fr; gap: 6px; }
