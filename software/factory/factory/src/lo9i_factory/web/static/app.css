@@ -89,7 +89,7 @@ input[type="checkbox"] { accent-color: var(--color-accent); }
 
 /* The top bar, as the app's (TopBar.svelte): the tabs, the page's actions on the right. */
 
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 50px; padding: 0 16px; max-width: 1600px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 0 16px; max-width: 1600px; margin: 0 auto; }
 .topbar .actions { flex: none; display: flex; align-items: center; gap: 12px; }
 .tabs { display: inline-flex; gap: 4px; width: fit-content; padding: 3px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
 .tabs a { border-radius: var(--radius-sm); padding: 6px 10px; font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted); transition: background 0.12s ease, color 0.12s ease; }
@@ -99,7 +99,7 @@ input[type="checkbox"] { accent-color: var(--color-accent); }
 /* Page */
 
 .container { width: 100%; max-width: 1600px; margin: 0 auto; padding: 0 16px; }
-.page { padding-top: 16px; padding-bottom: 16px; display: flex; flex-direction: column; gap: 16px; }
+.page { padding-top: 0; padding-bottom: 16px; display: flex; flex-direction: column; gap: 16px; }
 h1 { font-size: var(--font-size-xl); line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; }
 h2 { font-size: var(--font-size-md); line-height: 1.25; font-weight: 600; }
 .section-head .sub { margin-top: 4px; }
