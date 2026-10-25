@@ -1,8 +1,9 @@
-"""MCP server over stdio: the user's SSH hosts, and their Herdr session (herdr.py), the same terminal the
-user sees on the Hosts page, and the SSH tunnels the user set up there, which that page runs (page.py).
-lo9i starts it (see server.yaml) with HOSTS_DB and HOSTS_WEB_SOCKET set:
+"""MCP server over stdio: the user's hosts (the plugin's own list, service.py), and their Herdr session
+(herdr.py), the same terminal the user sees on the Hosts page, and the SSH tunnels the user set up there, which
+that page runs (page.py). lo9i starts it (see server.yaml) with HOSTS_DB, HOSTS_WEB_SOCKET and the plugin's key
+(vault.py) set:
 
-    HOSTS_DB=/path/hosts.db HOSTS_WEB_SOCKET=/path/page.sock hosts-mcp
+    HOSTS_DB=/path/hosts.db HOSTS_WEB_SOCKET=/path/page.sock LO9I_DATA_KEY=… hosts-mcp
 """
 
 import asyncio
@@ -16,15 +17,16 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import db, page, service
+from .errors import ConnectError, LockedError
 from .herdr import Herdr, HerdrError, Probe
 from .page import PageError
 from .service import Host, UnknownHostError
 from .ssh import OpenSsh
 
 INSTRUCTIONS = """\
-The user's Linux hosts, from their SSH config, and a terminal on each that keeps running when the
-connection drops (a Herdr session named lo9i). Your commands run in a tab of their own there, labeled
-assistant, which the user sees beside theirs on the Hosts page of lo9i's web app.
+The user's Linux hosts, as they keep them on the Hosts page of lo9i's web app, and a terminal on each
+that keeps running when the connection drops (a Herdr session named lo9i). Your commands run in a tab
+of their own there, labeled assistant, which the user sees beside theirs on the Hosts page.
 
 Start with list_hosts. run_command types a command in your tab and returns its output and exit code;
 read_screen shows what your tab shows, or the pane the user has in front. Commands that change a host
@@ -49,10 +51,14 @@ def _herdr() -> Herdr:
     return Herdr(OpenSsh())
 
 
+# What keeps a host from being reached, said to the assistant as the tool's error.
+_PROBLEMS = (UnknownHostError, LockedError, ConnectError)
+
+
 async def _shown(name: str) -> Host:
     try:
         return await service.host(name, shown_only=True)
-    except UnknownHostError as e:
+    except _PROBLEMS as e:
         raise ToolError(str(e)) from None
 
 
@@ -63,10 +69,13 @@ async def list_hosts(
     """The hosts the user shows on their Hosts page: name (what the other tools take), address
     (user@hostname:port) and when the user last opened its terminal. With check, also whether it
     answers now, has Herdr, and runs lo9i's Herdr session."""
-    hosts = await service.shown_hosts()
-    probes: list[Probe | None] = [None] * len(hosts)
-    if check:
-        probes = list(await asyncio.gather(*(_herdr().probe(h.name) for h in hosts)))
+    try:
+        hosts = await service.shown_hosts()
+        probes: list[Probe | None] = [None] * len(hosts)
+        if check:
+            probes = list(await asyncio.gather(*(_herdr().probe(h.name) for h in hosts)))
+    except _PROBLEMS as e:
+        raise ToolError(str(e)) from None
     return [_host(h, p) for h, p in zip(hosts, probes, strict=True)]
 
 
@@ -85,7 +94,7 @@ async def run_command(
     await _shown(host)
     try:
         run = await _herdr().run(host, command, timeout_seconds)
-    except HerdrError as e:
+    except (HerdrError, *_PROBLEMS) as e:
         raise ToolError(str(e)) from None
     return {"output": run.output, "exit_code": run.exit_code, "still_running": run.exit_code is None} | (
         {"note": "The start of the output scrolled out of the terminal before it was read."} if run.truncated else {}
@@ -107,7 +116,7 @@ async def read_screen(
     await _shown(host)
     try:
         return await _herdr().screen(host, lines, user_pane)
-    except HerdrError as e:
+    except (HerdrError, *_PROBLEMS) as e:
         raise ToolError(str(e)) from None
 
 
@@ -158,7 +167,10 @@ async def _tunnels(host: str | None) -> list[dict[str, Any]]:
     """The tunnels of the hosts the user shows, or of one of them."""
     if host is not None:
         await _shown(host)
-    shown = {h.name for h in await service.shown_hosts()}
+    try:
+        shown = {h.name for h in await service.shown_hosts()}
+    except _PROBLEMS as e:
+        raise ToolError(str(e)) from None
     found = await _page("GET", "/api/tunnels")
     return [t for t in found if t["host"] in shown and host in (None, t["host"])]
 

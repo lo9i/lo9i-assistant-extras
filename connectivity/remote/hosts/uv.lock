@@ -252,6 +252,7 @@ name = "hosts"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "jinja2" },
     { name = "mcp" },
@@ -267,6 +268,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=46" },
     { name = "fastapi", specifier = ">=0.142.2" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "mcp", specifier = ">=2.2.0" },

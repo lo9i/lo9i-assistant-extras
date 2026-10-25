@@ -1,7 +1,9 @@
 import asyncio
 import os
 import signal
+import stat
 import sys
+from pathlib import Path
 
 import pytest
 from conftest import REMOTE_UP, UP, FakeProcess, FakeSpawn, settled
@@ -62,9 +64,9 @@ def test_each_type_says_where_it_goes():
 # The ssh command
 
 
-def test_the_command_forwards_through_the_configs_host(config):
-    args = command(LOCAL)
-    assert args[:3] == ["ssh", "-F", str(config)]
+def test_the_command_forwards_through_the_host_with_its_connections_options():
+    args = command(LOCAL, ["-F", "/tmp/hosts-ssh-x/config", "-o", "BatchMode=yes"])
+    assert args[:3] == ["ssh", "-F", "/tmp/hosts-ssh-x/config"]
     assert args[-2:] == ["--", "pi"]
     assert args[args.index("-L") + 1] == "127.0.0.1:15432:db.internal:5432"
     for option in ("BatchMode=yes", "ExitOnForwardFailure=yes", "ServerAliveInterval=15", "ServerAliveCountMax=3"):
@@ -81,9 +83,25 @@ def test_local_and_socks_listen_only_on_this_mac():
     assert tunnels.forward(ipv6) == ["-L", "127.0.0.1:8080:[::1]:80"]
 
 
-def test_no_config_set_means_the_users_own(monkeypatch):
-    monkeypatch.delenv("HOSTS_SSH_CONFIG")
-    assert command(SOCKS)[:2] == ["ssh", "-v"]
+async def test_its_ssh_reads_a_config_written_from_the_list_for_it_alone(spawn: FakeSpawn):
+    running = spawn.tunnels()
+    await running.start(LOCAL)
+    await settled(lambda: running.status(1).state == "running")
+    [args] = spawn.commands
+    assert args == command(LOCAL, [*args[1:3], "-o", "BatchMode=yes"])  # Never asks for anything.
+    assert "Host pi\n  HostName lo9i-pi.local\n  User lo9i\n  Port 22\n" in spawn.configs[0]
+    assert spawn.envs == [{}]  # No password: no helper.
+    config = Path(args[2])
+    assert config.is_file() and stat.S_IMODE(config.stat().st_mode) == 0o600
+    await running.stop(1)
+    assert not config.exists() and not config.parent.exists()  # Gone once ssh is.
+
+
+async def test_a_host_that_isnt_in_the_list_any_more_fails_saying_so(spawn: FakeSpawn):
+    running = spawn.tunnels()
+    await running.start(Tunnel(9, "gone", "Web", "local", 8080, "localhost", 80))
+    await settled(lambda: running.status(9).state == "failed")
+    assert "No host named 'gone'" in running.status(9).message and spawn.commands == []
 
 
 # What ssh said, in plain words
@@ -104,7 +122,7 @@ def test_no_config_set_means_the_users_own(monkeypatch):
             True,
         ),
         ("Error: remote port forwarding failed for listen port 15432", "pi wouldn't open port 15432", True),
-        ("/Users/me/.ssh/config: line 3: Bad configuration option: hostnme", "error in your SSH config", True),
+        ("/tmp/hosts-ssh-x/config: line 3: Bad configuration option: hostnme", "error in pi's other options", True),
         ("something nobody expected", "ssh stopped (exit code 255).", False),
     ],
 )
@@ -122,7 +140,7 @@ async def test_a_tunnel_runs_once_ssh_says_its_up_and_stops_when_switched_off(sp
     assert running.status(1).state == "stopped"
     assert (await running.start(LOCAL)).state == "starting"
     await settled(lambda: running.status(1).state == "running")
-    assert spawn.commands == [command(LOCAL)]
+    assert [args[-2:] for args in spawn.commands] == [["--", "pi"]]
     await running.start(LOCAL)  # Already on: nothing new starts.
     await asyncio.sleep(0.01)
     assert len(spawn.started) == 1
@@ -161,7 +179,10 @@ async def test_a_dropped_connection_comes_back_on_its_own(spawn: FakeSpawn):
     first.exit(255)
     await settled(lambda: len(spawn.started) == 2 and running.status(1).state == "running")
     assert spawn.waits == [1]
-    assert spawn.commands[0] == spawn.commands[1]
+    # The same, but for its config, written again for each try from the list as it is then.
+    first_args, second_args = spawn.commands
+    assert first_args[2] != second_args[2] and first_args[3:] == second_args[3:]
+    assert spawn.configs[0] == spawn.configs[1]
     await running.stop_all()
     assert spawn.started[1].terminated
 
@@ -237,7 +258,7 @@ async def test_what_trying_again_wont_fix_fails_at_once(spawn: FakeSpawn, err, s
 
 
 async def test_no_ssh_on_this_mac_fails(spawn: FakeSpawn):
-    async def missing(args):
+    async def missing(args, env):
         raise FileNotFoundError(2, "No such file or directory")
 
     running = Tunnels(missing, spawn.sleep)
@@ -281,8 +302,8 @@ time.sleep(60)
 async def test_a_real_ssh_process_ends_when_its_tunnel_stops():
     started = []
 
-    async def python(args):
-        process = await tunnels.spawn([sys.executable, "-c", _FAKE_SSH])
+    async def python(args, env):
+        process = await tunnels.spawn([sys.executable, "-c", _FAKE_SSH], env)
         started.append(process)
         return process
 

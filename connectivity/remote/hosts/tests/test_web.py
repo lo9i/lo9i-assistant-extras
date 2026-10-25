@@ -31,7 +31,7 @@ sys.exit(int(sys.argv[1]))
 
 
 def _terminal(code: int = 0, err: str = ""):
-    return lambda name: [sys.executable, "-c", _FAKE_TERMINAL, str(code), err]
+    return lambda name, options: [sys.executable, "-c", _FAKE_TERMINAL, str(code), err]
 
 
 @pytest.fixture
@@ -100,12 +100,12 @@ def test_hidden_hosts_leave_the_table_until_asked_for(client):
 
 
 def test_the_host_picked_shows_on_the_right_the_first_until_one_is(client):
-    page = client.get("/").text
-    assert '<div id="details" class="column">' in page and 'data-details="pi"' in page
-    assert 'hx-get="hosts/pi/tunnels" hx-trigger="load"' in page  # Its tunnels, in their own card.
-    page = client.get("/?host=nas").text
-    assert 'data-details="nas"' in page and 'data-details="pi"' not in page
-    assert 'data-details="pi"' in client.get("/?host=elsewhere").text
+    page = client.get("/").text  # By name: nas first.
+    assert '<div id="details" class="column">' in page and 'data-details="nas"' in page
+    assert 'hx-get="hosts/nas/tunnels" hx-trigger="load"' in page  # Its tunnels, in their own card.
+    page = client.get("/?host=pi").text
+    assert 'data-details="pi"' in page and 'data-details="nas"' not in page
+    assert 'data-details="nas"' in client.get("/?host=elsewhere").text
     assert client.get("/hosts/elsewhere/details").status_code == 404
 
 
@@ -160,7 +160,7 @@ def test_how_the_terminal_ended_tells_the_page_what_to_do(fake_herdr, code, err,
 
 
 def test_no_ssh_on_this_computer_says_so(fake_herdr):
-    client = TestClient(create_app(fake_herdr, lambda name: ["/nonexistent/ssh"]))
+    client = TestClient(create_app(fake_herdr, lambda name, options: ["/nonexistent/ssh"]))
     with client.websocket_connect("/hosts/pi/terminal") as ws:
         ended = ws.receive_json()
     assert ended["reason"] == "failed" and "couldn't start ssh" in ended["message"]

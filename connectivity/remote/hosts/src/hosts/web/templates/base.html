@@ -15,15 +15,39 @@
 <body class="{% block body_class %}{% endblock %}">
   {% block content %}{% endblock %}
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
   <script>
-    // Errors outside forms come back as plain text; show them instead of failing silently.
-    document.body.addEventListener("htmx:responseError", (e) => {
+    // What the page has to say, in a note at the bottom: a problem outside forms (which come back as plain text,
+    // shown instead of failing silently), or what a change did (app.py's toast and hosts-reload, which loads the
+    // page again first, with the host it names picked, and says it once loaded).
+    (() => {
+      const KEY = "hosts.toast";
       const toast = document.getElementById("toast");
-      toast.textContent = e.detail.xhr.responseText || "Something went wrong";
-      toast.hidden = false;
-      setTimeout(() => (toast.hidden = true), 6000);
-    });
+      let timer;
+      const say = (message, problem = false) => {
+        toast.textContent = message;
+        toast.classList.toggle("problem", problem);
+        toast.hidden = false;
+        clearTimeout(timer);
+        timer = setTimeout(() => (toast.hidden = true), 6000);
+      };
+      document.body.addEventListener("htmx:responseError", (e) => {
+        say(e.detail.xhr.responseText || "That didn't work. Try again in a moment.", true);
+      });
+      document.body.addEventListener("toast", (e) => say(e.detail.message));
+      document.body.addEventListener("hosts-reload", (e) => {
+        sessionStorage.setItem(KEY, e.detail.message);
+        const url = new URL(location.href);
+        if (e.detail.host) url.searchParams.set("host", e.detail.host);
+        else url.searchParams.delete("host");
+        location.replace(url);
+      });
+      const said = sessionStorage.getItem(KEY);
+      if (said) {
+        sessionStorage.removeItem(KEY);
+        say(said);
+      }
+    })();
   </script>
 </body>
 </html>

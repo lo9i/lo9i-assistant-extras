@@ -1,6 +1,6 @@
-"""SSH tunnels: ports forwarded through a host by ssh on this computer (the Mac lo9i runs on), with the
-user's SSH config, as `ssh -N` with -L, -R or -D. The web page (web/app.py) runs them, so they stop with it;
-the assistant's tools (mcp_server.py) start and stop them through it.
+"""SSH tunnels: ports forwarded through a host by ssh on this computer (the Mac lo9i runs on), with the host's
+details from the plugin's list (connect.py), as `ssh -N` with -L, -R or -D. The web page (web/app.py) runs
+them, so they stop with it; the assistant's tools (mcp_server.py) start and stop them through it.
 
 - local (-L): a port on this Mac (127.0.0.1 only) reaches target_host:target_port as the host sees it.
 - remote (-R): a port on the host reaches target_host:target_port as this Mac sees it.
@@ -19,23 +19,23 @@ import re
 import subprocess
 import sys
 from collections import deque
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Protocol
 
+from . import connect
+from .errors import ConnectError, LockedError, UnknownHostError
 from .ssh import lasting, problem
-from .sshconfig import ssh_options
 
 KINDS = {"local": "Local", "remote": "Remote", "socks": "SOCKS"}
 # Where local and SOCKS tunnels listen: only programs on this Mac reach them.
 LOOPBACK = "127.0.0.1"
 # ssh notices a dead connection within 45 seconds, and gives up connecting after 10. It runs with no
-# terminal, so it fails instead of asking for a password; nor does it share a connection the user's config
-# may keep open (ControlMaster), which would end it at once.
+# terminal, so it fails instead of asking for anything but a password the host has (connect.py); nor does it
+# share a connection the host's options may keep open (ControlMaster), which would end it at once.
 _OPTIONS = (
     "-v", "-N", "-T",
-    "-o", "BatchMode=yes",
     "-o", "ExitOnForwardFailure=yes",
     "-o", "ServerAliveInterval=15",
     "-o", "ServerAliveCountMax=3",
@@ -173,9 +173,10 @@ def forward(tunnel: Tunnel) -> list[str]:
     return ["-D", f"{LOOPBACK}:{tunnel.listen_port}"]
 
 
-def command(tunnel: Tunnel) -> list[str]:
-    """The whole ssh command line, to the host by its name in the SSH config."""
-    return ["ssh", *ssh_options(), *_OPTIONS, *forward(tunnel), "--", tunnel.host]
+def command(tunnel: Tunnel, options: Sequence[str]) -> list[str]:
+    """The whole ssh command line, to the host by its name in the plugin's list. `options`: the connection's
+    (connect.py)."""
+    return ["ssh", *options, *_OPTIONS, *forward(tunnel), "--", tunnel.host]
 
 
 def explain(tunnel: Tunnel, err: str, code: int) -> tuple[str, bool]:
@@ -193,10 +194,13 @@ def explain(tunnel: Tunnel, err: str, code: int) -> tuple[str, bool]:
     if "bad " in lowered and "specification" in lowered:
         return "ssh didn't accept this tunnel's ports or address.", True
     if "bad configuration option" in lowered or "terminating, " in lowered:
-        return "ssh stopped at an error in your SSH config (~/.ssh/config).", True
+        return f"ssh stopped at an error in {tunnel.host}'s other options. Edit the host on the Hosts page.", True
     message = f"Can't reach {tunnel.host}: {problem(err, f'ssh stopped (exit code {code}).')}"
     if "permission denied" in lowered:
-        message += " A tunnel can't ask for a passphrase: add the key to the SSH agent (ssh-add)."
+        message += (
+            " A tunnel can't ask for a passphrase: add the key to the SSH agent (ssh-add), or check the host's"
+            " password."
+        )
     return message, lasting(err)
 
 
@@ -211,11 +215,12 @@ class Process(Protocol):
     def kill(self) -> None: ...
 
 
-async def spawn(args: Sequence[str]) -> Process:
-    """ssh in the background, in the page's process group, so whatever stops the page stops it too."""
+async def spawn(args: Sequence[str], env: Mapping[str, str]) -> Process:
+    """ssh in the background, in the page's process group, so whatever stops the page stops it too. `env`: what
+    the connection adds to its environment (connect.py)."""
     return await asyncio.create_subprocess_exec(
         *args, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
-        env=_environment(),
+        env=_environment() | dict(env),
     )  # fmt: skip
 
 
@@ -242,7 +247,7 @@ class Tunnels:
 
     def __init__(
         self,
-        spawn: Callable[[Sequence[str]], Awaitable[Process]] = spawn,
+        spawn: Callable[[Sequence[str], Mapping[str, str]], Awaitable[Process]] = spawn,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         settle_seconds: float = _SETTLE_SECONDS,
     ) -> None:
@@ -259,7 +264,9 @@ class Tunnels:
     async def start(self, tunnel: Tunnel) -> Status:
         """Switches it on; one already on goes on as it is."""
         assert tunnel.id is not None
-        if tunnel.id not in self._tasks:
+        # One that just failed may not have left _tasks yet (its done callback runs later): it isn't on.
+        current = self._tasks.get(tunnel.id)
+        if current is None or current.done():
             self._status[tunnel.id] = Status("starting")
             task = asyncio.create_task(self._keep_up(tunnel), name=f"tunnel {tunnel.id}")
             self._tasks[tunnel.id] = task
@@ -299,6 +306,9 @@ class Tunnels:
             except OSError as e:
                 self._status[tunnel.id] = Status("failed", f"This Mac couldn't start ssh: {e.strerror or e}.")
                 return
+            except (UnknownHostError, LockedError, ConnectError) as e:
+                self._status[tunnel.id] = Status("failed", str(e))
+                return
             message, final = explain(tunnel, err, code)
             if final:
                 self._status[tunnel.id] = Status("failed", message)
@@ -317,8 +327,12 @@ class Tunnels:
         """Runs ssh until it exits: how long the tunnel was up (None if it never came up), what ssh said,
         its debug lines left out, and its exit code."""
         assert tunnel.id is not None
+        async with connect.session(tunnel.host) as c:
+            return await self._run(tunnel, await self._spawn(command(tunnel, [*c.options, *c.unattended]), c.env))
+
+    async def _run(self, tunnel: Tunnel, process: Process) -> tuple[float | None, str, int]:
+        assert tunnel.id is not None
         loop = asyncio.get_running_loop()
-        process = await self._spawn(command(tunnel))
         said: deque[str] = deque(maxlen=_KEPT_LINES)
         up_at: float | None = None
 

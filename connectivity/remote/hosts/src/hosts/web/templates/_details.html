@@ -1,6 +1,6 @@
-{# The host picked in the table (app.py's details): what checking it found, its terminal, hiding it, and its
-   tunnels, with their switches, Add, Edit and Delete (_tunnels.html, loaded into its card, which keeps itself
-   current). An offline host's terminal can't connect, so Terminal is off then. #}
+{# The host picked in the table (app.py's details): what checking it found, how it signs in, its terminal, changing,
+   hiding and deleting it, and its tunnels, with their switches, Add, Edit and Delete (_tunnels.html, loaded into
+   its card, which keeps itself current). An offline host's terminal can't connect, so Terminal is off then. #}
 {% set path = 'hosts/' ~ (h.name | urlencode) %}
 {% set offline = probe is not none and not probe.reachable %}
 <section class="details surface--glass" data-details="{{ h.name }}">
@@ -18,6 +18,13 @@
   <dl>
     <dt class="micro-label">Address</dt>
     <dd class="mono">{{ h.address or '—' }}</dd>
+    <dt class="micro-label">Signs in with</dt>
+    <dd>
+      {%- if h.key %}<span class="mono">{{ h.key }}</span>{% endif -%}
+      {%- if h.key and h.password %} or {% endif -%}
+      {%- if h.password %}its password{% endif -%}
+      {%- if not h.key and not h.password %}The SSH agent's keys{% endif -%}
+    </dd>
     <dt class="micro-label">Session</dt>
     <dd>
       {% if probe is none or not probe.reachable %}—
@@ -34,11 +41,14 @@
     {% else %}
     <a class="btn btn--sm btn--neutral" href="{{ path }}" target="_blank">Terminal</a>
     {% endif %}
+    <button class="btn btn--sm btn--neutral" hx-get="{{ path }}/edit" hx-target="#host-form" hx-swap="innerHTML">Edit</button>
     {% if h.hidden %}
     <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/show">Show</button>
     {% else %}
     <button class="btn btn--sm btn--ghost" hx-post="{{ path }}/hide" title="Leave it off this page and the assistant's list">Hide</button>
     {% endif %}
+    <button class="btn btn--sm btn--ghost" hx-delete="{{ path }}"
+            hx-confirm="Delete the host “{{ h.name }}” and its tunnels? Your SSH config stays as it is.">Delete</button>
   </div>
 </section>
 <section class="details tunnels-card surface--glass">

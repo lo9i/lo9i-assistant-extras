@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "The user's SSH hosts, with terminals that survive lost connections (Herdr)"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=46",
     "fastapi>=0.142.2",
     "jinja2>=3.1.6",
     "mcp>=2.2.0",
@@ -13,6 +14,7 @@ dependencies = [
 [project.scripts]
 hosts-mcp = "hosts.mcp_server:main"
 hosts-web = "hosts.web.app:main"
+hosts-askpass = "hosts.askpass:main"
 
 [dependency-groups]
 dev = [

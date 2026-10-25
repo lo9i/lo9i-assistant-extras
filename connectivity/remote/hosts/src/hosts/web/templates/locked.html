@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{# The hosts can't be read (vault.py): why, in place of the table, and nothing else. #}
+{% block title %}Hosts{% endblock %}
+{% block content %}
+<header class="topbar">
+  <h1>Hosts</h1>
+</header>
+<main class="screen">
+  <section class="table-card surface--glass">
+    <div class="empty">
+      <h2 class="text-heading">Your hosts can't be opened right now</h2>
+      <p class="text-meta locked-text">{{ message }}</p>
+    </div>
+  </section>
+</main>
+{% endblock %}

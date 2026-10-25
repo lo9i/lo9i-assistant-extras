@@ -1,9 +1,10 @@
-"""Web UI: the Hosts page (a table of the SSH config's hosts, each checked as the page loads, with its
-tunnels, which are switched on and off and added there too) and a terminal page per host (xterm.js over a
-WebSocket, terminal.py) with the host's tunnels beside it (tunnels.py), which this process runs, so they
-stop with it. lo9i starts it (see server.yaml) and shows it in its web app:
+"""Web UI: the Hosts page (a table of the plugin's hosts, each checked as the page loads, added, changed,
+deleted and imported from the SSH config there, with its tunnels, which are switched on and off and added
+there too) and a terminal page per host (xterm.js over a WebSocket, terminal.py) with the host's tunnels beside
+it (tunnels.py), which this process runs, so they stop with it. lo9i starts it (see server.yaml) and shows it in
+its web app:
 
-    HOSTS_DB=/path/hosts.db hosts-web --socket /path/web.sock
+    HOSTS_DB=/path/hosts.db LO9I_DATA_KEY=… hosts-web --socket /path/web.sock
 
 It listens only on a Unix socket that only lo9i's daemon reaches, so it has no login: the daemon lets only
 the user's paired devices through, the terminal's WebSocket too. The daemon serves it under a path
@@ -15,10 +16,12 @@ import argparse
 import asyncio
 import contextlib
 import hashlib
+import json
 import os
 import re
 import socket
 from collections.abc import AsyncIterator, Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -29,8 +32,10 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import db, service, tunnels
-from ..db import DuplicateTunnelError
+from .. import connect, db, details, service, tunnels
+from ..db import DuplicateHostError, DuplicateTunnelError
+from ..details import InvalidHostError
+from ..errors import ConnectError, LockedError
 from ..herdr import ATTACH, Herdr, HerdrError, Probe
 from ..service import Host, UnknownHostError, UnknownTunnelError
 from ..ssh import OpenSsh, terminal_command
@@ -136,7 +141,98 @@ def _hosts_routes(app: FastAPI) -> None:
         return Response(headers={"HX-Refresh": "true"})
 
 
-def _terminal_routes(app: FastAPI, command: Callable[[str], list[str]]) -> None:
+def _host_form_routes(app: FastAPI) -> None:
+    """Adding, changing and deleting hosts, and importing the SSH config's again (htmx): the form comes into the
+    hosts page's dialog, and once saved the page loads again with the host picked, saying so."""
+
+    @app.get("/new-host", response_class=HTMLResponse)
+    async def new_host(request: Request) -> HTMLResponse:
+        return _host_form(request, None, {}, {}, False)
+
+    @app.post("/new-host")
+    async def add_host(request: Request) -> Response:
+        return await _save_host(request, None)
+
+    @app.get("/hosts/{name}/edit", response_class=HTMLResponse)
+    async def edit_host(request: Request, name: str) -> HTMLResponse:
+        await service.host(name)
+        found = await service.details(name)
+        values = {
+            "name": name, "hostname": found.hostname, "user": found.user, "port": found.port,
+            "identity_file": found.identity_file, "options": details.options_text(found.options),
+        }  # fmt: skip
+        return _host_form(request, name, values, {}, bool(found.password))
+
+    @app.post("/hosts/{name}")
+    async def change_host(request: Request, name: str) -> Response:
+        await service.host(name)
+        return await _save_host(request, name)
+
+    @app.delete("/hosts/{name}")
+    async def delete_host(request: Request, name: str) -> Response:
+        await service.host(name)
+        for t in await service.tunnels(name):
+            await _tunnels(request).stop(t.id)
+        await service.delete_host(name)
+        return _reload(f"{name} is deleted, with its tunnels.", "")
+
+    @app.post("/import")
+    async def reimport() -> Response:
+        """The SSH config's hosts the list doesn't have; the ones it has stay as they are."""
+        added = await service.reimport()
+        if not added:
+            return _toast("Every host in your SSH config is here already. Nothing changed.")
+        names = ", ".join(added[:5]) + (f" and {len(added) - 5} more" if len(added) > 5 else "")
+        return _reload(f"Added from your SSH config: {names}.", added[0])
+
+
+def _host_form(
+    request: Request, editing: str | None, values: dict[str, Any], errors: dict[str, str], has_password: bool
+) -> HTMLResponse:
+    return _render(request, "_host_form.html", editing=editing, values=values, errors=errors, has_password=has_password)
+
+
+async def _save_host(request: Request, editing: str | None) -> Response:
+    """Saves the form's host and has the page load again with it, or answers the form again with what to change.
+    Changing a host leaves its saved password unless one is typed, or the user asks to remove it; its tunnels that
+    are on connect again as it is now. The password typed never comes back in the form."""
+    body = (await request.body()).decode(errors="replace")
+    values = {key: found[-1] for key, found in parse_qs(body, keep_blank_values=True).items()}
+    saved = await service.details(editing) if editing else None
+    try:
+        name, found = details.parse(
+            values.get("name", ""), values.get("hostname", ""), values.get("user", ""), values.get("port", ""),
+            values.get("identity_file", ""), values.get("options", ""), values.get("password", ""),
+        )  # fmt: skip
+        if saved is not None and editing is not None:
+            if not found.password and not values.get("remove_password"):
+                found = replace(found, password=saved.password)
+            await service.change_host(editing, name, found)
+            for t in await service.tunnels(name):
+                await _tunnels(request).restart(t)
+        else:
+            await service.add_host(name, found)
+    except InvalidHostError as e:
+        errors = e.errors
+    except DuplicateHostError as e:
+        errors = {"name": str(e)}
+    else:
+        return _reload(f"{name} is saved.", name)
+    values.pop("password", None)
+    return _host_form(request, editing, values, errors, bool(saved and saved.password))
+
+
+def _reload(message: str, host: str) -> Response:
+    """Has the hosts page load again, with `host` picked ("" for the first), and say `message` (base.html)."""
+    return Response(headers={"HX-Trigger": json.dumps({"hosts-reload": {"message": message, "host": host}})})
+
+
+def _toast(message: str) -> Response:
+    """Has the page say `message`, changing nothing else (base.html)."""
+    return Response(headers={"HX-Trigger": json.dumps({"toast": {"message": message}})})
+
+
+def _terminal_routes(app: FastAPI, command: Callable[[str, list[str]], list[str]]) -> None:
     @app.get("/hosts/{name}", response_class=HTMLResponse)
     async def terminal_page(request: Request, name: str) -> HTMLResponse:
         return _render(request, "terminal.html", h=await service.host(name))
@@ -158,17 +254,26 @@ def _terminal_routes(app: FastAPI, command: Callable[[str], list[str]]) -> None:
 
     @app.websocket("/hosts/{name}/terminal")
     async def terminal(websocket: WebSocket, name: str, cols: int = _COLS, rows: int = _ROWS) -> None:
+        """ssh with a config written for this connection (connect.py), deleted when it ends."""
         if not await _known(websocket, name):
             return
         await websocket.accept()
         try:
-            attached = await Terminal.start(command(name), cols, rows)
-        except OSError as e:
-            message = f"This computer couldn't start ssh: {e.strerror or e}."
-            await websocket.send_json({"type": "ended", "reason": "failed", "message": message})
-            await websocket.close()
-            return
-        await bridge(websocket, attached, name, lambda: service.connected(name))
+            async with connect.session(name) as c:
+                try:
+                    attached = await Terminal.start(command(name, c.options), cols, rows, c.env)
+                except OSError as e:
+                    await _end_terminal(websocket, f"This computer couldn't start ssh: {e.strerror or e}.")
+                    return
+                await bridge(websocket, attached, name, lambda: service.connected(name))
+        except (UnknownHostError, LockedError, ConnectError) as e:
+            await _end_terminal(websocket, str(e))
+
+
+async def _end_terminal(websocket: WebSocket, message: str) -> None:
+    """The terminal couldn't start: the page says why, and doesn't try again."""
+    await websocket.send_json({"type": "ended", "reason": "failed", "message": message})
+    await websocket.close()
 
 
 def _tunnel_routes(app: FastAPI) -> None:
@@ -353,10 +458,10 @@ def described(t: Tunnel, status: Status) -> dict[str, Any]:
 
 
 async def _known(websocket: WebSocket, name: str) -> bool:
-    """Whether the config has the host; if not, the connection is refused."""
+    """Whether the list has the host; if not, or it can't be read, the connection is refused."""
     try:
         await service.host(name)
-    except UnknownHostError:
+    except (UnknownHostError, LockedError):
         await websocket.close(1008, f"No host named {name}.")
         return False
     return True
@@ -383,13 +488,15 @@ class ForwardedPrefix:
         await self.app(scope, receive, send)
 
 
-def attach_command(name: str) -> list[str]:
-    """ssh to the host, attached to lo9i's Herdr session there."""
-    return terminal_command(name, ATTACH)
+def attach_command(name: str, options: list[str]) -> list[str]:
+    """ssh to the host, attached to lo9i's Herdr session there. `options`: the connection's (connect.py)."""
+    return terminal_command(name, ATTACH, options)
 
 
 def create_app(
-    herdr: Herdr | None = None, command: Callable[[str], list[str]] = attach_command, running: Tunnels | None = None
+    herdr: Herdr | None = None,
+    command: Callable[[str, list[str]], list[str]] = attach_command,
+    running: Tunnels | None = None,
 ) -> FastAPI:
     """Tests pass a Herdr over a fake ssh, a local command for the terminal, and tunnels over a fake ssh."""
 
@@ -412,9 +519,19 @@ def create_app(
     async def unknown(request: Request, exc: Exception) -> Response:
         return Response(str(exc), status_code=404, media_type="text/plain")
 
+    @app.exception_handler(LockedError)
+    async def locked(request: Request, exc: Exception) -> Response:
+        """The hosts can't be read: the page says why in its place, an htmx request in the page's notice."""
+        if request.headers.get("hx-request"):
+            return Response(str(exc), status_code=503, media_type="text/plain")
+        page = _render(request, "locked.html", message=str(exc))
+        page.status_code = 503
+        return page
+
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.add_middleware(ForwardedPrefix)
     _hosts_routes(app)
+    _host_form_routes(app)
     _tunnel_routes(app)
     _api_routes(app)
     _terminal_routes(app, command)
