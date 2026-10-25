@@ -1,4 +1,5 @@
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -201,6 +202,45 @@ def test_landing_page_shows_unpaid_by_default(client):
 def test_static_links_change_with_content(client):
     html = client.get("/").text
     assert '"static/app.css?v=' in html and '"static/htmx.min.js?v=' in html
+
+
+def test_bills_are_listed_in_their_assets_cards(client):
+    client.post("/assets", headers=HX, data={"name": "HR-V", "kind": "car"})
+    client.post("/bills", headers=HX, data={"obligation_id": "1", "amount": "100", "due_date": "2026-10-10"})
+    client.post("/bills", headers=HX, data={"amount": "30", "due_date": "2026-10-11", "category": "tax"})
+    client.post("/bills", headers=HX, data={"amount": "5", "due_date": "2026-10-12", "category": "tax", "asset_id": "boni"})
+
+    html = client.get("/?f_scope=all&f_status=").text
+    boni, rest = html.split('id="card-boni"')[1].split('id="card-hr-v"')
+    car, general = rest.split('id="card-none"')
+    assert 'id="bill-1"' in boni and 'id="bill-3"' in boni and "$105,00" in boni
+    assert "No bills here." in car and 'id="bill-' not in car
+    assert 'id="bill-2"' in general and "General" in general and "$30,00" in general
+
+    # One asset picked: only its card.
+    html = client.get("/?f_scope=all&f_status=&f_asset=boni").text
+    assert 'id="card-boni"' in html and 'id="card-hr-v"' not in html and 'id="card-none"' not in html
+
+
+def test_no_asset_card_shows_only_when_needed(client):
+    assert 'id="card-none"' not in client.get("/").text
+    assert 'id="card-none"' in client.get("/?f_asset=none").text
+
+
+def test_pressing_bills_and_this_month_stand_out(client):
+    today = date.today()
+    for offset in (-3, 0, 1, 5, 30):
+        due = (today + timedelta(days=offset)).isoformat()
+        client.post("/bills", headers=HX, data={"amount": "5", "due_date": due, "category": "tax"})
+    client.post("/bills", headers=HX, data={"amount": "5", "due_date": today.isoformat(), "category": "tax"})
+    client.post("/bills/6/status", headers=HX, data={"status": "paid"})
+
+    html = client.get("/?f_scope=all&f_status=").text
+    assert "3 days overdue" in html and "Due today" in html and "Due tomorrow" in html and "Due in 5 days" in html
+    assert 'class="row bill pending due-overdue" id="bill-1"' in html
+    assert 'class="row bill pending" id="bill-5"' in html  # A month away.
+    assert 'class="row bill paid" id="bill-6"' in html  # Paid: nothing pressing.
+    assert html.count('class="month now"') == 1 and "· this month" in html
 
 
 

@@ -126,6 +126,38 @@ details > summary:hover { color: var(--color-text-primary); }
 .est { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--color-warn); }
 .actions { display: flex; gap: 6px; align-items: center; }
 
+/* The Bills page: a card per asset with its bills, side by side where they fit, stacked on a phone. */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 12px; align-items: start; }
+.bill-card { padding: 0; min-width: 0; overflow: hidden; }
+.card-head { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-divider); }
+.card-head .main { flex: 1; min-width: 0; }
+.card-head .title { font-size: var(--font-size-md); line-height: 1.3; }
+.card-total { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.card-total strong { font-size: var(--font-size-md); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bill-card.quiet .card-head { border-bottom: 0; padding-bottom: 0; }
+.bill-card.quiet .card-head .title { color: var(--color-text-muted); }
+.bill-card .empty { padding: 8px 16px 12px; }
+.bill-card .month + .month { border-top: 1px solid var(--color-divider); }
+.bill-card .month > h3 { display: flex; justify-content: space-between; gap: 12px; margin: 0; padding: 12px 16px 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); font-variant-numeric: tabular-nums; }
+/* This month's bills: the app's accent on their heading and a faint wash of it behind them. */
+.bill-card .month.now { background: color-mix(in srgb, var(--color-accent) 6%, transparent); box-shadow: inset 3px 0 0 var(--color-accent); }
+.bill-card .month.now > h3 { color: var(--color-accent); }
+
+/* A bill: its name and amount, then when it's due and what to do with it. */
+.row.bill { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; }
+.row.bill .title { min-width: 0; overflow-wrap: anywhere; }
+.row.bill .amount { text-align: right; }
+.row.bill .actions { justify-content: flex-end; }
+.bill-card .row.editing { margin: 8px; }
+.status-dot { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; vertical-align: middle; background: var(--tone, var(--color-text-faint)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, var(--color-text-faint)) 18%, transparent); }
+.status-dot.pending { --tone: var(--color-warn); }
+.status-dot.paid { --tone: var(--color-success); }
+/* An unpaid bill that's overdue, due today or due within a week: a tag by its name; the first two also
+   get an amber edge. */
+.due-tag { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; vertical-align: 1px; white-space: nowrap; color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 14%, transparent); }
+.due-overdue .due-tag, .due-today .due-tag { color: #18181b; background: var(--color-warn); }
+.row.due-overdue, .row.due-today { box-shadow: inset 3px 0 0 var(--color-warn); background: color-mix(in srgb, var(--color-warn) 7%, transparent); }
+
 .group { padding: 12px 16px; }
 .group-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding-bottom: 8px; border-bottom: 1px solid var(--color-divider); }
 .group-head .main { flex: 1 1 200px; }
@@ -212,12 +244,22 @@ button.ok, button.ghost.ok { color: var(--color-success); }
 
 form.inline { display: flex; gap: 8px; }
 
-.error { color: var(--color-danger); margin: 0; font-size: var(--font-size-xs); }
-/* Errors and conflicts (base.html's toast, a section's banner). */
+/* Errors and conflicts (a form's error, base.html's toast, a section's banner): the page's text on a
+   surface marked by a coloured edge, not red text. */
+.error, .banner {
+  color: var(--color-text-primary);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  border-left: 3px solid var(--color-danger);
+}
+.error {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: var(--font-size-xs);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border-radius: var(--radius-sm);
+}
 .banner {
   background: var(--surface-modal-bg);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
-  color: var(--color-danger);
   border-radius: var(--radius-md);
   padding: 12px 16px;
   margin: 0 0 12px;
@@ -230,4 +272,5 @@ form.inline { display: flex; gap: 8px; }
   .tiles { grid-template-columns: 1fr; gap: 6px; }
   .tile { flex-direction: row; justify-content: space-between; align-items: baseline; padding: 8px 12px; }
   .row .actions { width: 100%; justify-content: flex-end; }
+  .row.bill .actions { grid-column: 1 / -1; }
 }
