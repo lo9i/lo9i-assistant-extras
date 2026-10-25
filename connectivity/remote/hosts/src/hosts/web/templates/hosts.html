@@ -7,9 +7,11 @@
     {% if hidden_count %}
     <a class="btn btn--sm btn--neutral" href="{{ './' if showing_hidden else './?hidden=true' }}">{{ 'Hide hidden hosts' if showing_hidden else 'Show hidden hosts' }}</a>
     {% endif %}
+    <button class="btn btn--sm btn--neutral" hx-post="import" title="Adds the hosts of your SSH config (~/.ssh/config) that aren't here. Changes none, and never writes to it.">Re-import from SSH config</button>
     {% if hosts %}
-    <button class="btn btn--sm btn--primary" hx-get="tunnels/new" hx-target="#tunnel-form" hx-swap="innerHTML">New tunnel</button>
+    <button class="btn btn--sm btn--neutral" hx-get="tunnels/new" hx-target="#tunnel-form" hx-swap="innerHTML">New tunnel</button>
     {% endif %}
+    <button class="btn btn--sm btn--primary" hx-get="new-host" hx-target="#host-form" hx-swap="innerHTML">Add host</button>
   </div>
 </header>
 
@@ -19,7 +21,7 @@
       <div>
         <h2 class="text-heading">Your hosts</h2>
         <p class="text-meta">
-          From your SSH config.{% if hidden_count %} {{ hidden_count }} hidden.{% endif %}
+          Kept here, encrypted.{% if hidden_count %} {{ hidden_count }} hidden.{% endif %}
           {% if hosts %}Click one to see it on the right.{% endif %}
         </p>
       </div>
@@ -57,7 +59,13 @@
     {% elif hidden_count %}
     <p class="empty">Every host is hidden. <a href="./?hidden=true">Show hidden hosts</a> to bring some back.</p>
     {% else %}
-    <p class="empty">Your SSH config (~/.ssh/config) has no hosts. Add a <span class="mono">Host</span> entry there, then reload this page.</p>
+    <div class="empty">
+      <p>No hosts yet. Add one, or bring in the ones of your SSH config (~/.ssh/config), which stays as it is.</p>
+      <div class="empty-actions">
+        <button class="btn btn--sm btn--neutral" hx-post="import">Re-import from SSH config</button>
+        <button class="btn btn--sm btn--primary" hx-get="new-host" hx-target="#host-form" hx-swap="innerHTML">Add host</button>
+      </div>
+    </div>
     {% endif %}
   </section>
 
@@ -68,22 +76,25 @@
     {% endif %}
   </div>
 </main>
-{# Adding or changing a tunnel: the form (_tunnel_form.html) comes in here, and the dialog closes once it's saved
-   (the answer is empty and says tunnels-changed) or cancelled. #}
-<dialog id="tunnel-dialog" class="tunnel-dialog">
+{# Adding or changing a tunnel, or a host: the form (_tunnel_form.html, _host_form.html) comes into its dialog, which
+   closes once it's saved (the answer is empty and says tunnels-changed, or hosts-reload) or cancelled. #}
+<dialog id="tunnel-dialog" class="form-dialog">
   <div id="tunnel-form"></div>
 </dialog>
+<dialog id="host-dialog" class="form-dialog">
+  <div id="host-form"></div>
+</dialog>
 <script>
-  (() => {
-    const dialog = document.getElementById("tunnel-dialog");
-    const form = document.getElementById("tunnel-form");
+  for (const [dialogId, formId] of [["tunnel-dialog", "tunnel-form"], ["host-dialog", "host-form"]]) {
+    const dialog = document.getElementById(dialogId);
+    const form = document.getElementById(formId);
     document.body.addEventListener("htmx:afterSwap", (e) => {
       if (e.detail.target !== form) return;
       if (form.childElementCount && !dialog.open) dialog.showModal();
       else if (!form.childElementCount) dialog.close();
     });
     dialog.addEventListener("close", () => form.replaceChildren());
-  })();
+  }
 </script>
 <script src="{{ asset('table.js') }}"></script>
 {% endblock %}

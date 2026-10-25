@@ -220,7 +220,7 @@ async def test_a_host_that_doesnt_answer_says_why_in_plain_words(ssh: FakeSsh, f
 async def test_a_key_the_host_refuses_says_to_check_it(ssh: FakeSsh, fake_herdr):
     ssh.answers[herdr._READY] = answers(255, err="lo9i@pi: Permission denied (publickey).\n")
     with pytest.raises(
-        UnreachableError, match=re.escape("didn't accept this computer's SSH key. Check it in a terminal")
+        UnreachableError, match=re.escape("SSH key, or the host's password. Check its details on the Hosts page")
     ):
         await fake_herdr.run("pi", "uptime", 10)
 

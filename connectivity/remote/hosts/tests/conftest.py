@@ -1,13 +1,15 @@
 """SSH as the tests see it: a fake that answers each of herdr.py's scripts as a host would, a fake of the
-tunnels' ssh processes, and an SSH config of their own (HOSTS_SSH_CONFIG, which `ssh -G` reads offline).
-Nothing here reaches a network."""
+tunnels' ssh processes, an SSH config of their own to import the hosts from (HOSTS_SSH_CONFIG), a database of
+their own and a key to encrypt it (LO9I_DATA_KEY, which lo9i gives the plugin). Nothing here reaches a network."""
 
 import asyncio
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 from hosts import herdr
 from hosts.ssh import Result
@@ -120,11 +122,16 @@ class FakeSpawn:
 
     processes: list[Callable[[], FakeProcess]] = field(default_factory=list)
     commands: list[list[str]] = field(default_factory=list)
+    # What each try's ssh config said (the file is gone once it ends), and what its environment got.
+    configs: list[str] = field(default_factory=list)
+    envs: list[dict[str, str]] = field(default_factory=list)
     started: list[FakeProcess] = field(default_factory=list)
     waits: list[float] = field(default_factory=list)
 
-    async def __call__(self, args: Sequence[str]) -> FakeProcess:
+    async def __call__(self, args: Sequence[str], env: Mapping[str, str] | None = None) -> FakeProcess:
         self.commands.append(list(args))
+        self.configs.append(Path(args[args.index("-F") + 1]).read_text() if "-F" in args else "")
+        self.envs.append(dict(env or {}))
         process = self.processes.pop(0)() if self.processes else FakeProcess([UP])
         self.started.append(process)
         return process
@@ -151,7 +158,8 @@ def spawn() -> FakeSpawn:
 
 @pytest.fixture(autouse=True)
 def config(tmp_path, monkeypatch):
-    """The tests' SSH config and database, and a home folder of their own."""
+    """The tests' SSH config, which the hosts are imported from the first time they're asked for, their database
+    and its key, and a home folder of their own."""
     home = tmp_path / "home"
     (home / ".ssh").mkdir(parents=True)
     path = home / ".ssh" / "config"
@@ -159,4 +167,5 @@ def config(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("HOSTS_SSH_CONFIG", str(path))
     monkeypatch.setenv("HOSTS_DB", str(tmp_path / "hosts.db"))
+    monkeypatch.setenv("LO9I_DATA_KEY", Fernet.generate_key().decode())
     return path

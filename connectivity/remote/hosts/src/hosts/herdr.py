@@ -163,7 +163,7 @@ class Herdr:
         self._ssh = ssh
 
     async def probe(self, host: str) -> Probe:
-        """Whether the host answers, has Herdr, and runs lo9i's session. Never asks for a password."""
+        """Whether the host answers, has Herdr, and runs lo9i's session. Never waits for anyone to answer ssh."""
         result = await self._ssh.run(host, _PROBE, timeout=12)
         if result.code in (SSH_FAILED, TIMED_OUT):
             return Probe(False, problem=_unreachable(host, result.err, result.code))
@@ -272,7 +272,7 @@ def _unreachable(host: str, err: str, code: int) -> str:
     if code == TIMED_OUT:
         return f"{host} didn't answer in time."
     reason = problem(err)
-    return f"Can't reach {host}: {reason}" + (" Check it in a terminal with `ssh`." if lasting(err) else "")
+    return f"Can't reach {host}: {reason}" + (" Check its details on the Hosts page." if lasting(err) else "")
 
 
 def _herdr_error(text: str) -> str:

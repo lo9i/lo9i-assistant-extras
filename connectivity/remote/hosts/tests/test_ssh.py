@@ -3,6 +3,7 @@
 import os
 import shlex
 import stat
+from pathlib import Path
 
 import pytest
 
@@ -30,7 +31,8 @@ def fake_ssh(tmp_path, monkeypatch):
 async def test_a_script_runs_with_sh_on_the_host_never_asking_for_a_password(fake_ssh, config):
     result = await OpenSsh().run("pi", "echo $1", "a b; rm -rf ~")
     args = result.out.splitlines()
-    assert args[:2] == ["-F", str(config)]
+    assert args[0] == "-F" and args[1] != str(config)  # Its own config, from the list, never the user's.
+    assert not Path(args[1]).exists()  # Gone once ssh is.
     assert "BatchMode=yes" in args and "-T" in args
     host_at = args.index("--") + 1
     assert args[host_at] == "pi"
@@ -49,8 +51,9 @@ async def test_a_command_that_takes_too_long_is_stopped(fake_ssh, monkeypatch):
 
 
 def test_the_terminal_gets_a_terminal_and_notices_a_dead_network():
-    command = ssh.terminal_command("pi", "exec herdr")
-    assert command[0] == "ssh" and "-tt" in command and "ServerAliveInterval=10" in command
+    command = ssh.terminal_command("pi", "exec herdr", ["-F", "/tmp/hosts-ssh-x/config"])
+    assert command[:3] == ["ssh", "-F", "/tmp/hosts-ssh-x/config"]
+    assert "-tt" in command and "ServerAliveInterval=10" in command
     assert command[-2:] == ["pi", "sh -c 'exec herdr' sh"]
     assert command[-3] == "--"
 

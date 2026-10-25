@@ -42,6 +42,13 @@ def _until(client, text: str, path: str = "/hosts/pi/tunnels") -> str:
         time.sleep(0.01)
 
 
+def _spawned(spawn: FakeSpawn, count: int) -> None:
+    """Waits for the tunnels' tasks, on the client's loop, to have started `count` ssh processes."""
+    deadline = time.monotonic() + 3
+    while len(spawn.started) < count and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+
 def test_the_terminal_page_has_the_hosts_tunnels_beside_it(client):
     page = client.get("/hosts/pi").text
     assert 'id="tunnels-toggle"' in page and 'id="tunnels"' in page
@@ -155,6 +162,7 @@ def test_changing_a_tunnel_thats_on_runs_it_again_as_changed(client, spawn: Fake
     response = client.post(f"/hosts/pi/tunnels/{t.id}", content=urlencode(values), headers=FORM)
     assert response.headers["HX-Trigger"] == "tunnels-changed"
     _until(client, "localhost:25432")
+    _spawned(spawn, 2)  # Its ssh starts again once its config is written for it.
     assert spawn.started[0].terminated and "127.0.0.1:25432:db.internal:5432" in spawn.commands[-1]
 
 
@@ -162,6 +170,7 @@ def test_deleting_a_tunnel_stops_it(client, spawn: FakeSpawn):
     _add(client)
     [t] = _saved()
     client.post(f"/hosts/pi/tunnels/{t.id}/start")
+    _until(client, "Running")
     listed = client.delete(f"/hosts/pi/tunnels/{t.id}").text
     assert "No tunnels yet." in listed and _saved() == []
     assert spawn.started[0].terminated
@@ -185,6 +194,7 @@ def test_closing_the_page_stops_every_tunnel(fake_herdr, spawn: FakeSpawn):
         for t in _saved():
             client.post(f"/hosts/pi/tunnels/{t.id}/start")
         _until(client, "Running")
+        _spawned(spawn, 2)
     assert len(spawn.started) == 2 and all(p.terminated for p in spawn.started)
 
 

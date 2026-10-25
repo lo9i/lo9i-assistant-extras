@@ -1,0 +1,62 @@
+{# Adding a host, or changing one (`editing`, its name). `values` are its fields as typed, `errors` what to change
+   in them, by field. Its password never comes here: `has_password` says whether one is saved, which stays unless
+   one is typed or the user asks to remove it. What's typed is kept encrypted (app.py's _save_host). #}
+{% macro error(field) %}{% if errors[field] %}<span class="field-error">{{ errors[field] }}</span>{% endif %}{% endmacro %}
+<form class="host-form" hx-post="{{ ('hosts/' ~ (editing | urlencode)) if editing else 'new-host' }}" hx-target="#host-form">
+  <h3 class="text-heading">{{ 'Edit “' ~ editing ~ '”' if editing else 'New host' }}</h3>
+
+  <label class="field">
+    <span>Name</span>
+    <input class="input" name="name" value="{{ values.name or '' }}" placeholder="pi" maxlength="63" required autofocus autocapitalize="off" spellcheck="false">
+    {{ error("name") }}
+  </label>
+
+  <div class="field-row">
+    <label class="field">
+      <span>Address</span>
+      <input class="input" name="hostname" value="{{ values.hostname or '' }}" placeholder="pi.local or 192.168.1.20" required autocapitalize="off" spellcheck="false">
+      {{ error("hostname") }}
+    </label>
+    <label class="field port">
+      <span>Port</span>
+      <input class="input" name="port" value="{{ values.port or '' }}" inputmode="numeric" placeholder="22">
+      {{ error("port") }}
+    </label>
+  </div>
+
+  <label class="field">
+    <span>User</span>
+    <input class="input" name="user" value="{{ values.user or '' }}" placeholder="Yours on this Mac if empty" autocapitalize="off" spellcheck="false">
+    {{ error("user") }}
+  </label>
+
+  <label class="field">
+    <span>Key file</span>
+    <input class="input mono-input" name="identity_file" value="{{ values.identity_file or '' }}" placeholder="~/.ssh/id_ed25519" autocapitalize="off" spellcheck="false">
+    <span class="text-meta">Its path on this Mac. Only the path is kept, never the key. Empty: the SSH agent's and ssh's usual keys.</span>
+    {{ error("identity_file") }}
+  </label>
+
+  <label class="field">
+    <span>Password</span>
+    <input class="input" type="password" name="password" autocomplete="new-password"
+           placeholder="{{ 'Saved. Type a new one to change it' if has_password else 'Only for a host that signs in with one' }}">
+    <span class="text-meta">Kept encrypted, and given to ssh only when it asks.</span>
+    {{ error("password") }}
+  </label>
+  {% if has_password %}
+  <label class="check"><input type="checkbox" name="remove_password" value="1"> Remove the saved password</label>
+  {% endif %}
+
+  <label class="field">
+    <span>Other options</span>
+    <textarea class="input mono-input" name="options" rows="4" placeholder="ServerAliveInterval 30&#10;ProxyJump bastion" autocapitalize="off" spellcheck="false">{{ values.options or '' }}</textarea>
+    <span class="text-meta">One a line, as in an SSH config.</span>
+    {{ error("options") }}
+  </label>
+
+  <div class="form-actions">
+    <button type="button" class="btn btn--sm btn--ghost" onclick="this.closest('dialog')?.close()">Cancel</button>
+    <button class="btn btn--sm btn--primary">{{ 'Save' if editing else 'Add host' }}</button>
+  </div>
+</form>

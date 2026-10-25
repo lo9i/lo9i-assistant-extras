@@ -18,12 +18,13 @@ def test_a_database_from_before_tunnels_gets_their_table_and_keeps_its_hosts(tmp
     conn = db.connect(path)
     assert db.hidden(conn) == {"nas"}
     assert db.last_connected(conn) == {"nas": "2026-10-01T10:00:00+00:00"}
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
     assert db.tunnels(conn) == []
+    assert db.hosts(conn) == [] and not db.imported(conn)  # Not hosts until the import gives them details.
     conn.close()
     # Connecting again changes nothing.
     conn = db.connect(path)
-    assert db.hidden(conn) == {"nas"} and conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert db.hidden(conn) == {"nas"} and conn.execute("PRAGMA user_version").fetchone()[0] == 4
     conn.close()
 
 

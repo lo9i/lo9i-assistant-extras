@@ -55,7 +55,7 @@ async def test_checking_says_which_answer_and_run_herdr(ssh: FakeSsh):
         answers(out=sessions)() if ssh.calls[-1][0] == "pi" else answers(255, err="Connection refused")()
     )
     listed = (await call("list_hosts", {})).structured_content["result"]
-    pi, nas = listed
+    nas, pi = listed  # By name.
     assert (pi["reachable"], pi["herdr_installed"], pi["session_running"]) == (True, True, True)
     assert not nas["reachable"] and "refused the connection" in nas["problem"]
 

@@ -51,13 +51,14 @@ class Terminal:
         self._errors = asyncio.create_task(process.stderr.read())
 
     @classmethod
-    async def start(cls, command: Sequence[str], cols: int, rows: int) -> "Terminal":
+    async def start(cls, command: Sequence[str], cols: int, rows: int, env: dict[str, str] | None = None) -> "Terminal":
+        """`env`: what the command's environment gets on top of the page's (connect.py's)."""
         master, child = pty.openpty()
         _set_size(master, cols, rows)
         try:
             process = await asyncio.create_subprocess_exec(
                 *command, stdin=child, stdout=child, stderr=asyncio.subprocess.PIPE,
-                env=os.environ | {"TERM": "xterm-256color"}, preexec_fn=partial(_take_terminal, child),
+                env=os.environ | {"TERM": "xterm-256color"} | (env or {}), preexec_fn=partial(_take_terminal, child),
             )  # fmt: skip
         except BaseException:
             os.close(master)
