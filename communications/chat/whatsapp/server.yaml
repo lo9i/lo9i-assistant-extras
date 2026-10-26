@@ -1,6 +1,6 @@
 # Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
 # in lo9i's core/mcp/install.py and docs/channel-plugins.md. {data} is a folder for its data that updates leave
-# alone, {bin} the scripts of its own environment (built from its uv.lock), {socket} where the web page listens.
+# alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: whatsapp
 # Shown in the Plugins page; raise it with every change worth updating to.
 version: 0.1.0
@@ -16,11 +16,11 @@ fields:
 # Shown above the field when installing.
 steps:
   - "The assistant joins your own WhatsApp as a linked device, like WhatsApp Web, and talks to you only in your chat with yourself (Message yourself). It never reads, answers or marks read any other chat or group."
-  - "After installing, open the WhatsApp page in the web app and scan its QR code with your phone: WhatsApp → Settings → Linked devices → Link a device. The link stays when the assistant restarts."
-  - "No camera at hand, or using the terminal app? Enter your number below (for example +54 9 11 1234 5678), and the setup in Plugins offers a code to type in WhatsApp instead."
+  - "After installing, the setup in Plugins shows a QR code. Scan it with your phone: WhatsApp → Settings → Linked devices → Link a device. The link stays when the assistant restarts."
+  - "Using the assistant on the same phone, so there's nothing to scan? Enter your number below (for example +54 9 11 1234 5678), and the setup also offers a code to type in WhatsApp instead."
   - "WhatsApp doesn't allow assistants on personal numbers officially. The plugin writes little and slowly, but use it at your own risk."
 env:
-  # The linked session (whatsapp.db) and what the page shows (state.json) live here.
+  # The linked session (whatsapp.db) lives here.
   WHATSAPP_DATA: "{data}"
 trusted: false
 
@@ -31,9 +31,3 @@ channel:
   # The channel protocol it speaks (lo9i's docs/channel-plugins.md).
   protocol: 2
   style: A WhatsApp chat. Short messages. Simple Markdown only (bold, italics, code); no tables or headings.
-
-# The page lo9i shows as WhatsApp in its web app: the QR code to link the account, read from what the
-# channel writes in {data}. lo9i signs the user in and serves it under /whatsapp/ (X-Forwarded-Prefix).
-page:
-  command: "{bin}/lo9i-whatsapp-page"
-  args: [--socket, "{socket}"]

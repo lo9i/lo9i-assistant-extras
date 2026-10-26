@@ -1,6 +1,6 @@
-"""What the apps show for WhatsApp: whether the account is linked and where to talk to the assistant, or how to
-link it, with buttons for a new QR code, a code to type instead, and unlinking. Each item is `kind` (text,
-code, copy or action), `label` and `value`."""
+"""What the apps show for WhatsApp: whether the account is linked and where to talk to the assistant, or the QR
+code that links it, with buttons for a new QR code, a code to type instead, and unlinking. Each item is `kind` (text,
+code, copy, qr or action), `label` and `value`. A QR item's value is the text it encodes; each app draws it."""
 
 from lo9i_whatsapp.link import Snapshot, State
 
@@ -8,10 +8,7 @@ NEW_QR = "new-qr"
 LINK_CODE = "link-code"
 UNLINK = "unlink"
 
-_SCAN = (
-    "Not linked yet. Open the WhatsApp page in the web app and scan its QR code with your phone: "
-    "WhatsApp → Settings → Linked devices → Link a device."
-)
+_SCAN = "Not linked yet. On your phone: WhatsApp → Settings → Linked devices → Link a device, and scan this code."
 _TYPE = "On your phone: WhatsApp → Settings → Linked devices → Link a device → Link with phone number instead."
 
 
@@ -29,7 +26,8 @@ def items(link: Snapshot, phone_given: bool) -> list[dict[str, str]]:
         case State.WAITING:
             code = [_item("code", "Link code", link.code), _item("text", "", _TYPE)] if link.code else []
             ask = [_item("action", "Link with a code instead", LINK_CODE)] if phone_given and not link.code else []
-            return [*problem, _item("text", "", _SCAN), *code, *ask]
+            qr = _item("qr", "Scan with WhatsApp", link.qr)
+            return [*problem, _item("text", "", _SCAN), qr, *code, *ask]
         case State.EXPIRED:
             return [*problem, _item("text", "", "The QR code expired."), _item("action", "New QR code", NEW_QR)]
         case State.FAILED:

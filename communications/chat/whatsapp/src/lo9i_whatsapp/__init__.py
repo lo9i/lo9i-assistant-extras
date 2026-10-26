@@ -1,5 +1,5 @@
 """The WhatsApp channel: the user's own WhatsApp account, linked like WhatsApp Web, that lo9i runs as a plugin
-process (app.py), and the page that shows the QR code to link it (web/app.py).
+process (app.py).
 
 neonize imports python-magic, which needs the libmagic library, which a Mac doesn't have unless Homebrew put it
 there. The channel never asks it what a file is (it sends only text), so without libmagic a stand-in that says

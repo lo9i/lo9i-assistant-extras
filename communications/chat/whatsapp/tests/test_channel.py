@@ -46,8 +46,8 @@ class FakeWhatsApp:
 
 
 @pytest.fixture
-def setup(tmp_path):
-    client, link, whatsapp, choices = FakeClient(), Link(tmp_path), FakeWhatsApp(), Choices()
+def setup():
+    client, link, whatsapp, choices = FakeClient(), Link(), FakeWhatsApp(), Choices()
     channel = WhatsAppChannel(client, link, whatsapp, SelfChat(whatsapp, choices), phone_given=True)
     return channel, client, link, whatsapp, choices
 
@@ -57,7 +57,8 @@ async def test_the_status_follows_the_link(setup):
     await channel.hello("Max", [])
     assert client.statuses[-1] == [("text", "", "Connecting to WhatsApp…")]
     await link.waiting("2@abc")
-    assert client.statuses[-1][0][2].startswith("Not linked yet. Open the WhatsApp page")
+    assert client.statuses[-1][0][2].startswith("Not linked yet. On your phone: WhatsApp → Settings")
+    assert client.statuses[-1][1] == ("qr", "Scan with WhatsApp", "2@abc")
     assert client.statuses[-1][-1] == ("action", "Link with a code instead", LINK_CODE)
     await link.code("ABCD-EFGH")
     assert ("code", "Link code", "ABCD-EFGH") in client.statuses[-1]

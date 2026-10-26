@@ -46,7 +46,7 @@ def main() -> None:
 
 
 async def run(environ: Mapping[str, str]) -> None:
-    # lo9i stops the process with SIGTERM: the connection closes and the page learns it stopped.
+    # lo9i stops the process with SIGTERM: the connection closes before it ends.
     current = asyncio.current_task()
     if current is not None:
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, current.cancel)
@@ -54,7 +54,7 @@ async def run(environ: Mapping[str, str]) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     folder.chmod(0o700)
     phone = environ.get("WHATSAPP_PHONE", "").strip()
-    daemon, link, choices = Daemon.from_env(environ), Link(folder), Choices()
+    daemon, link, choices = Daemon.from_env(environ), Link(), Choices()
     whatsapp = WhatsApp(folder, link, phone)
     chat = SelfChat(whatsapp, choices)
     whatsapp.on_message = Handlers(daemon, chat, choices).message
@@ -64,7 +64,6 @@ async def run(environ: Mapping[str, str]) -> None:
             tasks.create_task(whatsapp.run())
             tasks.create_task(Runner(daemon, channel, LIMITS).run())
     finally:
-        link.stopped()
         await daemon.aclose()
 
 

@@ -141,7 +141,6 @@ THEME_SCRIPTS = [
     "apps/finance/expenses/src/expenses/web/static/theme.js",
     "apps/media/watchlist/src/watchlist/web/static/theme.js",
     "software/factory/factory/src/lo9i_factory/web/static/theme.js",
-    "communications/chat/whatsapp/src/lo9i_whatsapp/web/static/theme.js",
 ]
 
 

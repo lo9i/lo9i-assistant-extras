@@ -1,21 +1,9 @@
 """Whether the account is linked, and what linking it needs: the QR code to scan, or a code to type. The apps show
-it in the channel's setup (status.py) and the page shows the QR code; the page runs in a process of its own, so
-every change is also written to `$WHATSAPP_DATA/state.json`, where it reads it (web/app.py). The page asks for
-a new QR code by creating `$WHATSAPP_DATA/new-qr`."""
+it in the channel's setup (status.py), the QR code included, so every change is published."""
 
-import asyncio
-import json
-import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from enum import StrEnum
-from pathlib import Path
-from typing import Any
-
-logger = logging.getLogger(__name__)
-
-FILE = "state.json"
-NEW_QR_FILE = "new-qr"
 
 Listener = Callable[[], Awaitable[None]]
 
@@ -30,8 +18,6 @@ class State(StrEnum):
     LINKED = "linked"
     # WhatsApp won't connect the account (a ban, an outdated version); `problem` says why.
     FAILED = "failed"
-    # The channel isn't running.
-    STOPPED = "stopped"
 
 
 @dataclass(frozen=True)
@@ -48,8 +34,7 @@ class Snapshot:
 
 
 class Link:
-    def __init__(self, folder: Path) -> None:
-        self._path = folder / FILE
+    def __init__(self) -> None:
         self._now = Snapshot()
         self._listeners: list[Listener] = []
 
@@ -89,50 +74,9 @@ class Link:
     async def failed(self, problem: str) -> None:
         await self._set(Snapshot(State.FAILED, phone=self._now.phone, name=self._now.name, problem=problem))
 
-    def stopped(self) -> None:
-        """When the channel ends; nobody listens any more."""
-        self._now = Snapshot(State.STOPPED)
-        self._write()
-
-    def asked_for_new_qr(self) -> bool:
-        """Whether the page asked for a new QR code since the last time; the request is used up."""
-        request = self._path.with_name(NEW_QR_FILE)
-        try:
-            request.unlink()
-        except FileNotFoundError:
-            return False
-        return True
-
     async def _set(self, snapshot: Snapshot) -> None:
         if snapshot == self._now:
             return
         self._now = snapshot
-        await asyncio.to_thread(self._write)
         for listener in self._listeners:
             await listener()
-
-    def _write(self) -> None:
-        """Written whole to a temporary file first, so the page never reads half of it. Only this user may read
-        it: the QR code links the account."""
-        try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self._path.with_suffix(".tmp")
-            temporary.write_text(json.dumps(asdict(self._now)))
-            temporary.chmod(0o600)
-            temporary.replace(self._path)
-        except OSError as e:
-            logger.warning("Couldn't write %s: %s", self._path, e)
-
-
-def read(folder: Path) -> Snapshot:
-    """What the channel last wrote; STOPPED when it never ran."""
-    try:
-        data: dict[str, Any] = json.loads((folder / FILE).read_text())
-        return Snapshot(**{**data, "state": State(data["state"])})
-    except (OSError, ValueError, KeyError, TypeError):
-        return Snapshot(State.STOPPED)
-
-
-def ask_for_new_qr(folder: Path) -> None:
-    """The page's request for a new QR code, which the channel picks up."""
-    (folder / NEW_QR_FILE).touch()

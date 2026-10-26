@@ -110,7 +110,7 @@ def quick(monkeypatch):
 @pytest.fixture
 async def running(tmp_path):
     """A running connection, its link and its clients."""
-    clients, link = Clients(), Link(tmp_path)
+    clients, link = Clients(), Link()
     whatsapp = WhatsApp(tmp_path, link, "+54 9 11 1234-5678", new_client=clients)
     task = asyncio.create_task(whatsapp.run())
     await until(lambda: clients.made)
@@ -183,15 +183,15 @@ async def test_unlink_logs_out_and_starts_again(running):
     assert first.logged_out and link.now.state == State.STARTING and link.now.problem == ""
 
 
-async def test_the_qr_codes_run_out_until_the_user_asks_for_another(running, monkeypatch, tmp_path):
-    _, link, clients = running
+async def test_the_qr_codes_run_out_until_the_user_asks_for_another(running, monkeypatch):
+    whatsapp, link, clients = running
     monkeypatch.setattr(module, "QR_LIFETIME", 0.05)
     await clients.last.on_qr(clients.last, b"2@soon,gone")
     await until(lambda: link.now.state == State.EXPIRED)
     await asyncio.sleep(0.05)
     assert len(clients.made) == 1
-    # The page's button.
-    (tmp_path / "new-qr").touch()
+    # The setup's New QR code button.
+    await whatsapp.new_qr()
     await until(lambda: len(clients.made) == 2)
     monkeypatch.setattr(module, "QR_LIFETIME", 60)
     await clients.last.on_qr(clients.last, b"2@new")
@@ -206,7 +206,7 @@ async def test_a_code_to_type_for_the_number_entered(running):
 
 
 async def test_unreachable_whatsapp_is_said_and_tried_again(tmp_path):
-    clients, link = Clients(OSError("no network")), Link(tmp_path)
+    clients, link = Clients(OSError("no network")), Link()
     task = asyncio.create_task(WhatsApp(tmp_path, link, new_client=clients).run())
     await until(lambda: link.now.state == State.FAILED)
     assert "no network" in link.now.problem

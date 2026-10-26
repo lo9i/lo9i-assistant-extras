@@ -2,8 +2,8 @@
 (the Go library for WhatsApp Web's multi-device protocol) built for each system and shipped in neonize's wheels,
 so installing the plugin needs no Go, Node or compiler.
 
-While the account isn't linked, WhatsApp gives QR codes for a few minutes (link.py shows them); when they run
-out the connection ends and a new one starts when the user asks. Once linked, the session is kept in
+While the account isn't linked, WhatsApp gives QR codes for a few minutes (the setup shows them, status.py); when
+they run out the connection ends and a new one starts when the user asks. Once linked, the session is kept in
 `$WHATSAPP_DATA/whatsapp.db`, so restarts don't link again, and whatsmeow reconnects by itself when the
 network drops. When the phone unlinks it (or the user does, with Unlink), whatsmeow deletes the session and a
 new connection shows a new QR code.
@@ -49,11 +49,12 @@ DEVICE = DeviceProps(os="lo9i", platformType=DeviceProps.DESKTOP, requireFullSyn
 QR_LIFETIME = 75.0
 # The least time between two messages or edits the account sends.
 WRITE_GAP = 1.5
+# How often the QR codes are checked for having run out.
+_CHECK_SECONDS = 2.0
 # How long to wait before connecting again after WhatsApp couldn't be reached, at first and at most.
 FIRST_RETRY, MOST_RETRY = 5.0, 300.0
 # The ids of the messages the assistant sent that are remembered, so they're never taken for the user's.
 _SENT_KEPT = 2000
-_CHECK_SECONDS = 2.0
 
 OnMessage = Callable[[str, Incoming, Download], Awaitable[None]]
 NewClient = Callable[[Path], Any]
@@ -96,7 +97,6 @@ class WhatsApp:
     async def run(self) -> None:
         """Keeps the account connected until cancelled."""
         self._db.parent.mkdir(parents=True, exist_ok=True)
-        self._link.asked_for_new_qr()
         retry = FIRST_RETRY
         try:
             while True:
@@ -221,12 +221,9 @@ class WhatsApp:
                 return
 
     async def _wait_for_new_qr(self) -> None:
-        """Until the user asks for a new QR code, in the app's setup or on the page."""
+        """Until the user asks for a new QR code in the app's setup."""
         self._new_qr.clear()
-        while not self._link.asked_for_new_qr():
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(self._new_qr.wait(), _CHECK_SECONDS)
-                break
+        await self._new_qr.wait()
         self._new_qr.clear()
 
     async def _pause(self, seconds: float) -> None:
