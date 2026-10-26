@@ -147,3 +147,7 @@ A chat channel (`channel:` in `server.yaml`) is a process lo9i runs that talks t
 protocol is in lo9i's `docs/channel-plugins.md`. A coding agent (`agent:`) is a worker lo9i runs for
 each task, which reads the task from a folder and writes its steps and result there; the protocol is in
 lo9i's `docs/agent-plugins.md`.
+
+## License
+
+[MIT](LICENSE). The `programmer` skill's references adapt Hermes Agent's skills, also MIT, as each one says.
