@@ -9,7 +9,8 @@ its web app:
 It listens only on a Unix socket that only lo9i's daemon reaches, so it has no login: the daemon lets only
 the user's paired devices through, the terminal's WebSocket too. The daemon serves it under a path
 (/hosts/) and says which in X-Forwarded-Prefix; pages link relative to it (<base> in base.html). The
-assistant's tools (mcp_server.py) reach the tunnels as JSON under /api/ on the same socket.
+assistant's tools (mcp_server.py) reach the tunnels as JSON under /api/ on the same socket, and add and delete
+them there too.
 """
 
 import argparse
@@ -426,11 +427,42 @@ async def _shown_hosts() -> list[Host]:
 
 def _api_routes(app: FastAPI) -> None:
     """The tunnels as JSON, for the assistant's tools (mcp_server.py): this process runs them, so the tools
-    start and stop them here."""
+    add, start, stop and delete them here."""
 
     @app.get("/api/tunnels")
     async def api_tunnels(request: Request) -> JSONResponse:
         return JSONResponse([described(t, _tunnels(request).status(t.id)) for t in await service.tunnels()])
+
+    @app.post("/api/hosts/{name}/tunnels")
+    async def api_add(request: Request, name: str) -> Response:
+        """A tunnel through the host, from {name, type, listen_port, target_host, target_port, start}, checked as
+        the form's are, and on a port no other tunnel listens on in the same place; switched on if `start`.
+        Answers 400 with what to change, by field."""
+        await service.host(name)
+        asked = await request.json()
+        try:
+            typed = tunnels.parse(
+                name, asked.get("name", ""), asked.get("type", ""), asked.get("listen_port"),
+                asked.get("target_host") or "", asked.get("target_port"),
+            )  # fmt: skip
+            tunnels.check_port(typed, await service.tunnels())
+            saved = await service.save_tunnel(typed)
+        except InvalidTunnelError as e:
+            fields = {"kind": "type"}
+            wrong = "; ".join(f"{fields.get(field, field)}: {message}" for field, message in e.errors.items())
+            return Response(wrong, status_code=400, media_type="text/plain")
+        except DuplicateTunnelError as e:
+            return Response(str(e), status_code=400, media_type="text/plain")
+        status = await _tunnels(request).start(saved) if asked.get("start") else _tunnels(request).status(saved.id)
+        return JSONResponse(described(saved, status))
+
+    @app.delete("/api/hosts/{name}/tunnels/{tunnel_id}")
+    async def api_delete(request: Request, name: str, tunnel_id: int) -> JSONResponse:
+        """As the page's delete: stopped first. Answers with the tunnel as it was."""
+        t = await service.tunnel(name, tunnel_id)
+        await _tunnels(request).stop(tunnel_id)
+        await service.delete_tunnel(tunnel_id)
+        return JSONResponse(described(t, tunnels.STOPPED) | {"deleted": True})
 
     @app.post("/api/hosts/{name}/tunnels/{tunnel_id}/start")
     async def api_start(request: Request, name: str, tunnel_id: int) -> JSONResponse:

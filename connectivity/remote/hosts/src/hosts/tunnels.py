@@ -1,6 +1,6 @@
 """SSH tunnels: ports forwarded through a host by ssh on this computer (the Mac lo9i runs on), with the host's
 details from the plugin's list (connect.py), as `ssh -N` with -L, -R or -D. The web page (web/app.py) runs
-them, so they stop with it; the assistant's tools (mcp_server.py) start and stop them through it.
+them, so they stop with it; the assistant's tools (mcp_server.py) add, start, stop and delete them through it.
 
 - local (-L): a port on this Mac (127.0.0.1 only) reaches target_host:target_port as the host sees it.
 - remote (-R): a port on the host reaches target_host:target_port as this Mac sees it.
@@ -19,7 +19,7 @@ import re
 import subprocess
 import sys
 from collections import deque
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Protocol
@@ -143,6 +143,23 @@ def parse(
         raise InvalidTunnelError(errors)
     assert listen is not None
     return Tunnel(id, host, name, kind, listen, target, to)
+
+
+def check_port(tunnel: Tunnel, others: Iterable[Tunnel]) -> None:
+    """Raises InvalidTunnelError when another tunnel listens on the same port in the same place: this Mac for
+    local and SOCKS ones, whatever their host; the host for remote ones."""
+    for other in others:
+        if other.id == tunnel.id or other.listen_port != tunnel.listen_port:
+            continue
+        if tunnel.kind in _ON_THIS_MAC and other.kind in _ON_THIS_MAC:
+            where = "this Mac"
+        elif tunnel.kind == other.kind == "remote" and tunnel.host == other.host:
+            where = tunnel.host
+        else:
+            continue
+        raise InvalidTunnelError(
+            {"listen_port": f"{other.host}'s tunnel {other.name!r} uses port {tunnel.listen_port} on {where}."}
+        )
 
 
 def _ipv6(text: str) -> bool:

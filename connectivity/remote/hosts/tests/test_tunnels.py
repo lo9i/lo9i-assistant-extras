@@ -55,6 +55,30 @@ def test_what_to_change_is_said_by_field(fields, wrong):
     assert set(raised.value.errors) == wrong
 
 
+@pytest.mark.parametrize(
+    ("new", "clashes"),
+    [
+        # Local and SOCKS ones listen on this Mac, whatever their host.
+        (Tunnel(None, "nas", "Web", "local", 15432, "localhost", 80), True),
+        (Tunnel(None, "nas", "Proxy", "socks", 1080), True),
+        (Tunnel(None, "pi", "Web", "local", 15433, "localhost", 80), False),
+        # Remote ones listen on their host.
+        (Tunnel(None, "pi", "Other", "remote", 9000, "localhost", 3001), True),
+        (Tunnel(None, "nas", "Other", "remote", 9000, "localhost", 3001), False),
+        (Tunnel(None, "pi", "Web", "local", 9000, "localhost", 80), False),
+        # A tunnel doesn't clash with itself as it was.
+        (Tunnel(1, "pi", "Database", "local", 15432, "db.internal", 5433), False),
+    ],
+)
+def test_no_two_tunnels_listen_on_one_port_in_one_place(new, clashes):
+    if not clashes:
+        tunnels.check_port(new, [LOCAL, REMOTE, SOCKS])
+        return
+    with pytest.raises(InvalidTunnelError) as raised:
+        tunnels.check_port(new, [LOCAL, REMOTE, SOCKS])
+    assert set(raised.value.errors) == {"listen_port"}
+
+
 def test_each_type_says_where_it_goes():
     assert LOCAL.describe() == "localhost:15432 → db.internal:5432 on pi"
     assert REMOTE.describe() == "pi:9000 → localhost:3000 on this Mac"

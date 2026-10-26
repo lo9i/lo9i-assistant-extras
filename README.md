@@ -91,7 +91,8 @@ newer version later.
   host, in a session named `lo9i`, so it keeps running when the connection drops and the page reconnects to
   it on its own; when the host has no Herdr, the page offers to install it in `~/.local/bin`. The assistant's
   tools list the hosts, read that terminal's screen and run commands in a tab of their own there (`assistant`),
-  where you see them; a command asks you first. Keys held only by your ssh agent work too. Needs lo9i with plugin
+  where you see them; a command asks you first. They also list your SSH tunnels, switch them on and off, and add
+  or delete one when you ask, asking you first. Keys held only by your ssh agent work too. Needs lo9i with plugin
   data keys (plugin format 4).
 - **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
   for more), its audio as an MP3 with tags and cover, or its transcript as a text file; or let the
