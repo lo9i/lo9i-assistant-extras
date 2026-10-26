@@ -8,8 +8,9 @@ they run out the connection ends and a new one starts when the user asks. Once l
 network drops. When the phone unlinks it (or the user does, with Unlink), whatsmeow deletes the session and a
 new connection shows a new QR code.
 
-Only the user's chat with themself is read (incoming.py) and written in; the account never says it's online
-(which would stop the phone's notifications), never shows typing and never sends read receipts."""
+Only the user's chat with themself is read (incoming.py). The assistant writes there, and to someone else only
+when the user approves it (others.py); the account never says it's online (which would stop the phone's
+notifications), never shows typing and never sends read receipts."""
 
 import asyncio
 import contextlib
@@ -113,17 +114,28 @@ class WhatsApp:
     # The chat's writes (port.py).
 
     async def send(self, text: str) -> str:
-        client, me = self._linked()
-        await self._pacer.turn()
-        response = await client.send_message(me.jid, Message(conversation=text))
-        self._sent.append(response.ID)
-        return str(response.ID)
+        _, me = self.account()
+        return await self.write(me.jid, text)
 
     async def edit(self, message: str, text: str) -> None:
-        client, me = self._linked()
+        client, me = self.account()
         await self._pacer.turn()
         response = await client.edit_message(me.jid, message, Message(conversation=text))
         self._sent.append(response.ID)
+
+    def account(self) -> tuple[Any, Me]:
+        """neonize's client and the linked account. Raises ConnectionError while not linked."""
+        if self._client is None or self._me is None:
+            raise ConnectionError("WhatsApp isn't connected.")
+        return self._client, self._me
+
+    async def write(self, jid: Any, text: str) -> str:
+        """A text message to `jid`, kept apart from the others the account sends; returns its id."""
+        client, _ = self.account()
+        await self._pacer.turn()
+        response = await client.send_message(jid, Message(conversation=text))
+        self._sent.append(response.ID)
+        return str(response.ID)
 
     # The setup's buttons (channel.py).
 
@@ -297,11 +309,6 @@ class WhatsApp:
                 logger.exception("Handling a WhatsApp event failed")
 
         return guarded
-
-    def _linked(self) -> tuple[Any, Me]:
-        if self._client is None or self._me is None:
-            raise ConnectionError("WhatsApp isn't connected.")
-        return self._client, self._me
 
 
 async def _download(client: Any, message: Message) -> bytes:

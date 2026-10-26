@@ -3,8 +3,9 @@ entered (if any) and its channel credentials:
 
     WHATSAPP_DATA=... WHATSAPP_PHONE=... LO9I_URL=... LO9I_CHANNEL=... LO9I_CHANNEL_TOKEN=... lo9i-whatsapp
 
-It runs the WhatsApp connection (whatsapp.py) and lo9i's stream (runner.py) side by side, until lo9i stops it;
-when either ends with an error the process ends, and lo9i starts it again later.
+It runs the WhatsApp connection (whatsapp.py), lo9i's stream (runner.py) and the socket the plugin's tools write to
+others through (tools.py) side by side, until lo9i stops it; when one ends with an error the process ends, and
+lo9i starts it again later.
 """
 
 import asyncio
@@ -19,8 +20,10 @@ from lo9i_whatsapp.choices import Choices
 from lo9i_whatsapp.daemon import Daemon
 from lo9i_whatsapp.handlers import Handlers
 from lo9i_whatsapp.link import Link
+from lo9i_whatsapp.others import Others
 from lo9i_whatsapp.port import LIMITS, SelfChat
 from lo9i_whatsapp.runner import Runner
+from lo9i_whatsapp.tools import serve
 from lo9i_whatsapp.whatsapp import WhatsApp
 
 logger = logging.getLogger(__name__)
@@ -63,6 +66,7 @@ async def run(environ: Mapping[str, str]) -> None:
         async with asyncio.TaskGroup() as tasks:
             tasks.create_task(whatsapp.run())
             tasks.create_task(Runner(daemon, channel, LIMITS).run())
+            tasks.create_task(serve(folder, Others(whatsapp)))
     finally:
         await daemon.aclose()
 

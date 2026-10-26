@@ -3,10 +3,10 @@
 # alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: whatsapp
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.1.0
+version: 0.2.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
-description: Chat with the assistant in your WhatsApp chat with yourself, linked to your own number like WhatsApp Web
+description: Chat with the assistant in your WhatsApp chat with yourself, linked to your own number like WhatsApp Web, and let it write to your contacts for you (every message asks you first)
 # Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
 icon: icon.svg
 fields:
@@ -15,14 +15,20 @@ fields:
     optional: true
 # Shown above the field when installing.
 steps:
-  - "The assistant joins your own WhatsApp as a linked device, like WhatsApp Web, and talks to you only in your chat with yourself (Message yourself). It never reads, answers or marks read any other chat or group."
+  - "The assistant joins your own WhatsApp as a linked device, like WhatsApp Web, and talks to you only in your chat with yourself (Message yourself). It never reads, answers or marks read any other chat or group. It can write to someone else for you, as you, but asks you before every message, and doesn't see their answer."
   - "After installing, the setup in Plugins shows a QR code. Scan it with your phone: WhatsApp → Settings → Linked devices → Link a device. The link stays when the assistant restarts."
   - "Using the assistant on the same phone, so there's nothing to scan? Enter your number below (for example +54 9 11 1234 5678), and the setup also offers a code to type in WhatsApp instead."
   - "WhatsApp doesn't allow assistants on personal numbers officially. The plugin writes little and slowly, but use it at your own risk."
 env:
   # The linked session (whatsapp.db) lives here.
   WHATSAPP_DATA: "{data}"
+# Not trusted: writing to someone else isn't marked read-only, so lo9i asks the user before every message.
+# Finding a contact is read-only and runs without asking.
 trusted: false
+
+# The tools: find a contact, and write to them as the user. They ask the channel's process, which holds the
+# WhatsApp connection, over a socket in {data} (src/lo9i_whatsapp/tools.py).
+command: "{bin}/lo9i-whatsapp-mcp"
 
 # The account, over WhatsApp Web's multi-device protocol (whatsmeow, through neonize). lo9i keeps it running
 # while the plugin is on; it talks to lo9i over HTTP (LO9I_URL, LO9I_CHANNEL, LO9I_CHANNEL_TOKEN).
