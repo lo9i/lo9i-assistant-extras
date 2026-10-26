@@ -27,12 +27,7 @@
   {% endif %}
 
   {% if has_channels %}
-  <section hx-get="uploads" hx-trigger="load" hx-swap="outerHTML">
-    <div class="section-head">
-      <h1>Latest videos</h1>
-      <p class="sub">Reading your channels…</p>
-    </div>
-  </section>
+  {% include "_uploads.html" %}
   {% else %}
   <section>
     <div class="section-head"><h1>Latest videos</h1><p class="sub">No channels yet.</p></div>

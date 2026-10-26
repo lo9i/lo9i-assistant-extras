@@ -2,10 +2,11 @@
 
 import json
 import sqlite3
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Any
 
-from .models import Channel, Title
+from .models import Channel, Title, Video
 
 
 def now() -> str:
@@ -91,4 +92,30 @@ def insert_channel(
 
 
 def delete_channel(conn: sqlite3.Connection, id: str) -> bool:
+    conn.execute("DELETE FROM uploads WHERE channel_id = ?", (id,))
     return conn.execute("DELETE FROM channels WHERE id = ?", (id,)).rowcount > 0
+
+
+# --- Uploads read last ---
+
+
+def stored_uploads(conn: sqlite3.Connection) -> dict[str, tuple[list[Video], str | None, str]]:
+    """(videos, error, fetched_at) by channel id."""
+    rows = conn.execute("SELECT * FROM uploads")
+    return {r["channel_id"]: ([Video(**v) for v in json.loads(r["videos"])], r["error"], r["fetched_at"]) for r in rows}
+
+
+def save_uploads(conn: sqlite3.Connection, channel_id: str, videos: list[Video]) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO uploads (channel_id, videos, error, fetched_at) VALUES (?, ?, NULL, ?)",
+        (channel_id, json.dumps([asdict(v) for v in videos]), now()),
+    )
+
+
+def save_uploads_error(conn: sqlite3.Connection, channel_id: str, error: str) -> None:
+    """The read failed: its uploads stay as they were (stale beats blank)."""
+    conn.execute(
+        "INSERT INTO uploads (channel_id, error, fetched_at) VALUES (?, ?, ?)"
+        " ON CONFLICT (channel_id) DO UPDATE SET error = excluded.error, fetched_at = excluded.fetched_at",
+        (channel_id, error, now()),
+    )

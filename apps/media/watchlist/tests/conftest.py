@@ -4,6 +4,7 @@ answers through the `tmdb_data` fixture."""
 
 import copy
 import json
+import threading
 from datetime import date, timedelta
 
 import httpx
@@ -155,8 +156,25 @@ def youtube_data():
 
 
 @pytest.fixture
-def http(tmdb_data, youtube_data):
+def gate():
+    """Open: TMDB and YouTube answer at once. Tests clear it to make them
+    hang (until it's set again) and see what waits for them."""
+    gate = threading.Event()
+    gate.set()
+    return gate
+
+
+@pytest.fixture
+def asked():
+    """The requests TMDB and YouTube got, in order."""
+    return []
+
+
+@pytest.fixture
+def http(tmdb_data, youtube_data, gate, asked):
     def handle(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        gate.wait(10)
         if request.url.host == "api.themoviedb.org":
             if request.url.params.get("api_key") != "k":
                 return httpx.Response(401)

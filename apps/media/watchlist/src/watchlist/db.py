@@ -25,8 +25,7 @@ CREATE TABLE IF NOT EXISTS titles (
     CHECK ((season IS NULL) = (episode IS NULL))
 );
 
--- YouTube channels. Their uploads are read from the channel's feed when asked
--- for, not stored.
+-- YouTube channels.
 CREATE TABLE IF NOT EXISTS channels (
     -- YouTube's channel id, UC...
     id TEXT PRIMARY KEY,
@@ -34,6 +33,17 @@ CREATE TABLE IF NOT EXISTS channels (
     handle TEXT,
     thumbnail TEXT,
     added_at TEXT NOT NULL
+);
+
+-- The uploads last read from each channel, so the home page shows them
+-- without waiting for YouTube (service.fetch_uploads).
+CREATE TABLE IF NOT EXISTS uploads (
+    channel_id TEXT PRIMARY KEY,
+    -- Its latest uploads (models.Video), as of the last read that worked.
+    videos TEXT NOT NULL DEFAULT '[]',
+    -- Why the last read failed; NULL when it worked.
+    error TEXT,
+    fetched_at TEXT NOT NULL
 );
 """
 

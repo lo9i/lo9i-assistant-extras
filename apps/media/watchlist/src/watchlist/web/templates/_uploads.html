@@ -1,7 +1,11 @@
-<section>
+<section{% if reading %} hx-get="uploads" hx-trigger="load delay:{{ poll }}" hx-swap="outerHTML"{% endif %}>
   <div class="section-head">
     <h1>Latest videos</h1>
-    <p class="sub">{% if videos %}{{ plural(videos | length, 'video') }} from your channels, last {{ days }} days.{% else %}Nothing new in the last {{ days }} days.{% endif %}</p>
+    {% if reading and not videos %}
+    <p class="sub">Reading your channels…</p>
+    {% else %}
+    <p class="sub">{% if videos %}{{ plural(videos | length, 'video') }} from your channels, last {{ days }} days.{% else %}Nothing new in the last {{ days }} days.{% endif %}{% if reading %} Reading {{ plural(unread | length, 'more channel') }}…{% endif %}</p>
+    {% endif %}
     {% for name, why in failed.items() %}<p class="text-xs danger">{{ name }}: {{ why }}</p>{% endfor %}
   </div>
   {% if videos %}
