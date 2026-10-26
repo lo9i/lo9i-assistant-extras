@@ -24,10 +24,12 @@ SHARED = {
     "channel client": [
         "communications/chat/telegram/src/lo9i_telegram/daemon.py",
         "communications/chat/slack/src/lo9i_slack/daemon.py",
+        "communications/chat/whatsapp/src/lo9i_whatsapp/daemon.py",
     ],
     "channel runner": [
         "communications/chat/telegram/src/lo9i_telegram/runner.py",
         "communications/chat/slack/src/lo9i_slack/runner.py",
+        "communications/chat/whatsapp/src/lo9i_whatsapp/runner.py",
     ],
     "agent task folder": [
         "assistant/agents/claude-code/src/claude_code_tasks/task_folder.py",

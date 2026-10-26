@@ -1,0 +1,33 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py and docs/channel-plugins.md. {data} is a folder for its data that updates leave
+# alone, {bin} the scripts of its own environment (built from its uv.lock).
+name: whatsapp
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 0.1.0
+# The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
+format: 2
+description: Chat with the assistant in your WhatsApp chat with yourself, linked to your own number like WhatsApp Web
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: icon.svg
+fields:
+  - key: WHATSAPP_PHONE
+    label: Your phone number, with its country code (only to link with a code instead of the QR)
+    optional: true
+# Shown above the field when installing.
+steps:
+  - "The assistant joins your own WhatsApp as a linked device, like WhatsApp Web, and talks to you only in your chat with yourself (Message yourself). It never reads, answers or marks read any other chat or group."
+  - "After installing, the setup in Plugins shows a QR code. Scan it with your phone: WhatsApp → Settings → Linked devices → Link a device. The link stays when the assistant restarts."
+  - "Using the assistant on the same phone, so there's nothing to scan? Enter your number below (for example +54 9 11 1234 5678), and the setup also offers a code to type in WhatsApp instead."
+  - "WhatsApp doesn't allow assistants on personal numbers officially. The plugin writes little and slowly, but use it at your own risk."
+env:
+  # The linked session (whatsapp.db) lives here.
+  WHATSAPP_DATA: "{data}"
+trusted: false
+
+# The account, over WhatsApp Web's multi-device protocol (whatsmeow, through neonize). lo9i keeps it running
+# while the plugin is on; it talks to lo9i over HTTP (LO9I_URL, LO9I_CHANNEL, LO9I_CHANNEL_TOKEN).
+channel:
+  command: "{bin}/lo9i-whatsapp"
+  # The channel protocol it speaks (lo9i's docs/channel-plugins.md).
+  protocol: 2
+  style: A WhatsApp chat. Short messages. Simple Markdown only (bold, italics, code); no tables or headings.
