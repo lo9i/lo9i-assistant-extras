@@ -25,4 +25,6 @@ The user sets up SSH tunnels on the Hosts page (New tunnel, or the host picked i
 
 - `list_tunnels` says which there are and their state: running, starting, reconnecting (the connection dropped; it tries again on its own), failed (with a message saying what the user has to change), or stopped.
 - `start_tunnel` / `stop_tunnel` switch one on or off, by host and tunnel name; lo9i asks the user first. A started tunnel takes a few seconds to come up: `list_tunnels` again to see.
-- Only the user adds, changes or deletes tunnels, on the pages. "The Hosts page isn't running": the tunnels run in it, so ask the user to turn the hosts plugin off and on in Plugins.
+- `create_tunnel` adds one when the user asks for it: `host`, `name` (one the host's other tunnels don't have), `type` (`local`, `remote` or `socks`), `listen_port` (from 1024 up for local and socks; no other tunnel may listen on it in the same place), and for local and remote `target_host` (`localhost` if left out) and `target_port`. It stays stopped unless `start` is true. It comes back as `list_tunnels` shows it, or with what to change (a name the host has already, a port in use, a missing target port). Say which port it opens, on which side, before you add it; lo9i asks the user too.
+- `delete_tunnel` deletes one, by host and tunnel name, stopping it first; only when the user asks for exactly that.
+- Changing a tunnel is the user's, on the pages. "The Hosts page isn't running": the tunnels run in it, so ask the user to turn the hosts plugin off and on in Plugins.

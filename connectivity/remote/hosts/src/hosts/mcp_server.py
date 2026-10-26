@@ -1,14 +1,14 @@
 """MCP server over stdio: the user's hosts (the plugin's own list, service.py), and their Herdr session
 (herdr.py), the same terminal the user sees on the Hosts page, and the SSH tunnels the user set up there, which
-that page runs (page.py). lo9i starts it (see server.yaml) with HOSTS_DB, HOSTS_WEB_SOCKET and the plugin's key
-(vault.py) set:
+that page runs (page.py), and which the tools add and delete through it when the user asks. lo9i starts it (see
+server.yaml) with HOSTS_DB, HOSTS_WEB_SOCKET and the plugin's key (vault.py) set:
 
     HOSTS_DB=/path/hosts.db HOSTS_WEB_SOCKET=/path/page.sock LO9I_DATA_KEY=… hosts-mcp
 """
 
 import asyncio
 from functools import cache
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
 from mcp.server.mcpserver import MCPServer
@@ -36,7 +36,8 @@ the user's OK first: say what you'll run and why, and run it only after they agr
 
 The user's SSH tunnels (ports forwarded through a host by this Mac) are on the same page:
 list_tunnels says which there are and how each is doing; start_tunnel and stop_tunnel switch one on
-or off. Only the user adds or changes them, on the Hosts page.
+or off. When the user asks for a tunnel, create_tunnel adds it (stopped unless start), and delete_tunnel
+deletes one they ask to delete; the user changes them on the Hosts page.
 """
 
 mcp = MCPServer("hosts", instructions=INSTRUCTIONS)
@@ -163,6 +164,57 @@ async def stop_tunnel(
     return await _page("POST", f"/api/hosts/{quote(host, safe='')}/tunnels/{t['id']}/stop")
 
 
+@mcp.tool()
+async def create_tunnel(
+    host: Annotated[str, Field(description="The host it goes through: a name from list_hosts")],
+    name: Annotated[str, Field(description="Its name, one the host's other tunnels don't have (up to 40 characters)")],
+    type: Annotated[
+        Literal["local", "remote", "socks"],
+        Field(
+            description="local: a port on this Mac reaches target_host:target_port as the host sees it (ssh -L); "
+            "remote: a port on the host reaches target_host:target_port as this Mac sees it (ssh -R); "
+            "socks: a SOCKS proxy on this Mac through the host (ssh -D)"
+        ),
+    ],
+    listen_port: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=65535,
+            description="The port it listens on: on this Mac (127.0.0.1) for local and socks, from 1024 up; "
+            "on the host for remote. No other tunnel may listen on it there.",
+        ),
+    ],
+    target_host: Annotated[
+        str | None, Field(description="Where it goes, for local and remote (localhost if not given); not for socks")
+    ] = None,
+    target_port: Annotated[
+        int | None, Field(ge=1, le=65535, description="The port where it goes; needed for local and remote")
+    ] = None,
+    start: Annotated[bool, Field(description="Also switch it on once added")] = False,
+) -> dict[str, Any]:
+    """Adds an SSH tunnel through one of the user's hosts, as New tunnel on the Hosts page does, and gives it back
+    as list_tunnels does. Only when the user asks for one: say which ports it opens first. It stays stopped
+    unless start; a started one takes a few seconds to come up (list_tunnels again to see)."""
+    await _shown(host)
+    asked = {
+        "name": name, "type": type, "listen_port": listen_port, "target_host": target_host,
+        "target_port": target_port, "start": start,
+    }  # fmt: skip
+    return await _page("POST", f"/api/hosts/{quote(host, safe='')}/tunnels", asked)
+
+
+@mcp.tool(annotations=ToolAnnotations(destructive_hint=True))
+async def delete_tunnel(
+    host: Annotated[str, Field(description="The host's name from list_hosts")],
+    tunnel: Annotated[str, Field(description="The tunnel's name from list_tunnels")],
+) -> dict[str, Any]:
+    """Deletes one of the user's tunnels, as Delete on the Hosts page does: stopped first if it's on. Only when
+    the user asks for exactly that."""
+    t = await _tunnel(host, tunnel)
+    return await _page("DELETE", f"/api/hosts/{quote(host, safe='')}/tunnels/{t['id']}")
+
+
 async def _tunnels(host: str | None) -> list[dict[str, Any]]:
     """The tunnels of the hosts the user shows, or of one of them."""
     if host is not None:
@@ -184,9 +236,9 @@ async def _tunnel(host: str, name: str) -> dict[str, Any]:
     raise ToolError(f"{host} has no tunnel named {name!r}. Its tunnels are: {known}.")
 
 
-async def _page(method: str, path: str) -> Any:
+async def _page(method: str, path: str, body: Any = None) -> Any:
     try:
-        return await page.call(method, path)
+        return await page.call(method, path, body)
     except PageError as e:
         raise ToolError(str(e)) from None
 
