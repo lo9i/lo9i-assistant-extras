@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# Links are relative to where lo9i serves this (X-Forwarded-Prefix, see app.py). #}
+  <base href="{{ request.scope.root_path }}/">
+  <title>{% block title %}WhatsApp{% endblock %}</title>
+  <script src="{{ asset('theme.js') }}"></script>
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+</head>
+{# No brand of its own: lo9i's sidebar names the page. #}
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>

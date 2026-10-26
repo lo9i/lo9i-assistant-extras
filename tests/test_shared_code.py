@@ -24,10 +24,12 @@ SHARED = {
     "channel client": [
         "communications/chat/telegram/src/lo9i_telegram/daemon.py",
         "communications/chat/slack/src/lo9i_slack/daemon.py",
+        "communications/chat/whatsapp/src/lo9i_whatsapp/daemon.py",
     ],
     "channel runner": [
         "communications/chat/telegram/src/lo9i_telegram/runner.py",
         "communications/chat/slack/src/lo9i_slack/runner.py",
+        "communications/chat/whatsapp/src/lo9i_whatsapp/runner.py",
     ],
     "agent task folder": [
         "assistant/agents/claude-code/src/claude_code_tasks/task_folder.py",
@@ -139,6 +141,7 @@ THEME_SCRIPTS = [
     "apps/finance/expenses/src/expenses/web/static/theme.js",
     "apps/media/watchlist/src/watchlist/web/static/theme.js",
     "software/factory/factory/src/lo9i_factory/web/static/theme.js",
+    "communications/chat/whatsapp/src/lo9i_whatsapp/web/static/theme.js",
 ]
 
 

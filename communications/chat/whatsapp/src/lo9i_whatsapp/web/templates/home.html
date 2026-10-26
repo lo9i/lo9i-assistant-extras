@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="page">
+  <div id="panel">{% include "_panel.html" %}</div>
+</main>
+<script>
+  // The channel changes the QR code every 20 seconds and links in the background: the panel is read again
+  // every two seconds, and replaced only when it changed, so the QR code doesn't flicker.
+  const panel = document.getElementById("panel");
+  let shown = panel.innerHTML.trim();
+  const show = (html) => {
+    if (html.trim() === shown) return;
+    shown = html.trim();
+    panel.innerHTML = html;
+  };
+  setInterval(async () => {
+    try {
+      const response = await fetch("panel", { cache: "no-store" });
+      if (response.ok) show(await response.text());
+    } catch {
+      // The page is restarting; the next read gets it.
+    }
+  }, 2000);
+  panel.addEventListener("click", async (event) => {
+    if (!event.target.closest("[data-new-qr]")) return;
+    const response = await fetch("new-qr", { method: "POST" });
+    if (response.ok) show(await response.text());
+  });
+</script>
+{% endblock %}
