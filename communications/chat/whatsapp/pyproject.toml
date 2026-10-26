@@ -5,11 +5,13 @@ description = "Chat with the lo9i assistant in your WhatsApp chat with yourself"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28",
+    "mcp>=2.2.0",
     "neonize>=0.5.2,<0.6",
 ]
 
 [project.scripts]
 lo9i-whatsapp = "lo9i_whatsapp.app:main"
+lo9i-whatsapp-mcp = "lo9i_whatsapp.mcp_server:main"
 
 [dependency-groups]
 dev = [

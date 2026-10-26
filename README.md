@@ -50,13 +50,15 @@ newer version later.
   read and post in your workspace as you (every post asks you first). Create the Slack app from
   [`manifest.json`](communications/chat/slack/manifest.json) and enter its three tokens.
 - **whatsapp** (`communications/chat/whatsapp`): chat with the assistant in your own WhatsApp, in your chat
-  with yourself (Message yourself); it never reads, answers or marks read any other chat or group. It joins your
-  number as a linked device, like WhatsApp Web, over WhatsApp Web's protocol ([whatsmeow](https://github.com/tulir/whatsmeow),
-  through [neonize](https://github.com/krypton-byte/neonize), whose wheels bring it built for each system). Link it
-  by scanning the QR code its setup in Plugins shows (web and terminal apps), or, with your number entered, with a
+  with yourself (Message yourself); it never reads, answers or marks read any other chat or group. It can also
+  write to your contacts for you, as you: it finds them by name, and every message asks you first; it doesn't see
+  their answers, and writes to at most 20 people an hour. It joins your number as a linked device, like WhatsApp
+  Web, over WhatsApp Web's protocol ([whatsmeow](https://github.com/tulir/whatsmeow), through
+  [neonize](https://github.com/krypton-byte/neonize), whose wheels bring it built for each system). Link it by
+  scanning the QR code its setup in Plugins shows (web and terminal apps), or, with your number entered, with a
   code to type in WhatsApp. Its messages start with 🤖; approvals and questions are numbered options you answer
   with the number. Text, photos, documents and voice notes in, text out, written slowly. It's not an official
-  API: use it at your own risk. Needs a lo9i whose channel setup draws QR codes.
+  API: use it at your own risk.
 - **gmail**, **microsoft**, **icloud**, **yahoo**, **aol**, **fastmail** (`communications/email/<name>`):
   mail providers. Each one runs nothing: its `email:` section gives lo9i the provider's servers and how
   to get the password or sign in. Once one is installed, its accounts are added in its details in
