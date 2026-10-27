@@ -1,8 +1,11 @@
 {# A host's row in the table, with what checking it found (`probe`), the last time or now; without one it says
    it's checking. The page checks every host again as it shows, and each row comes again over /statuses as its
-   check ends (table.js). Clicking it shows the host on the right (_details.html). `items` are its tunnels with
-   how each is doing, counted in their own cell. #}
-<tr data-host="{{ h.name }}" {% if probe is none %}data-checking{% endif %} class="{{ 'dim' if h.hidden }}">
+   check ends (table.js). Clicking it shows the host on the right (_details.html), and double-clicking it opens its
+   terminal (data-terminal), as Terminal there does, which is off while the host is offline. `items` are its
+   tunnels with how each is doing, counted in their own cell. #}
+{%- set offline = probe is not none and not probe.reachable %}
+<tr data-host="{{ h.name }}" {% if probe is none %}data-checking{% endif %} class="{{ 'dim' if h.hidden }}"
+    {%- if not offline %} data-terminal="hosts/{{ h.name | urlencode }}"{% endif %}>
   <td class="medium" data-value="{{ h.name | lower }}">
     <button class="row-button">{{ h.name }}</button>
     {% if h.hidden %}<span class="pill">hidden</span>{% endif %}
