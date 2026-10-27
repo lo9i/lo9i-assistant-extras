@@ -1,9 +1,9 @@
 // The hosts table, as the app's list-and-details pages: the search box keeps the rows that have its words, a
-// column's header sorts by it (again to reverse it), and clicking a row shows its host on the right (its
-// details, from app.py's details, and its name in the address, so a reload keeps it). Once the page shows, every
-// host is checked again: each row comes over one WebSocket as its check ends (app.py's statuses), the search and
-// the order are applied again to it, and the details read again when it's the host shown. Cells also come in
-// again from htmx (a tunnel switched).
+// column's header sorts by it (again to reverse it), clicking a row shows its host on the right (its details,
+// from app.py's details, and its name in the address, so a reload keeps it), and double-clicking it opens its
+// terminal in a new tab. Once the page shows, every host is checked again: each row comes over one WebSocket as
+// its check ends (app.py's statuses), the search and the order are applied again to it, and the details read
+// again when it's the host shown. Cells also come in again from htmx (a tunnel switched).
 (() => {
   const table = document.getElementById("hosts");
   if (!table) return;
@@ -65,9 +65,21 @@
     history.replaceState(null, "", url);
   }
 
+  // The row clicked, unless it was something of its own (a link, a field).
+  const clicked = (event) => (event.target.closest("a, input") ? null : event.target.closest("tr[data-host]"));
+
+  // The first click of a double-click picks the host, the second doesn't read it again (detail counts the clicks),
+  // and the double-click opens its terminal as the details' Terminal does, unless it's offline (_row.html).
   body.addEventListener("click", (event) => {
-    const row = event.target.closest("tr[data-host]");
-    if (row && !event.target.closest("a, input")) pick(row.dataset.host);
+    const row = clicked(event);
+    if (row && event.detail < 2) pick(row.dataset.host);
+  });
+  body.addEventListener("mousedown", (event) => {
+    if (event.detail > 1 && clicked(event)) event.preventDefault(); // Not selecting the word double-clicked.
+  });
+  body.addEventListener("dblclick", (event) => {
+    const terminal = clicked(event)?.dataset.terminal;
+    if (terminal) window.open(terminal, "_blank", "noopener");
   });
 
   function replace(host, html) {

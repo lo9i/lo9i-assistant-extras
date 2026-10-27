@@ -60,6 +60,7 @@ def test_a_checked_row_says_whether_it_answers_and_runs_the_session(client, ssh:
     ssh.answers[herdr._PROBE] = answers(out=json.dumps({"sessions": [{"name": "lo9i", "running": True}]}))
     row = client.get("/hosts/pi/row").text
     assert "Online" in row and "Running" in row and "hosts/pi/row" not in row
+    assert 'data-terminal="hosts/pi"' in row  # Double-clicking it opens its terminal (table.js).
     details = client.get("/hosts/pi/details").text  # The host on the right shows what the check found.
     assert '<span class="pill pill--accent">Online</span>' in details
     assert '<a class="btn btn--sm btn--neutral" href="hosts/pi"' in details
@@ -68,6 +69,7 @@ def test_a_checked_row_says_whether_it_answers_and_runs_the_session(client, ssh:
     ssh.answers[herdr._PROBE] = answers(255, err="ssh: Could not resolve hostname lo9i-pi.local")
     row = client.get("/hosts/pi/row").text
     assert "Offline" in row and "address couldn&#39;t be found" in row
+    assert "data-terminal" not in row  # Nor does double-clicking it.
     # Its terminal can't connect: Terminal is off, saying why.
     details = client.get("/hosts/pi/details").text
     assert 'href="hosts/pi"' not in details and "address couldn&#39;t be found" in details
