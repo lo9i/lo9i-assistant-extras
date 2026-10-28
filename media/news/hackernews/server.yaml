@@ -1,0 +1,10 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. {bin} is the scripts of its own environment (built from its uv.lock).
+name: hackernews
+version: 1.0.0
+format: 2
+description: Hacker News stories, search, and mentions of any word (no account needed)
+icon: newspaper
+trusted: true
+# Trusted: every tool only reads HN's public APIs (Firebase and Algolia).
+command: "{bin}/hackernews-mcp"

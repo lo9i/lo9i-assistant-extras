@@ -94,6 +94,9 @@ newer version later.
   where you see them; a command asks you first. They also list your SSH tunnels, switch them on and off, and add
   or delete one when you ask, asking you first. Keys held only by your ssh agent work too. Needs lo9i with plugin
   data keys (plugin format 4).
+- **hackernews** (`media/news/hackernews`): read Hacker News: the front page, Show HN, Ask HN and newest
+  stories, search, and mentions of a word (your project's name) in stories and comments. Read-only; no account
+  needed. Good for a Home section.
 - **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
   for more), its audio as an MP3 with tags and cover, or its transcript as a text file; or let the
   assistant read the transcript to summarize or answer questions about the video. Files go to the
