@@ -1,0 +1,28 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. {bin} is the scripts of its own environment (built from its uv.lock).
+name: google-drive
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+# The plugin format (lo9i's core/repositories/formats.py): 5 for oauth.
+format: 5
+description: Search and read your Google Drive files, and create and edit Google Docs and Sheets
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: icon.svg
+# The user signs in to Google in the plugin's setup with an OAuth app of their own, as the gmail plugin's
+# "sign in with Google" does; lo9i gives the server the sign-in in LO9I_OAUTH (lo9i's core/mcp/plugin_oauth.py).
+# The drive scope covers Drive, Docs and Sheets; the tools only search, read, create and edit, never delete or share.
+oauth:
+  provider: google
+  scopes:
+    - https://www.googleapis.com/auth/drive
+# Shown when installing.
+steps:
+  - "It signs in with a Google OAuth app of your own, in a Google Cloud project (console.cloud.google.com, free). If you made one for the gmail plugin, use the same project and client."
+  - "In APIs & Services → Library, enable the Google Drive API, the Google Docs API and the Google Sheets API."
+  - "In Google Auth Platform (the OAuth consent screen), set it up as External and publish it (In production): while it's in Testing, Google ends the sign-in after 7 days. Google doesn't review an app only you use; when signing in, it warns that the app isn't verified: choose Advanced, then go on."
+  - "In Clients (Credentials), create an OAuth client ID of type Web application, with the redirect URI the plugin's setup shows as an Authorized redirect URI. Once installed, paste its client ID and secret in the setup and sign in."
+trusted: false
+
+# Searching and reading are marked read-only; creating and changing Docs and Sheets aren't, so lo9i asks the user
+# before each one unless they trust the plugin.
+command: "{bin}/google-drive-mcp"
