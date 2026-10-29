@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/news`, `media/video`, `productivity/calendar`, `productivity/maps`, `software/factory` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/news`, `media/video`, `productivity/calendar`, `productivity/documents`, `productivity/maps`, `software/factory` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -108,6 +108,13 @@ newer version later.
   calendars, from every account it has (iCloud, Google, Exchange), while the assistant runs in your login
   session; anywhere, a CalDAV account (iCloud, Fastmail, Nextcloud) whose server, username and app
   password you enter when installing it. Its tools and a skill.
+- **google-drive** (`productivity/documents/google-drive`): the assistant searches and reads your Google Drive
+  (Docs as Markdown, Sheets' cells, Slides, PDFs, text files) and creates and edits Google Docs (from Markdown,
+  adding text, replacing text, rewriting one) and Sheets (writing cells, adding rows and tabs); each change asks
+  you first. It signs in with a Google OAuth app of your own, as Gmail's sign-in with Google does: enable the Drive,
+  Docs and Sheets APIs in a Google Cloud project, publish its consent screen, create a Web application client with
+  the redirect URI its setup shows, and sign in there. The steps:
+  [its README](productivity/documents/google-drive/README.md). Needs lo9i with plugin sign-ins (plugin format 5).
 - **maps** (`productivity/maps/maps`): find places and addresses, what's near a place (nearest first), the address
   at a point, and routes with distance, travel time and steps by car, on foot or by bike, or the next trips by
   public transport where [Transitous](https://transitous.org) has the timetables. Each answer links to
