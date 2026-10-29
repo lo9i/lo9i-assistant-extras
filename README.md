@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/video`, `productivity/calendar`, `software/factory` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/news`, `media/video`, `productivity/calendar`, `productivity/maps`, `software/factory` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -108,6 +108,11 @@ newer version later.
   calendars, from every account it has (iCloud, Google, Exchange), while the assistant runs in your login
   session; anywhere, a CalDAV account (iCloud, Fastmail, Nextcloud) whose server, username and app
   password you enter when installing it. Its tools and a skill.
+- **maps** (`productivity/maps/maps`): find places and addresses, what's near a place (nearest first), the address
+  at a point, and routes with distance, travel time and steps by car, on foot or by bike, or the next trips by
+  public transport where [Transitous](https://transitous.org) has the timetables. Each answer links to
+  OpenStreetMap and Google Maps. It uses OpenStreetMap's Nominatim and the FOSSGIS OSRM servers, and Buenos Aires'
+  USIG for street addresses there, which OpenStreetMap mostly lacks. Read-only; no account needed.
 - **programmer** (`assistant/modes/programmer`): a skill for coding in your repositories: read the
   project's rules first, find a bug's cause before fixing it, tests first, review the diff, report what
   was verified. Pin it to a coding conversation with `/pin programmer`. Its debugging, testing and
