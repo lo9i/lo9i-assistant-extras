@@ -55,6 +55,15 @@ async def test_a_task_runs_headless_in_its_session_and_repository(fake_cli, repo
     assert "--secret-env-vars=COPILOT_GITHUB_TOKEN" in args
     assert "token in env: yes auto update: false" in steps and f"cwd: {repo.resolve()}" in steps
     assert "" not in steps  # blank lines aren't steps
+    assert "--add-dir" not in args
+
+
+async def test_the_files_sent_to_it_can_be_opened(fake_cli, repo, monkeypatch, tmp_path):
+    uploads = tmp_path / "uploads"
+    monkeypatch.setenv(runner.UPLOADS_ENV, str(uploads))
+    notes = []
+    await runner.run(_task(repo), notes.append)
+    assert f"--add-dir {uploads}" in notes[0].text
 
 
 async def test_a_nonzero_exit_fails_the_task(fake_cli, repo, monkeypatch):

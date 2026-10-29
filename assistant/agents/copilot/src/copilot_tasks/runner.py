@@ -13,6 +13,9 @@ from copilot_tasks.task_folder import Outcome, Progress, Task, note
 TOKEN_ENV = "COPILOT_GITHUB_TOKEN"
 # Where the downloaded CLI is kept, in the plugin's data folder.
 CLI_DIR_ENV = "COPILOT_CLI_DIR"
+# Where lo9i saves the files the user sends the agent (lo9i's docs/agent-plugins.md). A message names them by their
+# paths there, outside the repository, and Copilot opens files only in its folder and the ones added.
+UPLOADS_ENV = "LO9I_UPLOADS"
 # Lines of its output kept as the result: its final answer and the summary after it.
 _RESULT_LINES = 60
 # The longest line of its output read whole (a file it prints can be one long line); past the default
@@ -53,6 +56,7 @@ def command(binary: Path, task: Task) -> list[str]:
         "--session-id",
         task.session,
         f"--secret-env-vars={TOKEN_ENV}",
+        *(["--add-dir", uploads] if (uploads := os.environ.get(UPLOADS_ENV)) else []),
     ]
 
 
