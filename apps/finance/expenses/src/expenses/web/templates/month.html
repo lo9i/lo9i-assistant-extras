@@ -1,3 +1,9 @@
 {% extends "base.html" %}
 {% set nav = "month" %}
-{% block main %}{% include "_month.html" %}{% endblock %}
+{% block main %}{% include "_month.html" %}
+{% if focus %}
+<script>
+  // Opened at one bill (bills/<id>): it's picked out, in view.
+  document.getElementById("bill-{{ focus }}")?.scrollIntoView({ block: "center" });
+</script>
+{% endif %}{% endblock %}

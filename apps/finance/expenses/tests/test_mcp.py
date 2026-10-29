@@ -68,6 +68,8 @@ def test_month_summary_totals():
     s = payload(summary)
     # Both are earlier months; only the unpaid one is still listed.
     assert [b["id"] for b in s["bills"]] == [1]
+    # Where it is on the page, for lo9i's Home to link to.
+    assert s["bills"][0]["page_path"] == "bills/1"
     assert (s["total"], s["paid"], s["pending"]) == (100, 0, 100)
     assert s["by_category"] == {"tax": 100}
 

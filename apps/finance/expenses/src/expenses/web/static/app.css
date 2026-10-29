@@ -120,6 +120,7 @@ details > summary:hover { color: var(--color-text-primary); }
 .row:last-child { border-bottom: 0; }
 .row .main { flex: 1 1 200px; min-width: 0; }
 .row.paid .title, .row.paid .amount { color: var(--color-text-muted); }
+.row.focused { background: var(--color-bg-hover-ghost, rgb(127 127 127 / 0.12)); box-shadow: inset 3px 0 0 var(--color-accent, currentColor); }
 .row.editing { display: block; background: var(--surface-modal-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 16px; margin: 6px 0; }
 .title { font-weight: 600; }
 .amount { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }

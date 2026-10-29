@@ -71,7 +71,7 @@ def _db() -> Iterator[sqlite3.Connection]:
 def _title(t: Title) -> dict:
     """A title for the model: episode codes instead of nested objects, and
     no per-season counts, which only the service needs."""
-    out = asdict(t)
+    out = asdict(t) | {"page_path": t.page_path}
     del out["seasons"]
     for key in ("last_aired", "next_airing"):
         e = getattr(t, key)
@@ -196,7 +196,7 @@ def remove_title(id: int) -> str:
 def list_channels() -> list[dict]:
     """The YouTube channels followed, by name."""
     with _db() as conn:
-        return [{**asdict(c), "url": c.url} for c in service.list_channels(conn)]
+        return [{**asdict(c), "url": c.url, "page_path": c.page_path} for c in service.list_channels(conn)]
 
 
 @mcp.tool()
@@ -206,7 +206,7 @@ def add_channel(
     """Follow a YouTube channel."""
     with _db() as conn:
         c = service.add_channel(conn, _http(), channel)
-        return {**asdict(c), "url": c.url}
+        return {**asdict(c), "url": c.url, "page_path": c.page_path}
 
 
 @mcp.tool()

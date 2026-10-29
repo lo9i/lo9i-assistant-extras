@@ -182,6 +182,20 @@ def test_categories(client):
     assert "gifts" not in client.post("/categories/delete", headers=HX, data={"name": "gifts"}).text
 
 
+def test_a_bill_has_a_page_of_its_own_where_its_picked_out(client):
+    client.post("/bills", headers=HX, data={"amount": "50", "due_date": "2026-01-10", "category": "tax"})
+    client.post("/bills", headers=HX, data={"amount": "7", "due_date": "2026-01-11", "category": "tax"})
+    client.post("/bills/2/status", headers=HX, data={"status": "paid"})
+    # Unpaid: on the default month page.
+    html = client.get("/bills/1").text
+    assert 'class="row bill pending due-' in html and "focused\" id=\"bill-1\"" in html
+    assert 'getElementById("bill-1")' in html and 'id="bill-2"' not in html
+    # Paid in an earlier month, which the defaults leave out: every bill, so it's there.
+    html = client.get("/bills/2").text
+    assert 'focused" id="bill-2"' in html and 'id="bill-1"' in html
+    assert client.get("/bills/99").status_code == 404
+
+
 def test_missing_bill_is_a_plain_error(client):
     r = client.post("/bills/99/delete", headers=HX)
     assert (r.status_code, r.text) == (404, "bill 99 not found")

@@ -63,6 +63,11 @@ class Title:
         return self.released[:4] if self.released else None
 
     @property
+    def page_path(self) -> str:
+        """Where its page is on this plugin's web page, which lo9i's Home links an item to."""
+        return f"titles/{self.id}"
+
+    @property
     def watched_up_to(self) -> Episode | None:
         return Episode(self.season, self.episode) if self.season is not None else None
 
@@ -121,6 +126,11 @@ class Channel:
     @property
     def url(self) -> str:
         return f"https://www.youtube.com/{self.handle}" if self.handle else f"https://www.youtube.com/channel/{self.id}"
+
+    @property
+    def page_path(self) -> str:
+        """Where its page is on this plugin's web page, which lo9i's Home links an item to."""
+        return f"channels/{self.id}"
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Channel":

@@ -41,6 +41,8 @@ def test_a_show_from_search_to_watching():
     )
     assert payload(found)["tmdb_id"] == 95396
     show = payload(added)
+    # Where it is on the page, for lo9i's Home to link to.
+    assert show["page_path"] == "titles/1"
     assert (show["next_to_watch"], show["unwatched"], show["seasons"]) == ("S01E01", 19, 2)
     assert show["last_aired"] == {"episode": "S02E10", "air_date": "2025-03-20", "name": "Cold Harbor"}
     assert payload(watched)["status"] == "watching"
@@ -91,6 +93,7 @@ def test_channels_and_their_uploads():
         ("remove_channel", {"channel": "mkbhd"}),
     )
     assert payload(added)["id"] == CHANNEL_ID
+    assert payload(added)["page_path"] == f"channels/{CHANNEL_ID}"
     assert [v["id"] for v in payload(uploads)["videos"]] == ["new"]
     assert "failed" not in payload(uploads)
     assert removed.content[0].text == "removed Marques Brownlee & Co"
