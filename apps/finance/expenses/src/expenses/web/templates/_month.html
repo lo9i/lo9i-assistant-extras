@@ -56,7 +56,7 @@
         <h3><span>{{ g.month | month_name }}{% if now %} · this month{% endif %}</span>{% if c.months | length > 1 %}<span>{{ g.total | money }}</span>{% endif %}</h3>
         {% for b in g.bills %}
         {% set d = due(b, today) %}
-        <div class="row bill {{ b.status }}{{ ' due-' ~ d[0] if d }}" id="bill-{{ b.id }}">
+        <div class="row bill {{ b.status }}{{ ' due-' ~ d[0] if d }}{{ ' focused' if b.id == focus }}" id="bill-{{ b.id }}">
           <div class="title"><span class="status-dot {{ b.status }}" title="{{ b.status | capitalize }}"></span>{{ bill_label(b, obligations) }}{% if d %}<span class="due-tag">{{ d[1] }}</span>{% endif %}</div>
           <div class="amount">{{ b.amount | money }}{% if b.estimated %}<span class="est" title="Estimated from the last real bill">est.</span>{% endif %}</div>
           <div class="muted small meta">

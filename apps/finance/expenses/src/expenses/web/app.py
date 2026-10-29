@@ -335,6 +335,16 @@ def _month_routes(app: FastAPI) -> None:
             return _form_error(request, "_add_bill.html", "#add-bill", **ctx)
         return _render(request, "_month.html", **_month_ctx(conn, filters))
 
+    @app.get("/bills/{id}", response_class=HTMLResponse)
+    async def bill_page(request: Request, id: int, conn: Conn) -> HTMLResponse:
+        """The month page with the bill picked out, where lo9i's Home links one: unpaid this month's by default,
+        or every bill when the defaults leave it out."""
+        service.get_bill(conn, id)  # 404 for one that isn't there
+        filters = Filters.read({})
+        if not any(b.id == id for b in _month_ctx(conn, filters)["bills"]):
+            filters = Filters(scope="all", status="")
+        return _render(request, "month.html", focus=id, **_month_ctx(conn, filters))
+
     @app.get("/bills/{id}/edit", response_class=HTMLResponse)
     async def edit_bill(request: Request, id: int, conn: Conn) -> HTMLResponse:
         bill = service.get_bill(conn, id)

@@ -180,10 +180,17 @@ def test_summary_lists_episodes_to_catch_up_and_releases(conn, tmdb, tmdb_data):
     service.add_title(conn, tmdb, 1170608, "movie")
     s = service.summary(conn)
     assert s["catch_up"] == [
-        {"id": show.id, "name": "Severance", "unwatched": 2, "watched_up_to": "S02E08", "next_to_watch": "S02E09"}
+        {
+            "id": show.id,
+            "name": "Severance",
+            "page_path": f"titles/{show.id}",
+            "unwatched": 2,
+            "watched_up_to": "S02E08",
+            "next_to_watch": "S02E09",
+        }
     ]
-    coming = [(c["kind"], c["date"], c.get("episode")) for c in s["coming"]]
-    assert coming == [("movie", SOON, None), ("show", SOON, "S03E01")]
+    coming = [(c["kind"], c["date"], c.get("episode"), c["page_path"]) for c in s["coming"]]
+    assert coming == [("movie", SOON, None, "titles/2"), ("show", SOON, "S03E01", f"titles/{show.id}")]
     assert s["counts"] == {"movie": {"to_watch": 1}, "show": {"watching": 1}}
     assert [c["name"] for c in service.summary(conn, days=5)["coming"]] == []
 

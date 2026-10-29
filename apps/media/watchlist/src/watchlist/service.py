@@ -326,6 +326,7 @@ def summary(conn: sqlite3.Connection, days: int = 30) -> dict:
                 {
                     "id": t.id,
                     "name": t.name,
+                    "page_path": t.page_path,
                     "unwatched": t.unwatched,
                     "watched_up_to": t.watched_up_to.code if t.watched_up_to else None,
                     "next_to_watch": f"S{s:02d}E{e:02d}",
@@ -338,10 +339,10 @@ def summary(conn: sqlite3.Connection, days: int = 30) -> dict:
         if t.kind == "show" and t.next_airing and t.next_airing.air_date:
             n = t.next_airing
             if today.isoformat() <= n.air_date <= until:
-                show = {"id": t.id, "name": t.name, "kind": "show"}
+                show = {"id": t.id, "name": t.name, "kind": "show", "page_path": t.page_path}
                 coming.append({"date": n.air_date, **show, "episode": n.code, "episode_name": n.name})
         if t.kind == "movie" and t.released and today.isoformat() <= t.released <= until:
-            coming.append({"date": t.released, "id": t.id, "name": t.name, "kind": "movie"})
+            coming.append({"date": t.released, "id": t.id, "name": t.name, "kind": "movie", "page_path": t.page_path})
     counts: dict[str, dict[str, int]] = {k: {} for k in KINDS}
     for t in titles:
         counts[t.kind][t.status] = counts[t.kind].get(t.status, 0) + 1

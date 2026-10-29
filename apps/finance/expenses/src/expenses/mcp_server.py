@@ -73,7 +73,8 @@ def _changes(clear: list[str] | None, clearable: set[str], **given: Any) -> dict
 
 
 def _bills(bills: list) -> list[dict]:
-    return [asdict(b) for b in bills]
+    """Each with where it is on the plugin's web page, which lo9i's Home links an item to."""
+    return [asdict(b) | {"page_path": f"bills/{b.id}"} for b in bills]
 
 
 # --- Overview ---
