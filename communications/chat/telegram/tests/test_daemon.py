@@ -74,9 +74,9 @@ async def test_refused_and_unreachable_are_told_apart():
 
     lo9i = FakeLo9i(lambda r: httpx.Response(403, json={"detail": "Only the telegram channel"}), down)
     with pytest.raises(RefusedError, match="Only the telegram channel"):
-        await _daemon(lo9i).command("new")
+        await _daemon(lo9i).command("clear")
     with pytest.raises(DaemonUnavailableError):
-        await _daemon(lo9i).command("new")
+        await _daemon(lo9i).command("clear")
 
 
 class FakeChannel:

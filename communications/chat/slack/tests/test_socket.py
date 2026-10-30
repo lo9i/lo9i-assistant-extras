@@ -46,7 +46,7 @@ class FakeSocket:
 async def test_requests_are_acknowledged_and_retries_skipped():
     handlers, socket = FakeHandlers(), FakeSocket("xapp-1", None)
     requests = Requests(handlers)  # type: ignore[arg-type]
-    await requests.on_request(socket, SocketModeRequest("slash_commands", "e1", {"user_id": "U1", "command": "/new"}))
+    await requests.on_request(socket, SocketModeRequest("slash_commands", "e1", {"user_id": "U1", "command": "/clear"}))
     assert socket.responses[0].payload == {"text": "Started a new conversation."}
     retry = SocketModeRequest("events_api", "e2", {"event": {"type": "message"}}, retry_attempt=1)
     await requests.on_request(socket, retry)

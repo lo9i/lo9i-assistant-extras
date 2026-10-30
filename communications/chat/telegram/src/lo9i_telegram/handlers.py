@@ -1,5 +1,5 @@
 """Telegram updates from paired accounts, sent to lo9i: messages, with the message they reply to, buttons
-pressed and commands (/new, /start, an agent's /claude <folder>). lo9i shows what follows in the chat
+pressed and commands (/clear, /start, an agent's /claude <folder>). lo9i shows what follows in the chat
 through the stream's operations (channel.py)."""
 
 import logging

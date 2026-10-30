@@ -55,7 +55,7 @@ class Owner:
 # Until lo9i says which commands there are (its stream's `hello`): those it always has. manifest.json, which the
 # app is first created from, is the manifest with these.
 _COMMANDS = [
-    {"command": "new", "description": "Start a new conversation with your next message"},
+    {"command": "clear", "description": "Start a new conversation with your next message"},
     {"command": "pin", "description": "Keep a skill's instructions on in this conversation: /pin <skill>"},
     {"command": "unpin", "description": "Turn a pinned skill off in this conversation: /unpin <skill>"},
 ]

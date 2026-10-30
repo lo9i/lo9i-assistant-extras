@@ -8,7 +8,7 @@ from lo9i_telegram.pairing import Pairing
 
 logger = logging.getLogger(__name__)
 
-_PAIRED = "Paired ✓. You can talk to the assistant here now. /new starts a new conversation."
+_PAIRED = "Paired ✓. You can talk to the assistant here now. /clear starts a new conversation."
 
 
 def is_allowed(pairing: Pairing, update: Update) -> bool:

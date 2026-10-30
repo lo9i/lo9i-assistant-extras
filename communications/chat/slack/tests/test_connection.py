@@ -50,10 +50,10 @@ def test_the_manifest_is_named_after_the_assistant():
 
 
 def test_manifest_json_is_the_manifest_before_lo9i_names_its_commands():
-    """The file the app is first created from offers the commands lo9i always has: /new, /pin and /unpin."""
+    """The file the app is first created from offers the commands lo9i always has: /clear, /pin and /unpin."""
     saved = json.loads((Path(__file__).parents[1] / "manifest.json").read_text())
     assert saved == json.loads(connection.manifest("lo9i"))
-    assert [c["command"] for c in saved["features"]["slash_commands"]] == ["/new", "/pin", "/unpin"]
+    assert [c["command"] for c in saved["features"]["slash_commands"]] == ["/clear", "/pin", "/unpin"]
 
 
 class FakeClient:

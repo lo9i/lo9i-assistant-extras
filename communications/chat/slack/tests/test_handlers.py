@@ -1,4 +1,4 @@
-"""The channel hears only the owner's DMs and buttons and sends them to lo9i; /new and an agent's command are
+"""The channel hears only the owner's DMs and buttons and sends them to lo9i; /clear and an agent's command are
 answered with lo9i's text, privately."""
 
 from unittest.mock import create_autospec
@@ -85,9 +85,9 @@ async def test_a_button_sends_the_pressed_message_and_its_data():
 async def test_commands_are_for_the_owner_only_and_answered_with_lo9is_text():
     handlers, daemon, _ = _handlers()
     started = "Your next message starts a new conversation."
-    assert (await handlers.command({"user_id": "U1", "command": "/new"}))["text"] == started
-    assert "only answers" in (await handlers.command({"user_id": "U2", "command": "/new"}))["text"]
+    assert (await handlers.command({"user_id": "U1", "command": "/clear"}))["text"] == started
+    assert "only answers" in (await handlers.command({"user_id": "U2", "command": "/clear"}))["text"]
     await handlers.command({"user_id": "U1", "command": "/claude", "text": " ~/code/app "})
-    assert daemon.commands == [("new", ""), ("claude", "~/code/app")]
+    assert daemon.commands == [("clear", ""), ("claude", "~/code/app")]
     daemon.down = True
-    assert "isn't reachable" in (await handlers.command({"user_id": "U1", "command": "/new"}))["text"]
+    assert "isn't reachable" in (await handlers.command({"user_id": "U1", "command": "/clear"}))["text"]

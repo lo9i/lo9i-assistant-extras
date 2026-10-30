@@ -55,7 +55,7 @@ class TelegramChannel:
             await self._name.apply(self._bot, assistant_name)
 
     async def commands(self, commands: Commands) -> None:
-        """Telegram's command menu: /new and each agent's command. Any command typed goes to lo9i."""
+        """Telegram's command menu: /clear and each agent's command. Any command typed goes to lo9i."""
         if self._bot is None:
             return
         try:

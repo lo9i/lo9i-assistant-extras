@@ -1,5 +1,5 @@
 """What the Slack channel sends lo9i from Slack: the owner's DMs, with the message a thread reply answers,
-buttons pressed and slash commands (/new, an agent's /claude <folder>).
+buttons pressed and slash commands (/clear, an agent's /claude <folder>).
 lo9i shows what follows in the DM through the stream's operations (channel.py). Only the owner (the
 user who installed the app) is heard; everyone else is ignored."""
 

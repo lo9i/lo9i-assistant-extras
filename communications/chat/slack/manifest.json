@@ -15,7 +15,7 @@
     },
     "slash_commands": [
       {
-        "command": "/new",
+        "command": "/clear",
         "description": "Start a new conversation with your next message",
         "should_escape": false
       },

@@ -68,11 +68,11 @@ async def test_a_photo_and_a_voice_note_come_with_their_file(parts):
 async def test_a_command_is_answered_with_lo9is_text(parts):
     daemon, chat, choices = parts
     handlers = Handlers(daemon, chat, choices)
-    await handlers.message(CHAT, Incoming("M1", "/new"), _no_file)
+    await handlers.message(CHAT, Incoming("M1", "/clear"), _no_file)
     await handlers.message(CHAT, Incoming("M2", "/claude  ~/code/app "), _no_file)
     # A path isn't a command.
     await handlers.message(CHAT, Incoming("M3", "/Users/ani/notes.txt"), _no_file)
-    assert daemon.commands == [("new", ""), ("claude", "~/code/app")]
+    assert daemon.commands == [("clear", ""), ("claude", "~/code/app")]
     assert chat.said == ["Your next message starts a new conversation."] * 2
     assert [m[1] for m in daemon.messages] == ["/Users/ani/notes.txt"]
 

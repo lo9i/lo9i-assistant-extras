@@ -24,11 +24,11 @@ class FakeClient:
 
 async def test_hello_names_the_bot_and_shows_the_open_code(tmp_path, bot):
     client, pairing = FakeClient(), await Pairing.load(tmp_path)
-    commands = [{"command": "new", "description": "Start a side conversation"}]
+    commands = [{"command": "clear", "description": "Start a side conversation"}]
     await TelegramChannel(client, pairing, bot, "Bot: @lo9i_bot").hello("Max", commands)
     assert bot.set_my_name.call_args.args == ("Max",)
     [menu] = bot.set_my_commands.call_args.args
-    assert [(c.command, c.description) for c in menu] == [("new", "Start a side conversation")]
+    assert [(c.command, c.description) for c in menu] == [("clear", "Start a side conversation")]
     assert client.statuses[-1] == [
         ("text", "", "Bot: @lo9i_bot"),
         ("text", "", "Nobody is paired yet."),

@@ -62,11 +62,11 @@ async def test_strangers_are_not_heard(tmp_path, bot):
 async def test_a_command_is_answered_with_lo9is_text(tmp_path, bot):
     daemon = FakeDaemon()
     handlers = await _handlers(tmp_path, daemon)
-    message = create_autospec(Message, instance=True, text="/new@lo9i_bot")
+    message = create_autospec(Message, instance=True, text="/clear@lo9i_bot")
     await handlers.command(_update(effective_message=message), _context(bot))
     agent = create_autospec(Message, instance=True, text="/claude  ~/code/app ")
     await handlers.command(_update(effective_message=agent), _context(bot))
-    assert daemon.commands == [("new", ""), ("claude", "~/code/app")]
+    assert daemon.commands == [("clear", ""), ("claude", "~/code/app")]
     assert message.reply_text.call_args.args[0] == "Your next message starts a new conversation."
 
 

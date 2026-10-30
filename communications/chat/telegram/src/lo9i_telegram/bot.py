@@ -14,7 +14,7 @@ _MESSAGES = filters.TEXT & ~filters.COMMAND | filters.PHOTO | filters.Document.A
 
 def build_application(token: str, handlers: Handlers) -> Application:
     app = Application.builder().token(token).build()
-    # Every command goes to lo9i, which knows them: /new, /start and the agents' (/claude <folder>).
+    # Every command goes to lo9i, which knows them: /clear, /start and the agents' (/claude <folder>).
     app.add_handler(MessageHandler(filters.COMMAND, handlers.command))
     app.add_handler(CallbackQueryHandler(handlers.button))
     app.add_handler(MessageHandler(_MESSAGES, handlers.message))

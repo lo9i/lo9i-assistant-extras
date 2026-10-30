@@ -1,4 +1,4 @@
-"""The user's messages in their chat with themself, sent to lo9i: a command (/new, an agent's /claude <folder>),
+"""The user's messages in their chat with themself, sent to lo9i: a command (/clear, an agent's /claude <folder>),
 an answer to a message's options (choices.py), or a message, with its file and the message it replies to. lo9i
 shows what follows in the chat through the stream's operations (channel.py)."""
 
@@ -13,7 +13,7 @@ from lo9i_whatsapp.incoming import Incoming, Media
 
 logger = logging.getLogger(__name__)
 
-# /new, /claude ~/code/app; not a path like /Users/ani.
+# /clear, /claude ~/code/app; not a path like /Users/ani.
 _COMMAND = re.compile(r"^/([A-Za-z][\w-]*)(?:\s+(.*))?$", re.DOTALL)
 
 Download = Callable[[], Awaitable[bytes]]
