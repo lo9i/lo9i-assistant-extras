@@ -78,9 +78,11 @@ class Daemon:
         """What the apps show for the channel: `kind` text, code, copy or action, `label` and `value`."""
         await self._request("PUT", "/status", json={"items": list(items)})
 
-    async def done(self, operation_id: str, error: str = "", message: str = "") -> None:
-        """An operation's result: what went wrong, or the id of the message it sent."""
-        await self._request("POST", f"/deliveries/{operation_id}", json={"error": error, "message": message})
+    async def done(self, operation_id: str, error: str = "", message: str = "", messages: Sequence[str] = ()) -> None:
+        """An operation's result: what went wrong, or the id of the message it sent, and every message a send to
+        several chats took (`messages`), so replying to any of them goes on in its conversation."""
+        result = {"error": error, "message": message, **({"messages": list(messages)} if messages else {})}
+        await self._request("POST", f"/deliveries/{operation_id}", json=result)
 
     async def message(
         self,

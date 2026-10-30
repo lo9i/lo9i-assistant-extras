@@ -100,19 +100,22 @@ class FakeChannel:
         self.done.set()
         if data["chat"] == "":
             raise OperationError("No Telegram account is paired yet.")
+        if data["chat"] == "everyone":
+            return ["55", "1002"]
         return "1001"
 
 
 async def test_each_operation_is_confirmed_with_its_result_or_its_error():
     sent = {"id": "op1", "chat": "42", "text": "hi"}
     broadcast = {"id": "op2", "chat": "", "text": "hi"}
+    copies = {"id": "op3", "chat": "everyone", "text": "hi"}
     claude = [{"command": "claude", "description": "Hand this conversation to Claude Code"}]
     events = [("hello", {"assistant_name": "Max", "commands": []}), ("commands", {"commands": claude})]
-    lo9i = FakeLo9i(_sse(*events, ("send", sent), ("send", broadcast)))
+    lo9i = FakeLo9i(_sse(*events, ("send", sent), ("send", broadcast), ("send", copies)))
     channel = FakeChannel()
     running = asyncio.create_task(Runner(_daemon(lo9i), channel, LIMITS).run())
     for _ in range(100):
-        if len([r for r in lo9i.requests if "deliveries" in r.url.path]) == 2:
+        if len([r for r in lo9i.requests if "deliveries" in r.url.path]) == 3:
             break
         await asyncio.sleep(0.01)
     running.cancel()
@@ -120,6 +123,8 @@ async def test_each_operation_is_confirmed_with_its_result_or_its_error():
     assert results == {
         "op1": {"error": "", "message": "1001"},
         "op2": {"error": "No Telegram account is paired yet.", "message": ""},
+        # Sent to several chats: every copy, the one edits name last.
+        "op3": {"error": "", "message": "1002", "messages": ["55", "1002"]},
     }
     assert channel.names == ["Max"] and channel.offered == claude
 

@@ -1,0 +1,17 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. A named subagent runs nothing of its own (lo9i's core/mcp/subagents.py).
+name: coder
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+# The plugin format (lo9i's core/repositories/formats.py): 6 for subagent.
+format: 6
+description: A coding subagent the assistant hands small programming tasks to; it works in a folder with the shell and reports what it changed and verified
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: square-terminal
+subagent:
+  name: coder
+  description: Does a small, self-contained programming task in a folder on this computer (a script, a fix, a look at why something fails) with the shell, and reports what it changed and how it checked it. For bigger work in a repository, hand it to a coding agent instead (start_task).
+  prompt: prompt.md
+  # Code is where a stronger model pays off: the user's main model.
+  model: main
+  tools: [bash, list_skills, use_skill]

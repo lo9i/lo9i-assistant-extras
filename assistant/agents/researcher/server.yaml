@@ -1,0 +1,17 @@
+# Installed by lo9i from this repository (Plugins in the web app, /plugins in the terminal app). The format is
+# in lo9i's core/mcp/install.py. A named subagent runs nothing of its own (lo9i's core/mcp/subagents.py).
+name: researcher
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 1.0.0
+# The plugin format (lo9i's core/repositories/formats.py): 6 for subagent.
+format: 6
+description: A research subagent the assistant hands questions to; it reads many web pages and answers with its sources
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: book-open-text
+subagent:
+  name: researcher
+  description: Researches a question across many web pages and sources and answers with what it found, each claim with its link. For questions that need more than one search.
+  prompt: prompt.md
+  # Reading many pages is most of its work: the user's worker model keeps it cheap.
+  model: worker
+  tools: [web_search, web_extract, search_memory]

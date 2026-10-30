@@ -69,7 +69,7 @@ class TelegramChannel:
         else:
             logger.warning("Unknown action %r", action)
 
-    async def operate(self, kind: str, data: dict[str, Any]) -> str:
+    async def operate(self, kind: str, data: dict[str, Any]) -> str | list[str]:
         try:
             return await self._operate(kind, data)
         except TelegramError as e:
@@ -83,7 +83,7 @@ class TelegramChannel:
         except DaemonError as e:
             logger.warning("Couldn't send the status: %s", e)
 
-    async def _operate(self, kind: str, data: dict[str, Any]) -> str:
+    async def _operate(self, kind: str, data: dict[str, Any]) -> str | list[str]:
         bot = self._running_bot()
         if data["chat"] == _OWN_CHAT:
             return await self._operate_own(bot, kind, data)
@@ -96,9 +96,10 @@ class TelegramChannel:
             await _other(chat, kind, data)
         return ""
 
-    async def _operate_own(self, bot: Bot, kind: str, data: dict[str, Any]) -> str:
+    async def _operate_own(self, bot: Bot, kind: str, data: dict[str, Any]) -> str | list[str]:
         """In every paired account. Each chat numbers its messages on its own, so a message sent to all
-        of them has a different id in each: lo9i gets the last chat's, and edits reach each chat's copy."""
+        of them has a different id in each: lo9i gets them all, so a reply to any goes on in its conversation,
+        and edits name the last chat's, which reach each chat's copy."""
         recipients = self._recipients()
         if kind == "send":
             copies = {chat_id: await _send(TelegramChat(bot, chat_id), data) for chat_id in recipients}
@@ -106,7 +107,7 @@ class TelegramChannel:
             self._copies[sent] = copies
             while len(self._copies) > _COPIES_KEPT:
                 self._copies.popitem(last=False)
-            return sent
+            return [str(copies[chat_id]) for chat_id in recipients]
         if kind == "edit":
             # A message sent before the bot restarted: only the last chat's id is known.
             copies = self._copies.get(data["message"]) or {recipients[-1]: int(data["message"])}
