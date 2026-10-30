@@ -82,6 +82,11 @@ newer version later.
   Interrupt stops what it's doing and waits for your next message.
 - **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
   GitHub token with the Copilot Requests permission, and downloads the Copilot CLI on its first task.
+- **researcher**, **coder** (`assistant/agents/<name>`): named subagents the assistant hands tasks to with
+  `delegate`, each with its own instructions, model and tools; they run nothing of their own. researcher reads many
+  web pages (and what the assistant remembers about you) and answers with its sources, on your worker model. coder
+  does a small programming task in a folder with the shell and reports what it changed and how it checked it, on
+  your main model; commands that could do damage ask you first. Needs lo9i with named subagents (plugin format 6).
 - **hosts** (`connectivity/remote/hosts`): your Linux hosts, kept by the plugin itself, encrypted with a key
   lo9i gives it. The first time, it imports every `Host` of your `~/.ssh/config`, which it never changes; after
   that you add, edit and delete hosts on the page (an address, a user, a key file's path, other ssh options,
