@@ -68,7 +68,7 @@ async def test_the_users_own_chat_is_every_paired_account(tmp_path, bot):
     channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11, 22]), bot, "Bot: @lo9i_bot")
     buttons = [["✅ Approve", "ja:i1"], ["❌ Reject", "jr:i1"]]
     sent = await channel.operate("send", {"chat": "", "text": "The job is waiting", "buttons": buttons})
-    assert sent == "7" and [c.args[0] for c in bot.send_message.call_args_list] == [11, 22]
+    assert sent == ["7", "7"] and [c.args[0] for c in bot.send_message.call_args_list] == [11, 22]
     keys = bot.send_message.call_args.kwargs["reply_markup"].inline_keyboard[0]
     assert [k.callback_data for k in keys] == ["ja:i1", "jr:i1"]
 
@@ -78,8 +78,9 @@ async def test_an_edit_in_the_users_own_chat_reaches_each_accounts_copy(tmp_path
     ids = iter([5, 9, 6, 10])
     bot.send_message.side_effect = lambda *a, **k: create_autospec(Message, instance=True, message_id=next(ids))
     sent = await channel.operate("send", {"chat": "", "text": "Working…"})
-    assert sent == "9"
-    await channel.operate("edit", {"chat": "", "message": sent, "text": "Done"})
+    # Each account's copy, the one edits name last.
+    assert sent == ["5", "9"]
+    await channel.operate("edit", {"chat": "", "message": sent[-1], "text": "Done"})
     edits = [(c.kwargs["chat_id"], c.kwargs["message_id"]) for c in bot.edit_message_text.call_args_list]
     assert edits == [(11, 5), (22, 9)]
     # One the bot doesn't remember (sent before a restart) is edited only where its id is known to be.

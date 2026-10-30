@@ -38,9 +38,10 @@ class Channel(Protocol):
         """The user pressed one of the channel's setup buttons in an app."""
         ...
 
-    async def operate(self, kind: str, data: dict[str, Any]) -> str:
-        """Carries out a chat operation; returns the id of the message it sent ("" for others). Raises
-        when it can't."""
+    async def operate(self, kind: str, data: dict[str, Any]) -> str | list[str]:
+        """Carries out a chat operation; returns the id of the message it sent ("" for others), or for a send
+        that went to several chats (every paired account), every copy's id, the one later edits name last.
+        Raises when it can't."""
         ...
 
 
@@ -97,14 +98,16 @@ class Runner:
         if not (operation := data.get("id")):
             logger.warning("Ignored a %s operation without an id", kind)
             return
-        message, error = "", ""
+        sent: str | list[str] = ""
+        error = ""
         try:
-            message = await self._channel.operate(kind, data)
+            sent = await self._channel.operate(kind, data)
         except Exception as e:
             logger.warning("%s failed: %s", kind, e)
             error = str(e) or type(e).__name__
+        copies = sent if isinstance(sent, list) else []
         try:
-            await self._daemon.done(operation, error, message)
+            await self._daemon.done(operation, error, copies[-1] if copies else str(sent), copies)
         except DaemonError as e:
             logger.warning("Couldn't report %s: %s", kind, e)
 
