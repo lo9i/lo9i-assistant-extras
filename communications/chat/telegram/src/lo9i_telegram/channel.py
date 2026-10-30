@@ -140,7 +140,12 @@ def _message_id(message: str) -> int | None:
 
 
 async def _edit(chat: TelegramChat, message_id: int, data: dict[str, Any]) -> None:
-    await chat.edit(message_id, data["text"], data.get("markdown", False), data.get("buttons"))
+    """`keep_text`: the text is the message's own, as a press gave it, without its formatting; only the buttons
+    change."""
+    if data.get("keep_text"):
+        await chat.edit_buttons(message_id, data.get("buttons"))
+    else:
+        await chat.edit(message_id, data["text"], data.get("markdown", False), data.get("buttons"))
 
 
 async def _other(chat: TelegramChat, kind: str, data: dict[str, Any]) -> None:

@@ -53,6 +53,16 @@ class TelegramChat:
                 return
             await self._edit_plain(message_id, text, buttons)
 
+    async def edit_buttons(self, message_id: int, buttons: Buttons | None = None) -> None:
+        """Only the buttons change: the message keeps its text and formatting."""
+        try:
+            await self._bot.edit_message_reply_markup(
+                chat_id=self._chat_id, message_id=message_id, reply_markup=markup(buttons)
+            )
+        except BadRequest as e:
+            if "not modified" not in str(e):
+                logger.warning("Telegram edit failed: %s", e)
+
     async def typing(self) -> None:
         await self._bot.send_chat_action(self._chat_id, ChatAction.TYPING)
 

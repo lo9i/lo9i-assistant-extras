@@ -79,7 +79,11 @@ async def test_a_button_sends_the_pressed_message_and_its_data():
     handlers, daemon, _ = _handlers()
     await handlers.button(_press("r:abc", text="Approve bash?"))
     await handlers.button(_press("r:abc", user="U2"))
-    assert daemon.presses == [("D1", "5.0", "Approve bash?", "r:abc")]
+    await handlers.button(_press("ch:0:1a2b3c4d", text="**Push** a &lt; b?"))
+    assert daemon.presses == [
+        ("D1", "5.0", "Approve bash?", "r:abc"),
+        ("D1", "5.0", "**Push** a < b?", "ch:0:1a2b3c4d"),
+    ]
 
 
 async def test_commands_are_for_the_owner_only_and_answered_with_lo9is_text():
