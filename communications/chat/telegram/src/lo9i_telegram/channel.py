@@ -89,7 +89,7 @@ class TelegramChannel:
             return await self._operate_own(bot, kind, data)
         chat = TelegramChat(bot, int(data["chat"]))
         if kind == "send":
-            return str(await _send(chat, data))
+            return str(await _send(chat, data, _message_id(data.get("reply_to", ""))))
         if kind == "edit":
             await _edit(chat, int(data["message"]), data)
         else:
@@ -99,7 +99,8 @@ class TelegramChannel:
     async def _operate_own(self, bot: Bot, kind: str, data: dict[str, Any]) -> str | list[str]:
         """In every paired account. Each chat numbers its messages on its own, so a message sent to all
         of them has a different id in each: lo9i gets them all, so a reply to any goes on in its conversation,
-        and edits name the last chat's, which reach each chat's copy."""
+        and edits name the last chat's, which reach each chat's copy. Nothing there quotes a message: a message's id
+        is one chat's."""
         recipients = self._recipients()
         if kind == "send":
             copies = {chat_id: await _send(TelegramChat(bot, chat_id), data) for chat_id in recipients}
@@ -129,8 +130,13 @@ class TelegramChannel:
         return self._bot
 
 
-async def _send(chat: TelegramChat, data: dict[str, Any]) -> int:
-    return await chat.send(data["text"], data.get("markdown", False), data.get("buttons"))
+async def _send(chat: TelegramChat, data: dict[str, Any], reply_to: int | None = None) -> int:
+    return await chat.send(data["text"], data.get("markdown", False), data.get("buttons"), reply_to)
+
+
+def _message_id(message: str) -> int | None:
+    """A Telegram message's id, as lo9i got it; None for none."""
+    return int(message) if message.isdigit() else None
 
 
 async def _edit(chat: TelegramChat, message_id: int, data: dict[str, Any]) -> None:

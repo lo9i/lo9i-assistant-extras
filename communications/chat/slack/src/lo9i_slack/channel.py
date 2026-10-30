@@ -1,6 +1,6 @@
 """What the Slack channel does with lo9i's stream (runner.py): keeps the apps' status current (the
 manifest is named after the assistant) and carries out chat operations; the user's own chat is the
-owner's DM with the bot."""
+owner's DM with the bot, and what answers a message in a thread goes in that thread."""
 
 import logging
 from collections.abc import Sequence
@@ -14,6 +14,7 @@ from lo9i_slack.daemon import DaemonError
 from lo9i_slack.port import SlackChat
 from lo9i_slack.runner import Commands, OperationError
 from lo9i_slack.status import items
+from lo9i_slack.threads import Threads
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class SlackChannel:
         self._connection = connection
         self._assistant_name = "lo9i"
         self._commands: Commands = []
+        self._threads = Threads()
 
     async def hello(self, assistant_name: str, commands: Commands) -> None:
         self._commands = commands
@@ -59,9 +61,10 @@ class SlackChannel:
             raise OperationError(f"Slack didn't take it: {e}") from e
 
     async def _operate(self, kind: str, data: dict[str, Any]) -> str:
-        chat = SlackChat(self._running(), await self._channel(data["chat"]))
+        channel = await self._channel(data["chat"])
+        chat = SlackChat(self._running(), channel)
         if kind == "send":
-            return await chat.send(data["text"], markdown=data.get("markdown", False), buttons=data.get("buttons"))
+            return await self._send(chat, channel, data)
         if kind == "edit":
             await chat.edit(
                 data["message"], data["text"], markdown=data.get("markdown", False), buttons=data.get("buttons")
@@ -71,6 +74,15 @@ class SlackChannel:
         elif kind == "voice":
             raise OperationError("Slack can't take voice notes from the bot.")
         return ""
+
+    async def _send(self, chat: SlackChat, channel: str, data: dict[str, Any]) -> str:
+        """In the thread of the message it answers, if that one is in a thread."""
+        thread = await self._threads.root(self._running(), channel, data.get("reply_to", ""))
+        sent = await chat.send(
+            data["text"], markdown=data.get("markdown", False), buttons=data.get("buttons"), thread=thread
+        )
+        self._threads.keep(channel, sent, thread)
+        return sent
 
     async def _channel(self, chat: str) -> str:
         """The owner's DM for the user's own chat."""

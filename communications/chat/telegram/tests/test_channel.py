@@ -106,3 +106,15 @@ async def test_edits_typing_and_voice_go_to_the_chat(tmp_path, bot):
     assert await channel.operate("typing", {"chat": "42"}) == ""
     await channel.operate("voice", {"chat": "42", "audio": "T2dnUw=="})
     assert bot.send_voice.call_args.args == (42, b"OggS")
+
+
+async def test_a_send_quotes_the_message_it_answers_in_its_chat_only(tmp_path, bot):
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, "Bot: @lo9i_bot")
+    await channel.operate("send", {"chat": "42", "text": "Sure.", "reply_to": "5"})
+    replied = bot.send_message.call_args.kwargs["reply_parameters"]
+    assert (replied.message_id, replied.allow_sending_without_reply) == (5, True)
+    await channel.operate("send", {"chat": "42", "text": "Hi."})
+    assert bot.send_message.call_args.kwargs["reply_parameters"] is None
+    # A message's id is one chat's: the user's own chat, every paired account, quotes nothing.
+    await channel.operate("send", {"chat": "", "text": "Done.", "reply_to": "5"})
+    assert bot.send_message.call_args.kwargs["reply_parameters"] is None

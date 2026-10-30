@@ -2,7 +2,7 @@
 
 import logging
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, ReplyParameters
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest
 
@@ -25,14 +25,20 @@ class TelegramChat:
         self._bot = bot
         self._chat_id = chat_id
 
-    async def send(self, text: str, markdown: bool = False, buttons: Buttons | None = None) -> int:
+    async def send(
+        self, text: str, markdown: bool = False, buttons: Buttons | None = None, reply_to: int | None = None
+    ) -> int:
+        """`reply_to`: the message it answers, which it quotes; sent all the same when that message is gone."""
+        replied = ReplyParameters(reply_to, allow_sending_without_reply=True) if reply_to else None
         try:
             body, parse_mode = _formatted(text, markdown)
             message = await self._bot.send_message(
-                self._chat_id, body, parse_mode=parse_mode, reply_markup=markup(buttons)
+                self._chat_id, body, parse_mode=parse_mode, reply_markup=markup(buttons), reply_parameters=replied
             )
         except BadRequest:
-            message = await self._bot.send_message(self._chat_id, text, reply_markup=markup(buttons))
+            message = await self._bot.send_message(
+                self._chat_id, text, reply_markup=markup(buttons), reply_parameters=replied
+            )
         return message.message_id
 
     async def edit(self, message_id: int, text: str, markdown: bool = False, buttons: Buttons | None = None) -> None:

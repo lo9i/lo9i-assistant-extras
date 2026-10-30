@@ -27,17 +27,20 @@ class SlackChat:
         self._client = client
         self._channel = channel
 
-    async def send(self, text: str, *, markdown: bool = False, buttons: Buttons | None = None) -> str:
-        blocks = _blocks(text, markdown, buttons)
+    async def send(self, text: str, *, markdown: bool = False, buttons: Buttons | None = None, thread: str = "") -> str:
+        """`thread`: the timestamp of the first message of the thread it goes in; "" for none."""
+        blocks, thread_ts = _blocks(text, markdown, buttons), thread or None
         try:
             response = await self._client.chat_postMessage(
-                channel=self._channel, text=text, blocks=blocks, mrkdwn=False
+                channel=self._channel, text=text, blocks=blocks, mrkdwn=False, thread_ts=thread_ts
             )
         except SlackApiError as e:
             if not markdown:
                 raise
             logger.warning("Slack rejected a markdown message: %s", e)
-            response = await self._client.chat_postMessage(channel=self._channel, text=text, mrkdwn=False)
+            response = await self._client.chat_postMessage(
+                channel=self._channel, text=text, mrkdwn=False, thread_ts=thread_ts
+            )
         return str(response["ts"])
 
     async def edit(self, message_id: str, text: str, *, markdown: bool = False, buttons: Buttons | None = None) -> None:
