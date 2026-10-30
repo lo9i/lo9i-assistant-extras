@@ -55,7 +55,7 @@ class Step:
     name, `detail` what it's about) or a tool call's result (`tool` the call it ends, `text` its output).
     `text_delta` and `thinking_delta` are the words of a text or thinking as they're written, before the
     whole of it comes as a `text` or `thinking` step. `id` is a tool call's id, `within` the id of the call
-    whose subagent took the step."""
+    whose subagent took the step. `waiting` is for a `user` step: this worker takes no messages while it works."""
 
     kind: Kind
     text: str = ""
@@ -63,6 +63,7 @@ class Step:
     detail: str = ""
     id: str = ""
     within: str = ""
+    waiting: bool = False
 
     def to_json(self) -> str:
         return json.dumps({k: v for k, v in asdict(self).items() if v}, ensure_ascii=False)

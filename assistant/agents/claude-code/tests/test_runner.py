@@ -226,10 +226,42 @@ async def test_a_message_sent_while_it_works_goes_to_it_and_it_ends_once_it_answ
     assert seen["client"].sent == ["fix the tests", "and update the docs"]
     assert steps == [
         Step("tool", tool="Bash", detail="pytest", id="1"),
-        Step("user", "and update the docs", id="0001"),
+        Step("user", "and update the docs", id="0001", waiting=True),
+        Step("taken", id="0001"),  # Claude Code echoed it: it got to it
         Step("text", "Fixed, and the docs too."),
     ]
     assert outcome.ok and outcome.text == "Docs too."
+
+
+async def test_a_message_claude_code_hasnt_got_to_stays_waiting(monkeypatch, inbox, tmp_path):
+    """Claude Code takes a message once it's done with the turn in progress: until it echoes it, there's no `taken`
+    step, so lo9i sends it again if the user stops the task."""
+
+    class Busy(FakeClient):
+        async def query(self, text):
+            if text == "fix the tests":
+                await super().query(text)
+            else:
+                self.sent.append(text)  # held until its turn ends, which it never does
+
+    def client(options):
+        return Busy(lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "sleep 600"})], "c")])
+
+    monkeypatch.setattr(runner, "ClaudeSDKClient", client)
+    monkeypatch.setenv(runner.TOKEN_ENV, "sk-ant-api03-x")
+    steps = []
+
+    def progress(step):
+        steps.append(step)
+        if step.kind == "tool":
+            _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(runner.run(_task(), progress, inbox), 0.3)
+    assert steps == [
+        Step("tool", tool="Bash", detail="sleep 600", id="1"),
+        Step("user", "and update the docs", id="0001", waiting=True),
+    ]
 
 
 async def test_an_interrupt_stops_the_step_and_it_waits_for_the_next_message(monkeypatch, inbox, tmp_path):
@@ -257,7 +289,8 @@ async def test_an_interrupt_stops_the_step_and_it_waits_for_the_next_message(mon
         Step("tool", tool="Bash", detail="sleep 600", id="1"),
         note(runner._INTERRUPTED),
         Step("result", "Interrupted", "Bash", id="1"),
-        Step("user", "do it so", id="0002"),
+        Step("user", "do it so", id="0002", waiting=True),
+        Step("taken", id="0002"),
         Step("text", "Done another way."),
     ]
     assert outcome.ok and outcome.text == "Another way."
