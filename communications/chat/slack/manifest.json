@@ -16,7 +16,17 @@
     "slash_commands": [
       {
         "command": "/new",
-        "description": "Start a new conversation",
+        "description": "Start a new conversation with your next message",
+        "should_escape": false
+      },
+      {
+        "command": "/pin",
+        "description": "Keep a skill's instructions on in this conversation: /pin <skill>",
+        "should_escape": false
+      },
+      {
+        "command": "/unpin",
+        "description": "Turn a pinned skill off in this conversation: /unpin <skill>",
         "should_escape": false
       }
     ]

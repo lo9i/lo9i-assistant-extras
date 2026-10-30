@@ -1,6 +1,7 @@
 """The tokens are checked with Slack before the channel starts, and the status shows the outcome."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -46,6 +47,13 @@ def test_the_manifest_is_named_after_the_assistant():
     app = json.loads(connection.manifest("Max"))
     assert app["display_information"]["name"] == "Max" and app["features"]["bot_user"]["display_name"] == "Max"
     assert app["settings"]["socket_mode_enabled"] is True
+
+
+def test_manifest_json_is_the_manifest_before_lo9i_names_its_commands():
+    """The file the app is first created from offers the commands lo9i always has: /new, /pin and /unpin."""
+    saved = json.loads((Path(__file__).parents[1] / "manifest.json").read_text())
+    assert saved == json.loads(connection.manifest("lo9i"))
+    assert [c["command"] for c in saved["features"]["slash_commands"]] == ["/new", "/pin", "/unpin"]
 
 
 class FakeClient:
