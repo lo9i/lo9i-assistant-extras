@@ -21,8 +21,8 @@ class FakeDaemon:
     async def press(self, chat, message, text, data):
         self.presses.append((chat, message, text, data))
 
-    async def command(self, command, text=""):
-        self.commands.append((command, text))
+    async def command(self, command, text="", chat="", reply_to=""):
+        self.commands.append((command, text, chat, reply_to))
         return "Your next message starts a new conversation."
 
 
@@ -72,8 +72,14 @@ async def test_a_command_is_answered_with_lo9is_text(parts):
     await handlers.message(CHAT, Incoming("M2", "/claude  ~/code/app "), _no_file)
     # A path isn't a command.
     await handlers.message(CHAT, Incoming("M3", "/Users/ani/notes.txt"), _no_file)
-    assert daemon.commands == [("clear", ""), ("claude", "~/code/app")]
-    assert chat.said == ["Your next message starts a new conversation."] * 2
+    # Sent as a reply, it carries the message it replies to: /pin changes that message's conversation.
+    await handlers.message(CHAT, Incoming("M4", "/pin coding", "M1"), _no_file)
+    assert daemon.commands == [
+        ("clear", "", CHAT, ""),
+        ("claude", "~/code/app", CHAT, ""),
+        ("pin", "coding", CHAT, "M1"),
+    ]
+    assert chat.said == ["Your next message starts a new conversation."] * 3
     assert [m[1] for m in daemon.messages] == ["/Users/ani/notes.txt"]
 
 

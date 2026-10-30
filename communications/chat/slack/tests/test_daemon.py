@@ -60,7 +60,12 @@ async def test_what_the_user_does_goes_to_lo9i():
     assert b'name="chat"\r\n\r\n42' in sent and b'name="voice"\r\n\r\ntrue' in sent and b'filename="a.jpg"' in sent
     assert b'name="reply_to"\r\n\r\n5' in sent and b'name="message"\r\n\r\n8' in sent
     assert json.loads(lo9i.requests[1].content) == {"chat": "42", "message": "9", "text": "Approve?", "data": "a:i1"}
-    assert json.loads(lo9i.requests[2].content) == {"command": "claude", "text": "~/code/app"}
+    assert json.loads(lo9i.requests[2].content) == {
+        "command": "claude",
+        "text": "~/code/app",
+        "chat": "",
+        "reply_to": "",
+    }
     assert [r.url.path for r in lo9i.requests] == [
         "/channels/slack/messages",
         "/channels/slack/presses",

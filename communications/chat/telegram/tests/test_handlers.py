@@ -21,8 +21,8 @@ class FakeDaemon:
     async def press(self, chat, message, text, data):
         self.presses.append((chat, message, text, data))
 
-    async def command(self, command, text=""):
-        self.commands.append((command, text))
+    async def command(self, command, text="", chat="", reply_to=""):
+        self.commands.append((command, text, chat, reply_to))
         return "Your next message starts a new conversation."
 
 
@@ -62,12 +62,21 @@ async def test_strangers_are_not_heard(tmp_path, bot):
 async def test_a_command_is_answered_with_lo9is_text(tmp_path, bot):
     daemon = FakeDaemon()
     handlers = await _handlers(tmp_path, daemon)
-    message = create_autospec(Message, instance=True, text="/clear@lo9i_bot")
+    message = create_autospec(Message, instance=True, text="/clear@lo9i_bot", chat_id=222, reply_to_message=None)
     await handlers.command(_update(effective_message=message), _context(bot))
-    agent = create_autospec(Message, instance=True, text="/claude  ~/code/app ")
+    agent = create_autospec(Message, instance=True, text="/claude  ~/code/app ", chat_id=222, reply_to_message=None)
     await handlers.command(_update(effective_message=agent), _context(bot))
-    assert daemon.commands == [("clear", ""), ("claude", "~/code/app")]
+    assert daemon.commands == [("clear", "", "222", ""), ("claude", "~/code/app", "222", "")]
     assert message.reply_text.call_args.args[0] == "Your next message starts a new conversation."
+
+
+async def test_a_command_sent_as_a_reply_carries_the_message_it_replies_to(tmp_path, bot):
+    daemon = FakeDaemon()
+    handlers = await _handlers(tmp_path, daemon)
+    replied = create_autospec(Message, instance=True, message_id=7)
+    pin = create_autospec(Message, instance=True, text="/pin coding", chat_id=222, reply_to_message=replied)
+    await handlers.command(_update(effective_message=pin), _context(bot))
+    assert daemon.commands == [("pin", "coding", "222", "7")]
 
 
 def _message(text: str, **fields) -> MagicMock:

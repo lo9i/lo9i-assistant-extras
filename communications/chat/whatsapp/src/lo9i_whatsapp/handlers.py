@@ -36,7 +36,7 @@ class Conversation(Protocol):
         message: str = "",
     ) -> None: ...
     async def press(self, chat: str, message: str, text: str, data: str) -> None: ...
-    async def command(self, command: str, text: str = "") -> str: ...
+    async def command(self, command: str, text: str = "", chat: str = "", reply_to: str = "") -> str: ...
 
 
 class Say(Protocol):
@@ -66,7 +66,8 @@ class Handlers:
         text = incoming.text.strip()
         if incoming.media is None and (command := _COMMAND.match(text)):
             name, rest = command.group(1), (command.group(2) or "").strip()
-            await self._chat.say(await self._daemon.command(name, rest))
+            # Sent as a reply, /pin and /unpin change the conversation of the message it replies to.
+            await self._chat.say(await self._daemon.command(name, rest, chat, incoming.reply_to))
             return
         if incoming.media is None and (pick := self._choices.pick(text, incoming.reply_to)):
             await self._daemon.press(chat, pick.offer.message, pick.offer.text, pick.data)
