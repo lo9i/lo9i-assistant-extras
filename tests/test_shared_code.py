@@ -49,6 +49,10 @@ ACCEPTED = {
     ("agent task folder", "_message"): _NO_MESSAGES,
     ("agent task folder", "Runner"): _NO_MESSAGES,
     ("agent task folder", "run"): _NO_MESSAGES,
+    ("agent task folder", "Measured"): (
+        "Copilot's CLI doesn't say how full its context is (lo9i's docs/agent-plugins.md: context.json is optional), "
+        "so its worker has none to write while it works."
+    ),
 }
 
 

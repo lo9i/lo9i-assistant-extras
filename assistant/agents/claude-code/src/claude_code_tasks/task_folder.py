@@ -2,8 +2,8 @@
 starts the worker with the folder as its last argument; the worker writes its pid, appends each step to
 progress.log as a JSON line, and writes result.json last. Stopping the task signals the worker's process
 group, so the worker leads its own and everything it starts goes with it. While it works, what the user
-sends it comes through inbox/ (Inbox). How full the agent's context is once it answered goes in context.json,
-just before result.json."""
+sends it comes through inbox/ (Inbox). How full the agent's context is goes in context.json, written whole
+as it works and once more just before result.json."""
 
 import asyncio
 import json
@@ -127,9 +127,11 @@ def _message(path: Path) -> Message:
 
 # Records one step of what the agent is doing.
 Progress = Callable[[Step], None]
+# Records how full the agent's context is now, while it works. It never fails: the task goes on without it.
+Measured = Callable[[Context], None]
 # Runs the task with the agent and says how it ended, taking what the user sends meanwhile from the inbox.
 # Errors it raises end the task as failed.
-Runner = Callable[[Task, Progress, Inbox], Awaitable[Outcome]]
+Runner = Callable[[Task, Progress, Inbox, Measured], Awaitable[Outcome]]
 
 
 def main(runner: Runner) -> None:
@@ -148,10 +150,16 @@ async def run(folder: Path, task: Task, runner: Runner) -> Outcome:
         with (folder / "progress.log").open("a", encoding="utf-8") as log:
             log.write(step.to_json() + "\n")
 
+    def measured(context: Context) -> None:
+        try:
+            _write_whole(folder / "context.json", asdict(context))
+        except OSError as e:
+            print(f"Couldn't write how full the context is: {e}", file=sys.stderr)
+
     inbox = Inbox(folder)
     inbox.open()
     try:
-        outcome = await runner(task, progress, inbox)
+        outcome = await runner(task, progress, inbox, measured)
     except Exception as e:
         outcome = Outcome(ok=False, text=f"{type(e).__name__}: {e}")
     finally:

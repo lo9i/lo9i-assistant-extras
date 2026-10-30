@@ -4,6 +4,8 @@ else needs installing."""
 import asyncio
 import os
 import sys
+import time
+from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
@@ -22,7 +24,7 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import ThinkingConfig
 
 from claude_code_tasks.relay import Relay
-from claude_code_tasks.task_folder import Context, Inbox, Message, Outcome, Progress, Step, Task, note
+from claude_code_tasks.task_folder import Context, Inbox, Measured, Message, Outcome, Progress, Step, Task, note
 
 # The plugin's optional field: a Claude token (`claude setup-token`, from a Pro or Max plan) or an
 # Anthropic API key.
@@ -55,25 +57,29 @@ _UNDER_LO9I = (
 # Shown when the user interrupts it, and as the result of each call it stopped.
 _INTERRUPTED = "Interrupted: waiting for your next message"
 _INTERRUPTED_CALL = "Interrupted"
+# How full its context is, told while it works at most this often: each time Claude Code counts it afresh.
+_MEASURE_SECONDS = 15
 
 
-async def run(task: Task, progress: Progress, inbox: Inbox) -> Outcome:
+async def run(task: Task, progress: Progress, inbox: Inbox, measured: Measured) -> Outcome:
     """With the Claude token when there is one, else on the user's Copilot plan."""
     token, github_token = _take(TOKEN_ENV), _take(COPILOT_ENV)
     if token:
-        return await _run(task, progress, inbox, options(task, auth_env(token)))
+        return await _run(task, progress, inbox, measured, options(task, auth_env(token)))
     if not github_token:
         raise RuntimeError(_NO_LOGIN)
     async with Relay(github_token).running() as relay:
         progress(note("Using Claude on your GitHub Copilot plan"))
-        outcome = await _run(task, progress, inbox, options(task, relay.claude_env()))
+        outcome = await _run(task, progress, inbox, measured, options(task, relay.claude_env()))
     # Claude Code prices its calls at Anthropic's API rates, which isn't what Copilot charges.
     return replace(outcome, cost_usd=None)
 
 
-async def _run(task: Task, progress: Progress, inbox: Inbox, settings: ClaudeAgentOptions) -> Outcome:
+async def _run(
+    task: Task, progress: Progress, inbox: Inbox, measured: Measured, settings: ClaudeAgentOptions
+) -> Outcome:
     async with ClaudeSDKClient(settings) as client:
-        result = await Session(client, progress, inbox).answer(task.prompt)
+        result = await Session(client, progress, inbox, Gauge(client, measured)).answer(task.prompt)
         context = await _context(client) if result is not None else None
     if result is None:
         return Outcome(ok=False, text="Claude Code ended without a result.")
@@ -92,14 +98,51 @@ async def _context(client: ClaudeSDKClient) -> Context | None:
     return Context(tokens=usage["totalTokens"], window=usage["rawMaxTokens"])
 
 
+class Gauge:
+    """How full Claude Code's context is, told while it works: after each of its messages, at most every
+    `every` seconds, since each time it counts it afresh. It's asked beside the session, so the steps keep
+    flowing while it answers. When Claude Code can't say, it isn't asked again until the task ends."""
+
+    def __init__(
+        self,
+        client: ClaudeSDKClient,
+        measured: Measured,
+        every: float = _MEASURE_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._client, self._measured, self._every, self._clock = client, measured, every, clock
+        self._asked_at: float | None = None
+        self._asking: asyncio.Task[None] | None = None
+        self._unknown = False
+
+    def stepped(self) -> None:
+        if self._unknown or (self._asking is not None and not self._asking.done()):
+            return
+        if self._asked_at is not None and self._clock() - self._asked_at < self._every:
+            return
+        self._asked_at = self._clock()
+        self._asking = asyncio.create_task(self._measure())
+
+    async def _measure(self) -> None:
+        context = await _context(self._client)
+        if context is None:
+            self._unknown = True
+            return
+        self._measured(context)
+
+    def stop(self) -> None:
+        if self._asking is not None:
+            self._asking.cancel()
+
+
 class Session:
     """Claude Code's session for the task, kept open so the user can steer it while it works. A message
     from the inbox goes to it at once, and it takes it between its steps, echoing it back as it does
     (`replay-user-messages`); an interrupt stops the step in progress, and the session waits for the
     user's next message. It ends once Claude Code has answered every message, with its last result."""
 
-    def __init__(self, client: ClaudeSDKClient, progress: Progress, inbox: Inbox) -> None:
-        self._client, self._progress, self._inbox = client, progress, inbox
+    def __init__(self, client: ClaudeSDKClient, progress: Progress, inbox: Inbox, gauge: Gauge) -> None:
+        self._client, self._progress, self._inbox, self._gauge = client, progress, inbox, gauge
         self._steps = Steps()
         # The messages sent that Claude Code hasn't taken yet, with their ids in the inbox ("" for the task's).
         self._untaken: list[tuple[str, str]] = []
@@ -117,6 +160,7 @@ class Session:
         finally:
             listening.cancel()
             answering.cancel()
+            self._gauge.stop()
         if listening in done:
             listening.result()  # it only ends with an error
         return answering.result()
@@ -126,6 +170,8 @@ class Session:
         async for message in self._client.receive_messages():
             for step in self._steps.of(message):
                 self._progress(self._shown(step))
+            if isinstance(message, AssistantMessage | ResultMessage):
+                self._gauge.stepped()
             self._taken(message)
             if isinstance(message, ResultMessage):
                 result = message
