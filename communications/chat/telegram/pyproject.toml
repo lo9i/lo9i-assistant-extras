@@ -11,6 +11,7 @@ dependencies = [
 
 [project.scripts]
 lo9i-telegram = "lo9i_telegram.app:main"
+lo9i-telegram-check = "lo9i_telegram.check:main"
 
 [dependency-groups]
 dev = [

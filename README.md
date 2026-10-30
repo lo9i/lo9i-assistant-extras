@@ -68,16 +68,18 @@ newer version later.
   Installing it also takes the accounts that were connected by hand before it existed.
 - **contacts** (`communications/contacts/contacts`): the assistant looks people up in your contacts, by
   name, email or phone number: their numbers, emails, birthday and addresses. It only reads. Given a CardDAV
-  account (iCloud with an app-specific password, Fastmail, Nextcloud), it reads that, on any computer;
-  without one, the Contacts on your Mac, while the assistant runs in your login session. Google Contacts
-  needs a sign-in it doesn't do yet.
+  account (iCloud with an app-specific password, Fastmail, Nextcloud), it reads that, on any computer; signed
+  in with Google in its setup (an OAuth app of your own, with the CardDAV API on), Google Contacts; without
+  either, the Contacts on your Mac, while the assistant runs in your login session. A CardDAV account is
+  checked when it's installed, so a wrong password shows there.
 - **phone** (`communications/phone/phone`): the assistant calls people with the Phone app on your Mac,
   through your iPhone, with their numbers from the contacts plugin. macOS asks you to confirm each call,
   and you do the talking. Mac only, while the assistant runs in your login session.
 - **claude-code** (`assistant/agents/claude-code`): hand coding tasks to Claude Code, which works on
   them on its own in the repository you name and reports back. While the assistant's model is GitHub
   Copilot it runs on your Copilot plan, with nothing to enter; otherwise it takes a Claude token (from a
-  Pro or Max plan, `claude setup-token`) or an Anthropic API key. The Claude Code CLI comes with the plugin.
+  Pro or Max plan, `claude setup-token`) or an Anthropic API key, which is checked when it's installed. The
+  Claude Code CLI comes with the plugin.
   While it works in a conversation handed to it, what you write there reaches it between its steps, and
   Interrupt stops what it's doing and waits for your next message.
 - **copilot** (`assistant/agents/copilot`): the same with GitHub Copilot. It asks for a fine-grained
@@ -167,6 +169,10 @@ A chat channel (`channel:` in `server.yaml`) is a process lo9i runs that talks t
 protocol is in lo9i's `docs/channel-plugins.md`. A coding agent (`agent:`) is a worker lo9i runs for
 each task, which reads the task from a folder and writes its steps and result there; the protocol is in
 lo9i's `docs/agent-plugins.md`.
+
+A plugin that asks for a token or a password can check it when it's installed (`check:` in `server.yaml`: a
+command, or a tool of its MCP server), so a wrong one shows in the install dialog instead of on first use; what
+it writes is in lo9i's `docs/plugin-checks.md`. claude-code, telegram and contacts do.
 
 ## License
 

@@ -1,6 +1,6 @@
 [project]
 name = "lo9i-contacts"
-version = "1.1.0"
+version = "1.2.0"
 description = "The people in the user's contacts, on a CardDAV account or the Mac, for lo9i"
 requires-python = ">=3.12"
 dependencies = [

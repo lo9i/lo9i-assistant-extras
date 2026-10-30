@@ -26,7 +26,7 @@ from lo9i_telegram.runner import Runner
 logger = logging.getLogger(__name__)
 
 # Never the library's text: it quotes the token, and the status reaches every app.
-_REFUSED = "Telegram refused the bot token. Check it with @BotFather and enter it again."
+REFUSED = "Telegram refused the bot token. Check it with @BotFather and enter it again."
 
 
 def main() -> None:
@@ -52,7 +52,7 @@ async def _serve(daemon: Daemon, pairing: Pairing, token: str) -> None:
         await app.initialize()
     except InvalidToken:
         logger.error("Telegram refused the bot token.")
-        await Runner(daemon, TelegramChannel(daemon, pairing, None, _REFUSED), LIMITS).run()
+        await Runner(daemon, TelegramChannel(daemon, pairing, None, REFUSED), LIMITS).run()
         return
     async with polling(app):
         logger.info("Telegram bot running as @%s.", app.bot.username)

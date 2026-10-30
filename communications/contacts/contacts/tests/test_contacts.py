@@ -180,7 +180,10 @@ def test_denied_access_says_where_to_allow_it(on_a_mac):
         contacts.search("Ana")
 
 
-def test_off_a_mac_it_says_to_give_it_a_carddav_account(monkeypatch):
+def test_off_a_mac_it_says_to_sign_in_with_google_or_give_it_a_carddav_account(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
-    with pytest.raises(contacts.ContactsError, match="give the contacts plugin its URL, user name and password"):
+    with pytest.raises(
+        contacts.ContactsError,
+        match=r"sign in with Google .* or give it a CardDAV\s+account's URL, user name and password",
+    ):
         contacts.search("Ana")

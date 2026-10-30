@@ -57,3 +57,43 @@ async def test_with_a_carddav_account_it_reads_that_instead_of_the_mac(monkeypat
     _, result = await _call("find_contact", query="Ana")
     assert result.is_error and "all three" in result.content[0].text
     mcp_server._account.cache_clear()
+
+
+async def test_signed_in_with_google_and_no_carddav_account_it_reads_google_contacts(monkeypatch):
+    from lo9i_contacts import carddav, google
+
+    searched = []
+
+    async def search(self, query):
+        searched.append((self._url, query))
+        return []
+
+    monkeypatch.setattr(carddav.CardDav, "search", search)
+    for key in ("URL", "USER", "PASSWORD"):
+        monkeypatch.setenv(f"CARDDAV_{key}", "")
+    monkeypatch.setenv(google.ENV, json.dumps({"refresh_token": "r", "client_id": "c"}))
+    mcp_server._account.cache_clear()
+    await _call("find_contact", query="Ana")
+    assert searched == [(google.CARDDAV_URL + "/", "Ana")]
+    mcp_server._account.cache_clear()
+
+
+async def test_the_check_refuses_an_account_that_doesnt_work_and_passes_the_macs(monkeypatch):
+    from lo9i_contacts import carddav, google
+
+    async def check(self):
+        raise contacts.ContactsError("The CardDAV server refused the user name and password.")
+
+    monkeypatch.setattr(carddav.CardDav, "check", check)
+    monkeypatch.delenv(google.ENV, raising=False)
+    for key in ("URL", "USER", "PASSWORD"):
+        monkeypatch.setenv(f"CARDDAV_{key}", "")
+    mcp_server._account.cache_clear()
+    _, result = await _call("check_account")
+    assert not result.is_error
+    for key, value in {"URL": "https://contacts.icloud.com", "USER": "me@icloud.com", "PASSWORD": "pw"}.items():
+        monkeypatch.setenv(f"CARDDAV_{key}", value)
+    mcp_server._account.cache_clear()
+    _, result = await _call("check_account")
+    assert result.is_error and "refused the user name and password" in result.content[0].text
+    mcp_server._account.cache_clear()

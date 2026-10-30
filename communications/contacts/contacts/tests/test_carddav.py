@@ -89,7 +89,8 @@ class Server:
 
 
 def _account(server: Server, password: str = "pw") -> CardDav:
-    return CardDav("https://contacts.example.com", "me", password, transport=httpx2.MockTransport(server))
+    auth = httpx2.BasicAuth("me", password)
+    return CardDav("https://contacts.example.com", auth, transport=httpx2.MockTransport(server))
 
 
 async def test_contacts_are_found_on_the_account_with_their_labels_birthday_and_addresses():
@@ -136,6 +137,14 @@ async def test_a_server_found_only_at_its_well_known_address_still_works():
 async def test_a_wrong_password_says_so():
     with pytest.raises(ContactsError, match="refused the user name and password"):
         await _account(Server(), password="wrong").search("ana")
+
+
+async def test_checking_an_account_signs_in_and_finds_its_books_without_reading_them():
+    server = Server()
+    await _account(server).check()
+    assert server.reports == 0
+    with pytest.raises(ContactsError, match="refused the user name and password"):
+        await _account(Server(), password="wrong").check()
 
 
 def test_an_account_needs_all_three_or_none():

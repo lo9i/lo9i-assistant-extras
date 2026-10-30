@@ -1,11 +1,13 @@
-"""Contacts on a CardDAV server (iCloud, Fastmail, Nextcloud, ...), for a host that isn't a Mac or an account the
-Mac's Contacts don't have. The server is found the way CardDAV clients find it (RFC 6764, RFC 6352): the
-user's principal at the URL given or its /.well-known/carddav, the principal's address book home, the address
-books in it; then every vCard in them, read once and kept for CACHE_SECONDS, and searched here."""
+"""Contacts on a CardDAV server (iCloud, Fastmail, Nextcloud, Google with its own sign-in in google.py, ...), for a
+host that isn't a Mac or an account the Mac's Contacts don't have. The server is found the way CardDAV clients find
+it (RFC 6764, RFC 6352): the user's principal at the URL given or its /.well-known/carddav, the principal's address
+book home, the address books in it; then every vCard in them, read once and kept for CACHE_SECONDS, and searched
+here."""
 
 import re
 import time
 import xml.etree.ElementTree as ET
+from collections.abc import Awaitable, Callable
 from urllib.parse import urljoin
 
 import httpx2
@@ -26,6 +28,11 @@ _HOME = (
     "<d:prop><c:addressbook-home-set/></d:prop></d:propfind>"
 )
 _BOOKS = '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'
+# What a 401 means with a user name and password.
+PASSWORD_REFUSED = (
+    "The CardDAV server refused the user name and password. iCloud needs an app-specific password "
+    "(account.apple.com → Sign-In and Security)."
+)
 _CARDS = (
     '<c:addressbook-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:carddav">'
     "<d:prop><c:address-data/></d:prop></c:addressbook-query>"
@@ -36,12 +43,30 @@ class _NotDavError(ContactsError):
     """The URL answered, but not as a CardDAV collection does."""
 
 
+class _RefusedError(ContactsError):
+    """The server refused the credentials (401): what to do about it depends on what they were."""
+
+
 class CardDav:
-    def __init__(self, url: str, user: str, password: str, transport: httpx2.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        url: str,
+        auth: httpx2.Auth,
+        refused: str = PASSWORD_REFUSED,
+        transport: httpx2.AsyncBaseTransport | None = None,
+    ) -> None:
+        """`auth` signs its requests (a user name and password, or a sign-in); `refused` says what to do when the
+        server refuses them."""
         self._url = url if url.endswith("/") else url + "/"
-        self._auth = httpx2.BasicAuth(user, password)
+        self._auth = auth
+        self._refused = refused
         self._transport = transport
         self._read: tuple[float, list[Contact]] | None = None
+
+    async def check(self) -> None:
+        """Signs in and finds the account's address books, without reading them: whether the account works.
+        Raises ContactsError saying why not."""
+        await self._session(self._address_books)
 
     async def search(self, query: str) -> list[Contact]:
         """Contacts matching `query`: an email address, a phone number or a name. Raises ContactsError."""
@@ -53,14 +78,25 @@ class CardDav:
         return self._read[1]
 
     async def _read_all(self) -> list[Contact]:
+        return await self._session(self._all_cards)
+
+    async def _session[T](self, work: Callable[[httpx2.AsyncClient], Awaitable[T]]) -> T:
         try:
             async with httpx2.AsyncClient(
                 auth=self._auth, timeout=_TIMEOUT, follow_redirects=True, transport=self._transport
             ) as http:
-                books = await self._books(http, await self._home(http, await self._principal(http)))
-                return [contact for book in books for contact in await self._cards(http, book)]
+                return await work(http)
+        except _RefusedError:
+            raise ContactsError(self._refused) from None
         except httpx2.HTTPError as e:
             raise ContactsError(f"Couldn't reach the CardDAV server at {self._url}: {e}") from e
+
+    async def _all_cards(self, http: httpx2.AsyncClient) -> list[Contact]:
+        books = await self._address_books(http)
+        return [contact for book in books for contact in await self._cards(http, book)]
+
+    async def _address_books(self, http: httpx2.AsyncClient) -> list[str]:
+        return await self._books(http, await self._home(http, await self._principal(http)))
 
     async def _principal(self, http: httpx2.AsyncClient) -> str:
         for url in (self._url, urljoin(self._url, "/.well-known/carddav")):
@@ -97,10 +133,10 @@ async def _dav(http: httpx2.AsyncClient, method: str, url: str, body: str, depth
     headers = {"Depth": str(depth), "Content-Type": "application/xml; charset=utf-8"}
     response = await http.request(method, url, content=body, headers=headers)
     if response.status_code == 401:
-        raise ContactsError(
-            "The CardDAV server refused the user name and password. iCloud needs an app-specific password "
-            "(account.apple.com → Sign-In and Security)."
-        )
+        raise _RefusedError()
+    if response.status_code == 403:
+        # Google says here which API to turn on in the user's project, with its link.
+        raise ContactsError(f"The CardDAV server refused to answer {method} {url}: {_said(response)}")
     if response.status_code != 207:
         raise _NotDavError(f"The CardDAV server answered {method} {url} with {response.status_code}.")
     try:
@@ -110,6 +146,16 @@ async def _dav(http: httpx2.AsyncClient, method: str, url: str, body: str, depth
     for href in root.iter(f"{_DAV}href"):
         href.text = urljoin(str(response.url), (href.text or "").strip())
     return root
+
+
+def _said(response: httpx2.Response) -> str:
+    """The server's own words for a refusal: Google's error message, or the start of what it answered."""
+    try:
+        error = response.json().get("error")
+    except (ValueError, AttributeError):
+        error = None
+    message = error.get("message") if isinstance(error, dict) else None
+    return str(message or response.text[:300] or f"HTTP {response.status_code}").strip()
 
 
 def _hrefs(root: ET.Element, prop: str) -> list[str]:
