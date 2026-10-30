@@ -103,9 +103,11 @@ class Daemon:
         """A button pressed on `message`, whose text is `text`."""
         await self._request("POST", "/presses", json={"chat": chat, "message": message, "text": text, "data": data})
 
-    async def command(self, command: str, text: str = "") -> str:
-        """`command` without its slash, and what follows it; returns what to answer."""
-        response = await self._request("POST", "/commands", json={"command": command, "text": text})
+    async def command(self, command: str, text: str = "", chat: str = "", reply_to: str = "") -> str:
+        """`command` without its slash, and what follows it; returns what to answer. `chat` and `reply_to`: where it
+        was sent and the message it replies to, whose conversation /pin and /unpin change."""
+        sent = {"command": command, "text": text, "chat": chat, "reply_to": reply_to}
+        response = await self._request("POST", "/commands", json=sent)
         return str(response.json()["text"])
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:

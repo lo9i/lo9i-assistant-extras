@@ -1,5 +1,6 @@
 """Telegram updates from paired accounts, sent to lo9i: messages, with the message they reply to, buttons
-pressed and commands (/clear, /start, an agent's /claude <folder>). lo9i shows what follows in the chat
+pressed and commands (/clear, /start, /pin, an agent's /claude <folder>), a command too with the message it replies
+to. lo9i shows what follows in the chat
 through the stream's operations (channel.py)."""
 
 import logging
@@ -30,7 +31,7 @@ class Conversation(Protocol):
         message: str = "",
     ) -> None: ...
     async def press(self, chat: str, message: str, text: str, data: str) -> None: ...
-    async def command(self, command: str, text: str = "") -> str: ...
+    async def command(self, command: str, text: str = "", chat: str = "", reply_to: str = "") -> str: ...
 
 
 class Handlers:
@@ -39,13 +40,15 @@ class Handlers:
         self._pairing = pairing
 
     async def command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Any command, with what follows it (/claude ~/code/app): lo9i says what to answer."""
+        """Any command, with what follows it (/claude ~/code/app): lo9i says what to answer. Sent as a reply, /pin
+        and /unpin change the conversation of the message it replies to."""
         message = update.effective_message
         if message is None or not message.text or not is_allowed(self._pairing, update):
             return
         first, _, rest = message.text.partition(" ")
         name = first.removeprefix("/").split("@")[0]
-        await message.reply_text(await self._daemon.command(name, rest.strip()))
+        answer = await self._daemon.command(name, rest.strip(), str(message.chat_id), _replied(message))
+        await message.reply_text(answer)
 
     async def message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         message = update.effective_message
@@ -58,8 +61,7 @@ class Handlers:
             return
         text, voice = message.text or message.caption or "", bool(message.voice or message.audio)
         # A reply goes on in the conversation of the message it replies to.
-        replied = message.reply_to_message
-        reply_to = str(replied.message_id) if replied is not None else ""
+        reply_to = _replied(message)
         await self._daemon.message(str(message.chat_id), text, attachments, voice, reply_to, str(message.message_id))
 
     async def button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -81,3 +83,9 @@ class Handlers:
             await message.reply_text(f"⚠️ {error}")
             return
         logger.error("Telegram update failed", exc_info=error)
+
+
+def _replied(message: Message) -> str:
+    """The id of the message it replies to; "" for none."""
+    replied = message.reply_to_message
+    return str(replied.message_id) if replied is not None else ""
