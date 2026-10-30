@@ -12,11 +12,12 @@ from telegram import Bot, BotCommand
 from telegram.error import TelegramError
 
 from lo9i_telegram.daemon import DaemonError
+from lo9i_telegram.i18n import Language
 from lo9i_telegram.name import BotName
 from lo9i_telegram.pairing import Pairing
 from lo9i_telegram.port import TelegramChat
 from lo9i_telegram.runner import Commands, OperationError
-from lo9i_telegram.status import NEW_PAIRING_CODE, items
+from lo9i_telegram.status import NEW_PAIRING_CODE, REFUSED, items
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,13 @@ class StatusSink(Protocol):
 
 
 class TelegramChannel:
-    def __init__(self, daemon: StatusSink, pairing: Pairing, bot: Bot | None, bot_line: str) -> None:
-        """`bot` is None when Telegram refused the token; `bot_line` then says so."""
+    def __init__(self, daemon: StatusSink, pairing: Pairing, bot: Bot | None, t: Language) -> None:
+        """`bot` is None when Telegram refused the token, which the status then says. `t`: the language its own
+        text is in, which lo9i sets (`language`) and the handlers share."""
         self._daemon = daemon
         self._pairing = pairing
         self._bot = bot
-        self._bot_line = bot_line
+        self._t = t
         self._name = BotName()
         # The id lo9i got for a message sent to its own chat → the message's id in each paired chat.
         self._copies: OrderedDict[str, dict[int, int]] = OrderedDict()
@@ -48,6 +50,11 @@ class TelegramChannel:
     async def hello(self, assistant_name: str, commands: Commands) -> None:
         await self.renamed(assistant_name)
         await self.commands(commands)
+        await self.publish_status()
+
+    async def language(self, language: str) -> None:
+        """The language the user chose for the apps' text: the status follows it at once, the replies from then on."""
+        self._t.use(language)
         await self.publish_status()
 
     async def renamed(self, assistant_name: str) -> None:
@@ -79,7 +86,7 @@ class TelegramChannel:
         """While lo9i is away this fails quietly; every new stream starts with `hello`, which publishes it
         again."""
         try:
-            await self._daemon.set_status(items(self._bot_line, self._pairing))
+            await self._daemon.set_status(items(self._t, self._bot_line(), self._pairing))
         except DaemonError as e:
             logger.warning("Couldn't send the status: %s", e)
 
@@ -126,8 +133,13 @@ class TelegramChannel:
 
     def _running_bot(self) -> Bot:
         if self._bot is None:
-            raise OperationError(self._bot_line)
+            raise OperationError(REFUSED)
         return self._bot
+
+    def _bot_line(self) -> str:
+        if self._bot is None:
+            return self._t(REFUSED)
+        return self._t("Bot: @{username}", username=self._bot.username)
 
 
 async def _send(chat: TelegramChat, data: dict[str, Any], reply_to: int | None = None) -> int:

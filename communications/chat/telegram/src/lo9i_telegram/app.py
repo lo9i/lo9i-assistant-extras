@@ -19,14 +19,12 @@ from lo9i_telegram.bot import build_application, polling
 from lo9i_telegram.channel import TelegramChannel
 from lo9i_telegram.daemon import Daemon
 from lo9i_telegram.handlers import Handlers
+from lo9i_telegram.i18n import Language
 from lo9i_telegram.pairing import Pairing
 from lo9i_telegram.port import LIMITS
 from lo9i_telegram.runner import Runner
 
 logger = logging.getLogger(__name__)
-
-# Never the library's text: it quotes the token, and the status reaches every app.
-REFUSED = "Telegram refused the bot token. Check it with @BotFather and enter it again."
 
 
 def main() -> None:
@@ -47,17 +45,18 @@ async def run(environ: Mapping[str, str]) -> None:
 
 
 async def _serve(daemon: Daemon, pairing: Pairing, token: str) -> None:
-    app = build_application(token, Handlers(daemon, pairing))
+    """The channel and the handlers share the language, which lo9i sets on the stream."""
+    t = Language()
+    app = build_application(token, Handlers(daemon, pairing, t))
     try:
         await app.initialize()
     except InvalidToken:
         logger.error("Telegram refused the bot token.")
-        await Runner(daemon, TelegramChannel(daemon, pairing, None, REFUSED), LIMITS).run()
+        await Runner(daemon, TelegramChannel(daemon, pairing, None, t), LIMITS).run()
         return
     async with polling(app):
         logger.info("Telegram bot running as @%s.", app.bot.username)
-        channel = TelegramChannel(daemon, pairing, app.bot, f"Bot: @{app.bot.username}")
-        await Runner(daemon, channel, LIMITS).run()
+        await Runner(daemon, TelegramChannel(daemon, pairing, app.bot, t), LIMITS).run()
 
 
 if __name__ == "__main__":

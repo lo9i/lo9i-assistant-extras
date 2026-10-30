@@ -9,6 +9,7 @@ from telegram import Message
 from telegram.error import NetworkError
 
 from lo9i_telegram.channel import TelegramChannel
+from lo9i_telegram.i18n import Language
 from lo9i_telegram.pairing import FILE, Pairing
 from lo9i_telegram.runner import OperationError
 from lo9i_telegram.status import NEW_PAIRING_CODE
@@ -25,7 +26,7 @@ class FakeClient:
 async def test_hello_names_the_bot_and_shows_the_open_code(tmp_path, bot):
     client, pairing = FakeClient(), await Pairing.load(tmp_path)
     commands = [{"command": "clear", "description": "Start a side conversation"}]
-    await TelegramChannel(client, pairing, bot, "Bot: @lo9i_bot").hello("Max", commands)
+    await TelegramChannel(client, pairing, bot, Language()).hello("Max", commands)
     assert bot.set_my_name.call_args.args == ("Max",)
     [menu] = bot.set_my_commands.call_args.args
     assert [(c.command, c.description) for c in menu] == [("clear", "Start a side conversation")]
@@ -41,7 +42,7 @@ async def test_hello_names_the_bot_and_shows_the_open_code(tmp_path, bot):
 
 async def test_a_new_code_from_the_app_and_a_pairing_update_the_status(tmp_path, bot):
     client, pairing = FakeClient(), await Pairing.load(tmp_path)
-    channel = TelegramChannel(client, pairing, bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(client, pairing, bot, Language())
     first = pairing.code
     await channel.action(NEW_PAIRING_CODE)
     assert pairing.code != first and ("code", "Pairing code", pairing.code) in client.statuses[-1]
@@ -52,7 +53,7 @@ async def test_a_new_code_from_the_app_and_a_pairing_update_the_status(tmp_path,
 
 async def test_without_a_bot_operations_say_why(tmp_path):
     pairing = await Pairing.load(tmp_path)
-    channel = TelegramChannel(FakeClient(), pairing, None, "Telegram refused the bot token.")
+    channel = TelegramChannel(FakeClient(), pairing, None, Language())
     await channel.hello("Max", [])
     with pytest.raises(OperationError, match="refused"):
         await channel.operate("send", {"chat": "42", "text": "hi"})
@@ -65,7 +66,7 @@ async def _paired(tmp_path, ids):
 
 
 async def test_the_users_own_chat_is_every_paired_account(tmp_path, bot):
-    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11, 22]), bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11, 22]), bot, Language())
     buttons = [["✅ Approve", "ja:i1"], ["❌ Reject", "jr:i1"]]
     sent = await channel.operate("send", {"chat": "", "text": "The job is waiting", "buttons": buttons})
     assert sent == ["7", "7"] and [c.args[0] for c in bot.send_message.call_args_list] == [11, 22]
@@ -74,7 +75,7 @@ async def test_the_users_own_chat_is_every_paired_account(tmp_path, bot):
 
 
 async def test_an_edit_in_the_users_own_chat_reaches_each_accounts_copy(tmp_path, bot):
-    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11, 22]), bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11, 22]), bot, Language())
     ids = iter([5, 9, 6, 10])
     bot.send_message.side_effect = lambda *a, **k: create_autospec(Message, instance=True, message_id=next(ids))
     sent = await channel.operate("send", {"chat": "", "text": "Working…"})
@@ -90,7 +91,7 @@ async def test_an_edit_in_the_users_own_chat_reaches_each_accounts_copy(tmp_path
 
 
 async def test_nobody_paired_or_a_telegram_error_fails_the_operation(tmp_path, bot):
-    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, []), bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, []), bot, Language())
     with pytest.raises(OperationError, match="paired"):
         await channel.operate("send", {"chat": "", "text": "hi"})
     bot.send_message.side_effect = NetworkError("down")
@@ -99,7 +100,7 @@ async def test_nobody_paired_or_a_telegram_error_fails_the_operation(tmp_path, b
 
 
 async def test_edits_typing_and_voice_go_to_the_chat(tmp_path, bot):
-    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, Language())
     await channel.operate("edit", {"chat": "42", "message": "7", "text": "Approve bash?", "buttons": []})
     edit = bot.edit_message_text.call_args
     assert (edit.kwargs["chat_id"], edit.kwargs["message_id"], edit.kwargs["reply_markup"]) == (42, 7, None)
@@ -109,7 +110,7 @@ async def test_edits_typing_and_voice_go_to_the_chat(tmp_path, bot):
 
 
 async def test_a_send_quotes_the_message_it_answers_in_its_chat_only(tmp_path, bot):
-    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, Language())
     await channel.operate("send", {"chat": "42", "text": "Sure.", "reply_to": "5"})
     replied = bot.send_message.call_args.kwargs["reply_parameters"]
     assert (replied.message_id, replied.allow_sending_without_reply) == (5, True)
@@ -121,7 +122,7 @@ async def test_a_send_quotes_the_message_it_answers_in_its_chat_only(tmp_path, b
 
 
 async def test_an_edit_that_keeps_the_text_changes_only_the_buttons(tmp_path, bot):
-    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, "Bot: @lo9i_bot")
+    channel = TelegramChannel(FakeClient(), await _paired(tmp_path, [11]), bot, Language())
     edit = {
         "chat": "42",
         "message": "7",

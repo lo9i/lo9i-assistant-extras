@@ -3,15 +3,16 @@
 from telegram import Audio, Document, Message, PhotoSize, Voice
 
 from lo9i_telegram.daemon import Attachment
+from lo9i_telegram.i18n import translatable
 
 
 class UnsupportedMediaError(Exception):
-    pass
+    """The text says why, in English marked for translation: the handlers show it in the user's language."""
 
 
 async def attachments_from(message: Message) -> list[Attachment]:
     if message.video_note:
-        raise UnsupportedMediaError("Video messages aren't supported.")
+        raise UnsupportedMediaError(translatable("Video messages aren't supported."))
     if message.voice:
         return [await _voice(message.voice)]
     if message.audio:

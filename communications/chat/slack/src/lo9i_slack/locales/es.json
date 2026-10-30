@@ -1,0 +1,15 @@
+{
+  "App manifest": "Manifiesto de la app",
+  "Couldn't download the file from Slack: {error}": "No se pudo descargar el archivo de Slack: {error}",
+  "Personal assistant": "Asistente personal",
+  "Slack rejected the {token}: {error}": "Slack rechazó el {token}: {error}",
+  "The bot token and the user token are from different workspaces.": "El token del bot y el token de usuario son de espacios de trabajo distintos.",
+  "The {token} should start with {prefix}": "El {token} debería empezar con {prefix}",
+  "This assistant only answers the person who set it up.": "Este asistente solo responde a la persona que lo configuró.",
+  "Video isn't supported.": "Los videos no son compatibles.",
+  "Workspace: {team} · owner: {name}": "Espacio de trabajo: {team} · propietario: {name}",
+  "app token": "token de la app",
+  "bot token": "token del bot",
+  "user token": "token de usuario",
+  "⚠️ The assistant can't be reached right now. Try again in a moment.": "⚠️ No se puede contactar al asistente ahora. Vuelve a intentarlo en un momento."
+}

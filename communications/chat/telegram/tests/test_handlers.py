@@ -8,6 +8,7 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import ContextTypes
 
 from lo9i_telegram.handlers import Handlers
+from lo9i_telegram.i18n import Language
 from lo9i_telegram.pairing import FILE, Pairing
 
 
@@ -28,7 +29,7 @@ class FakeDaemon:
 
 async def _handlers(tmp_path, daemon):
     (tmp_path / FILE).write_text(json.dumps({"users": [{"id": 222, "name": "Ani"}]}))
-    return Handlers(daemon, await Pairing.load(tmp_path))
+    return Handlers(daemon, await Pairing.load(tmp_path), Language())
 
 
 def _update(user_id=222, **fields) -> MagicMock:

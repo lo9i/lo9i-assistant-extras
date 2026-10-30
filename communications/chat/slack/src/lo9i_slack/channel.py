@@ -9,8 +9,9 @@ from typing import Any, Protocol
 from slack_sdk.errors import SlackApiError, SlackClientError
 from slack_sdk.web.async_client import AsyncWebClient
 
-from lo9i_slack.connection import Owner
+from lo9i_slack.connection import Owner, SlackError
 from lo9i_slack.daemon import DaemonError
+from lo9i_slack.i18n import Language
 from lo9i_slack.port import SlackChat
 from lo9i_slack.runner import Commands, OperationError
 from lo9i_slack.status import items
@@ -29,14 +30,24 @@ class StatusSink(Protocol):
 
 
 class SlackChannel:
-    def __init__(self, daemon: StatusSink, web: AsyncWebClient | None, connection: Owner | str) -> None:
-        """Without `web` Slack refused the tokens, and `connection` says why."""
+    def __init__(
+        self, daemon: StatusSink, web: AsyncWebClient | None, connection: Owner | SlackError, t: Language
+    ) -> None:
+        """Without `web` Slack refused the tokens, and `connection` says why. `t`: the language its own text is in,
+        which lo9i sets (`language`) and the handlers share."""
         self._daemon = daemon
         self._web = web
         self._connection = connection
+        self._t = t
         self._assistant_name = "lo9i"
         self._commands: Commands = []
         self._threads = Threads()
+
+    async def language(self, language: str) -> None:
+        """The language the user chose for the apps' text: the status follows it at once, the replies from then on;
+        the manifest too, once the app is updated with it."""
+        self._t.use(language)
+        await self._publish_status()
 
     async def hello(self, assistant_name: str, commands: Commands) -> None:
         self._commands = commands
@@ -88,8 +99,8 @@ class SlackChannel:
         """The owner's DM for the user's own chat."""
         if chat != _OWN_CHAT:
             return chat
-        if isinstance(self._connection, str):
-            raise OperationError(self._connection)
+        if isinstance(self._connection, SlackError):
+            raise OperationError(str(self._connection))
         opened = (await self._running().conversations_open(users=self._connection.id)).get("channel") or {}
         return str(opened["id"])
 
@@ -97,7 +108,7 @@ class SlackChannel:
         """While lo9i is away this fails quietly; every new stream starts with `hello`, which publishes it
         again."""
         try:
-            await self._daemon.set_status(items(self._connection, self._assistant_name, self._commands))
+            await self._daemon.set_status(items(self._t, self._connection, self._assistant_name, self._commands))
         except DaemonError as e:
             logger.warning("Couldn't send the status: %s", e)
 

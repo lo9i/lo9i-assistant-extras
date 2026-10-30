@@ -12,6 +12,12 @@ from slack_sdk.errors import SlackApiError, SlackClientError
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.web.async_slack_response import AsyncSlackResponse
 
+from lo9i_slack.i18n import Language, translatable
+
+# The tokens' names, in what's said about them.
+_APP_TOKEN = translatable("app token")
+_BOT_TOKEN = translatable("bot token")
+_USER_TOKEN = translatable("user token")
 _BOT_SCOPES = ["chat:write", "commands", "files:read", "im:history", "im:read", "users:read"]
 _USER_SCOPES = [
     "channels:history",
@@ -29,7 +35,16 @@ _USER_SCOPES = [
 
 
 class SlackError(Exception):
-    """A token was rejected or a call failed. The text says which and why."""
+    """A token was rejected or a call failed. The text says which and why, in English; `shown` says it in the
+    user's language."""
+
+    def __init__(self, text: str, /, **values: str) -> None:
+        super().__init__(text.format(**values) if values else text)
+        self._text, self._values = text, values
+
+    def shown(self, t: Language) -> str:
+        """Its values translated too: a token's name is."""
+        return t(self._text, **{name: t(value) for name, value in self._values.items()})
 
 
 class SlackUnreachableError(SlackError):
@@ -61,12 +76,13 @@ _COMMANDS = [
 ]
 
 
-def manifest(name: str, commands: list[dict[str, str]] | None = None) -> str:
+def manifest(name: str, commands: list[dict[str, str]] | None = None, t: Language | None = None) -> str:
     """The app manifest to paste in Slack's "Create New App → From a manifest". Slack offers only the
     slash commands it lists, so when lo9i's commands change (an agent installed), the app's manifest is
-    updated with this one."""
+    updated with this one. Its description is in `t`'s language, English without one."""
+    t = t or Language()
     app = {
-        "display_information": {"name": name, "description": "Personal assistant"},
+        "display_information": {"name": name, "description": t("Personal assistant")},
         "features": {
             "app_home": {
                 "home_tab_enabled": False,
@@ -94,26 +110,27 @@ def _slash(command: dict[str, str]) -> dict[str, object]:
 
 async def verify(tokens: Tokens) -> Owner:
     """Checks each token with Slack. Raises SlackError, SlackUnreachableError when Slack can't be reached."""
-    _check_prefix("App token", tokens.app, "xapp-")
-    _check_prefix("Bot token", tokens.bot, "xoxb-")
-    _check_prefix("User token", tokens.user, "xoxp-")
-    await _call("App token", AsyncWebClient(tokens.app), "apps.connections.open")
-    bot = await _call("Bot token", AsyncWebClient(tokens.bot), "auth.test")
-    user = await _call("User token", AsyncWebClient(tokens.user), "auth.test")
+    _check_prefix(_APP_TOKEN, tokens.app, "xapp-")
+    _check_prefix(_BOT_TOKEN, tokens.bot, "xoxb-")
+    _check_prefix(_USER_TOKEN, tokens.user, "xoxp-")
+    await _call(_APP_TOKEN, AsyncWebClient(tokens.app), "apps.connections.open")
+    bot = await _call(_BOT_TOKEN, AsyncWebClient(tokens.bot), "auth.test")
+    user = await _call(_USER_TOKEN, AsyncWebClient(tokens.user), "auth.test")
     if bot["team_id"] != user["team_id"]:
-        raise SlackError("The bot token and the user token are from different workspaces.")
+        raise SlackError(translatable("The bot token and the user token are from different workspaces."))
     return Owner(team=str(user["team"]), id=str(user["user_id"]), name=str(user["user"]))
 
 
 def _check_prefix(label: str, token: str, prefix: str) -> None:
     if not token.startswith(prefix):
-        raise SlackError(f"{label} should start with {prefix}")
+        raise SlackError(translatable("The {token} should start with {prefix}"), token=label, prefix=prefix)
 
 
 async def _call(label: str, client: AsyncWebClient, method: str) -> AsyncSlackResponse:
     try:
         return await client.api_call(method)
     except SlackApiError as e:
-        raise SlackError(f"Slack rejected the {label.lower()}: {e.response.get('error', 'unknown error')}") from e
+        error = str(e.response.get("error", "unknown error"))
+        raise SlackError(translatable("Slack rejected the {token}: {error}"), token=label, error=error) from e
     except (SlackClientError, OSError) as e:
         raise SlackUnreachableError(f"Couldn't reach Slack: {e}") from e

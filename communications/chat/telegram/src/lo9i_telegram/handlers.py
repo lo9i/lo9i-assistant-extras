@@ -11,7 +11,8 @@ from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from lo9i_telegram.auth import is_allowed, try_pairing
-from lo9i_telegram.daemon import Attachment, DaemonError
+from lo9i_telegram.daemon import Attachment, DaemonError, DaemonUnavailableError
+from lo9i_telegram.i18n import Language
 from lo9i_telegram.media import UnsupportedMediaError, attachments_from
 from lo9i_telegram.pairing import Pairing
 
@@ -35,9 +36,11 @@ class Conversation(Protocol):
 
 
 class Handlers:
-    def __init__(self, daemon: Conversation, pairing: Pairing) -> None:
+    def __init__(self, daemon: Conversation, pairing: Pairing, t: Language) -> None:
+        """`t`: the language the replies are in, which lo9i sets on the stream (channel.py)."""
         self._daemon = daemon
         self._pairing = pairing
+        self._t = t
 
     async def command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Any command, with what follows it (/claude ~/code/app): lo9i says what to answer. Sent as a reply, /pin
@@ -52,12 +55,16 @@ class Handlers:
 
     async def message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         message = update.effective_message
-        if message is None or await try_pairing(self._pairing, update) or not is_allowed(self._pairing, update):
+        if (
+            message is None
+            or await try_pairing(self._pairing, update, self._t)
+            or not is_allowed(self._pairing, update)
+        ):
             return
         try:
             attachments = await attachments_from(message)
         except UnsupportedMediaError as e:
-            await message.reply_text(str(e))
+            await message.reply_text(self._t(str(e)))
             return
         text, voice = message.text or message.caption or "", bool(message.voice or message.audio)
         # A reply goes on in the conversation of the message it replies to.
@@ -76,9 +83,13 @@ class Handlers:
 
     async def failed(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Python-telegram-bot's error handler: a request lo9i refused or couldn't take is said in the
-        chat; anything else is a bug, logged."""
+        chat (what lo9i refused it with is in the user's language already); anything else is a bug, logged."""
         error = context.error
         message = update.effective_message if isinstance(update, Update) else None
+        if isinstance(error, DaemonUnavailableError) and message is not None:
+            logger.warning("%s", error)
+            await message.reply_text(self._t("⚠️ The assistant can't be reached right now. Try again in a moment."))
+            return
         if isinstance(error, DaemonError) and message is not None:
             await message.reply_text(f"⚠️ {error}")
             return

@@ -1,7 +1,7 @@
 """lo9i's check of the bot token before it's saved (`check:` in server.yaml, lo9i's docs/plugin-checks.md): it asks
 Telegram who the bot is (getMe), so a wrong token shows in the install dialog instead of a bot that never answers.
-It exits 1 saying why on stdout when Telegram refuses the token. When Telegram can't be reached it lets the token
-through: the bot starts once Telegram is back."""
+It exits 1 saying why on stdout, in the language lo9i gives in LO9I_LANGUAGE, when Telegram refuses the token. When
+Telegram can't be reached it lets the token through: the bot starts once Telegram is back."""
 
 import asyncio
 import os
@@ -11,7 +11,8 @@ from telegram import Bot
 from telegram.error import InvalidToken, TelegramError
 from telegram.request import BaseRequest
 
-from lo9i_telegram.app import REFUSED
+from lo9i_telegram.i18n import Language
+from lo9i_telegram.status import REFUSED
 
 
 async def problem(token: str, request: BaseRequest | None = None) -> str | None:
@@ -31,7 +32,7 @@ async def problem(token: str, request: BaseRequest | None = None) -> str | None:
 def main() -> None:
     reason = asyncio.run(problem(os.environ.get("TELEGRAM_TOKEN", "")))
     if reason:
-        print(reason)
+        print(Language(os.environ.get("LO9I_LANGUAGE", ""))(reason))
         sys.exit(1)
 
 

@@ -8,6 +8,7 @@ import pytest
 import lo9i_slack.connection as connection
 from lo9i_slack.channel import SlackChannel
 from lo9i_slack.connection import Owner, SlackError, Tokens, verify
+from lo9i_slack.i18n import Language
 from lo9i_slack.runner import OperationError
 
 _ANSWERS = {
@@ -37,7 +38,7 @@ async def test_the_owner_is_the_user_tokens_user():
 
 
 async def test_wrong_prefixes_and_mixed_workspaces_are_refused():
-    with pytest.raises(SlackError, match="App token should start with xapp-"):
+    with pytest.raises(SlackError, match="The app token should start with xapp-"):
         await verify(Tokens("xoxb-1", "xoxb-1", "xoxp-1"))
     with pytest.raises(SlackError, match="different workspaces"):
         await verify(Tokens("xapp-1", "xoxb-1", "xoxp-other"))
@@ -66,7 +67,7 @@ class FakeClient:
 
 async def test_the_status_shows_the_workspace_and_a_manifest_that_follows_the_name():
     client = FakeClient()
-    channel = SlackChannel(client, None, Owner("Acme", "U1", "ani"))
+    channel = SlackChannel(client, None, Owner("Acme", "U1", "ani"), Language())
     claude = {"command": "claude", "description": "Hand this conversation to Claude Code"}
     await channel.hello("Max", [])
     await channel.renamed("Ada")
@@ -80,8 +81,12 @@ async def test_the_status_shows_the_workspace_and_a_manifest_that_follows_the_na
 
 async def test_refused_tokens_show_why_and_fail_operations():
     client = FakeClient()
-    channel = SlackChannel(client, None, "Slack rejected the bot token: invalid_auth")
+    refused = SlackError("Slack rejected the {token}: {error}", token="bot token", error="invalid_auth")
+    channel = SlackChannel(client, None, refused, Language())
     await channel.hello("Max", [])
     assert client.statuses[-1][0] == ("text", "", "Slack rejected the bot token: invalid_auth")
     with pytest.raises(OperationError, match="invalid_auth"):
         await channel.operate("send", {"chat": "", "text": "hi"})
+    await channel.language("es")
+    assert client.statuses[-1][0] == ("text", "", "Slack rechazó el token del bot: invalid_auth")
+    assert json.loads(client.statuses[-1][1][2])["display_information"]["description"] == "Asistente personal"

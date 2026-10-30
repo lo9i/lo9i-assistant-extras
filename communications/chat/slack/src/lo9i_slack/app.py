@@ -19,6 +19,7 @@ from lo9i_slack.channel import SlackChannel
 from lo9i_slack.connection import SlackError, SlackUnreachableError, Tokens, verify
 from lo9i_slack.daemon import Daemon
 from lo9i_slack.handlers import Handlers
+from lo9i_slack.i18n import Language
 from lo9i_slack.port import LIMITS
 from lo9i_slack.runner import Runner
 from lo9i_slack.socket_mode import Requests, connected
@@ -44,17 +45,19 @@ async def run(environ: Mapping[str, str]) -> None:
 
 
 async def _serve(daemon: Daemon, tokens: Tokens) -> None:
+    """The channel and the handlers share the language, which lo9i sets on the stream."""
+    t = Language()
     try:
         owner = await verify(tokens)
     except SlackUnreachableError:
         raise
     except SlackError as e:
         logger.error("%s", e)
-        await Runner(daemon, SlackChannel(daemon, None, str(e)), LIMITS).run()
+        await Runner(daemon, SlackChannel(daemon, None, e, t), LIMITS).run()
         return
     web = AsyncWebClient(tokens.bot)
-    async with connected(tokens.app, web, Requests(Handlers(daemon, web, tokens.bot, owner.id))):
-        await Runner(daemon, SlackChannel(daemon, web, owner), LIMITS).run()
+    async with connected(tokens.app, web, Requests(Handlers(daemon, web, tokens.bot, owner.id, t))):
+        await Runner(daemon, SlackChannel(daemon, web, owner, t), LIMITS).run()
 
 
 if __name__ == "__main__":
