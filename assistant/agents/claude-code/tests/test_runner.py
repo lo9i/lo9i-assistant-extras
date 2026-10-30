@@ -82,6 +82,10 @@ async def inbox(tmp_path):
     opened.close()
 
 
+def _unmeasured(context):
+    pass
+
+
 def _send(folder, name, message):
     """As lo9i does: the message's file in inbox/, then SIGUSR1."""
     (folder / "inbox" / f"{name}.json").write_text(json.dumps(message))
@@ -177,7 +181,7 @@ async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environme
         monkeypatch, lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c"), _result()]
     )
     steps = []
-    outcome = await runner.run(_task(), steps.append, inbox)
+    outcome = await runner.run(_task(), steps.append, inbox, _unmeasured)
     assert outcome.ok and outcome.text == "Fixed 2 tests." and outcome.cost_usd == 0.42
     assert seen["client"].sent == ["fix the tests"]
     assert steps == [Step("tool", tool="Bash", detail="pytest", id="1")] and seen["options"].env == {
@@ -189,23 +193,70 @@ async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environme
 async def test_the_outcome_says_how_full_its_context_is_once_it_answered(monkeypatch, inbox):
     usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5}
     _fake(monkeypatch, lambda text: [_result()], context=usage)
-    outcome = await runner.run(_task(), lambda _: None, inbox)
+    outcome = await runner.run(_task(), lambda _: None, inbox, _unmeasured)
     assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000)
+
+
+async def test_it_says_how_full_its_context_is_while_it_works(monkeypatch, inbox):
+    """Before its answer ends: after a message of Claude Code's, while it goes on working."""
+    usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5}
+    seen = _fake(
+        monkeypatch, lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c")], usage
+    )
+    told = []
+
+    def measured(context):
+        told.append(context)
+        seen["client"]._out.put_nowait(_result())  # it answers only once it said
+
+    outcome = await runner.run(_task(), lambda _: None, inbox, measured)
+    assert told == [Context(tokens=61_000, window=200_000)]  # the result came under 15s later: not asked again
+    assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000)
+
+
+async def test_its_context_is_asked_at_most_every_few_seconds_and_not_again_once_it_cant_say():
+    class Counting(FakeClient):
+        asked = 0
+
+        async def get_context_usage(self):
+            self.asked += 1
+            return await super().get_context_usage()
+
+    async def settled():
+        for _ in range(3):
+            await asyncio.sleep(0)
+
+    now = [0.0]
+    usage = {"totalTokens": 1_000, "rawMaxTokens": 200_000}
+    says, told = Counting(lambda text: [], usage), []
+    gauge = runner.Gauge(says, told.append, every=15, clock=lambda: now[0])
+    for at in (0, 5, 14, 15, 20, 31):
+        now[0] = at
+        gauge.stepped()
+        await settled()
+    assert says.asked == 3 and told == [Context(1_000, 200_000)] * 3  # at 0, 15 and 31
+    cant = Counting(lambda text: [])
+    gauge = runner.Gauge(cant, told.append, every=15, clock=lambda: now[0])
+    for at in (40, 60, 80):
+        now[0] = at
+        gauge.stepped()
+        await settled()
+    assert cant.asked == 1
 
 
 async def test_an_answer_stands_when_claude_code_cant_say_how_full_its_context_is(monkeypatch, inbox, capsys):
     _fake(monkeypatch, lambda text: [_result()])
-    outcome = await runner.run(_task(), lambda _: None, inbox)
+    outcome = await runner.run(_task(), lambda _: None, inbox, _unmeasured)
     assert outcome.ok and outcome.text == "Fixed 2 tests." and outcome.context is None
     assert "Couldn't read Claude Code's context use" in capsys.readouterr().err
 
 
 async def test_an_error_result_fails_the_task_and_no_token_is_refused(monkeypatch, inbox):
     _fake(monkeypatch, lambda text: [_result(is_error=True, text="")])
-    outcome = await runner.run(_task(), lambda _: None, inbox)
+    outcome = await runner.run(_task(), lambda _: None, inbox, _unmeasured)
     assert not outcome.ok and outcome.text == "Claude Code ended with error_during_execution."
     with pytest.raises(RuntimeError, match="No login for Claude Code"):
-        await runner.run(_task(), lambda _: None, inbox)
+        await runner.run(_task(), lambda _: None, inbox, _unmeasured)
 
 
 async def test_a_message_sent_while_it_works_goes_to_it_and_it_ends_once_it_answered_it(monkeypatch, inbox, tmp_path):
@@ -222,7 +273,7 @@ async def test_a_message_sent_while_it_works_goes_to_it_and_it_ends_once_it_answ
         if step.kind == "tool":
             _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
 
-    outcome = await runner.run(_task(), progress, inbox)
+    outcome = await runner.run(_task(), progress, inbox, _unmeasured)
     assert seen["client"].sent == ["fix the tests", "and update the docs"]
     assert steps == [
         Step("tool", tool="Bash", detail="pytest", id="1"),
@@ -257,7 +308,7 @@ async def test_a_message_claude_code_hasnt_got_to_stays_waiting(monkeypatch, inb
             _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
 
     with pytest.raises(TimeoutError):
-        await asyncio.wait_for(runner.run(_task(), progress, inbox), 0.3)
+        await asyncio.wait_for(runner.run(_task(), progress, inbox, _unmeasured), 0.3)
     assert steps == [
         Step("tool", tool="Bash", detail="sleep 600", id="1"),
         Step("user", "and update the docs", id="0001", waiting=True),
@@ -283,7 +334,7 @@ async def test_an_interrupt_stops_the_step_and_it_waits_for_the_next_message(mon
                 0.05, _send, tmp_path, "0002", {"kind": "message", "text": "do it so"}
             )
 
-    outcome = await runner.run(_task(), progress, inbox)
+    outcome = await runner.run(_task(), progress, inbox, _unmeasured)
     assert seen["client"].interrupts == 1 and seen["client"].sent == ["fix the tests", "do it so"]
     assert steps == [
         Step("tool", tool="Bash", detail="sleep 600", id="1"),
@@ -327,7 +378,7 @@ async def test_without_a_claude_token_it_runs_on_copilot_through_the_relay(monke
     monkeypatch.setenv(runner.COPILOT_ENV, "ghu_x")
     monkeypatch.delenv(runner.TOKEN_ENV, raising=False)
     steps = []
-    outcome = await runner.run(_task(), steps.append, inbox)
+    outcome = await runner.run(_task(), steps.append, inbox, _unmeasured)
     assert outcome.ok and outcome.cost_usd is None  # Anthropic's prices aren't what Copilot charges
     assert seen == {"github_token": "ghu_x", "env": {"ANTHROPIC_BASE_URL": "http://127.0.0.1:1"}}
     assert steps == [note("Using Claude on your GitHub Copilot plan")] and runner.COPILOT_ENV not in os.environ

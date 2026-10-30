@@ -13,7 +13,7 @@ _TASK = Task("t1", "/repo", "fix it", "s1", "", "2026-10-08T00:00:00+00:00")
 
 
 async def test_steps_are_json_lines_and_the_outcome_says_when_it_ended(tmp_path):
-    async def runner(task, progress, inbox):
+    async def runner(task, progress, inbox, measured):
         progress(note("Using Claude on your GitHub Copilot plan"))
         progress(Step("tool", tool="Bash", detail="pytest", id="1"))
         return Outcome(ok=True, text="Fixed.", cost_usd=0.5)
@@ -28,7 +28,7 @@ async def test_steps_are_json_lines_and_the_outcome_says_when_it_ended(tmp_path)
 
 
 async def test_an_error_ends_the_task_as_failed(tmp_path):
-    async def runner(task, progress, inbox):
+    async def runner(task, progress, inbox, measured):
         raise RuntimeError("no login")
 
     outcome = await run(tmp_path, _TASK, runner)
@@ -44,6 +44,22 @@ def test_the_context_goes_in_a_file_of_its_own_so_an_older_lo9i_still_reads_the_
     assert result == {"ok": True, "text": "Fixed.", "finished_at": "now", "cost_usd": None}
     _write_outcome(failed, Outcome(ok=False, text="no login"))
     assert not (failed / "context.json").exists() and (failed / "result.json").exists()
+
+
+async def test_how_full_the_context_is_is_written_whole_as_it_works_and_a_failure_there_doesnt_end_it(tmp_path, capsys):
+    written = []
+
+    async def runner(task, progress, inbox, measured):
+        measured(Context(42_000, 200_000))
+        written.append(json.loads((tmp_path / "context.json").read_text()))
+        (tmp_path / "context.json").unlink()
+        (tmp_path / "context.partial").mkdir()  # so the next can't be written
+        measured(Context(50_000, 200_000))
+        return Outcome(ok=True, text="Fixed.")
+
+    outcome = await run(tmp_path, _TASK, runner)
+    assert written == [{"tokens": 42_000, "window": 200_000}] and not (tmp_path / "context.json").exists()
+    assert outcome.ok and "Couldn't write how full the context is" in capsys.readouterr().err
 
 
 def test_the_worker_writes_its_pid_and_stops_at_once_when_already_stopped(tmp_path):
