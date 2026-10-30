@@ -18,7 +18,7 @@ import httpx
 
 from copilot_tasks.task_folder import Progress, note
 
-VERSION = "1.0.91"
+VERSION = "1.0.95"
 _REGISTRY = "https://registry.npmjs.org"
 _MEMBER = "package/copilot"
 _SYSTEMS = {"darwin": "darwin", "linux": "linux"}
