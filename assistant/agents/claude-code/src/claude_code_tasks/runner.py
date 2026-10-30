@@ -101,8 +101,8 @@ class Session:
     def __init__(self, client: ClaudeSDKClient, progress: Progress, inbox: Inbox) -> None:
         self._client, self._progress, self._inbox = client, progress, inbox
         self._steps = Steps()
-        # The messages sent that Claude Code hasn't taken yet.
-        self._untaken: list[str] = []
+        # The messages sent that Claude Code hasn't taken yet, with their ids in the inbox ("" for the task's).
+        self._untaken: list[tuple[str, str]] = []
         # Interrupted: it waits for the user's next message.
         self._paused = False
         # A turn is in progress: there's something to interrupt.
@@ -148,12 +148,13 @@ class Session:
             if message.kind == "interrupt":
                 await self._interrupt()
             else:
-                self._progress(Step("user", message.text, id=message.id))
+                # Claude Code takes it once it's done with the turn in progress: `_taken` says when.
+                self._progress(Step("user", message.text, id=message.id, waiting=True))
                 self._paused = False
-                await self._say(message.text)
+                await self._say(message.text, message.id)
 
-    async def _say(self, text: str) -> None:
-        self._untaken.append(text.strip())
+    async def _say(self, text: str, message_id: str = "") -> None:
+        self._untaken.append((text.strip(), message_id))
         self._working = True
         await self._client.query(text)
 
@@ -174,8 +175,12 @@ class Session:
         """Claude Code echoes each message it takes; its subagents' prompts come with the call they're in."""
         if isinstance(message, UserMessage) and isinstance(message.content, str) and not message.parent_tool_use_id:
             text = message.content.strip()
-            if text in self._untaken:
-                self._untaken.remove(text)
+            taken = next((sent for sent in self._untaken if sent[0] == text), None)
+            if taken is None:
+                return
+            self._untaken.remove(taken)
+            if taken[1]:
+                self._progress(Step("taken", id=taken[1]))
 
 
 def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:

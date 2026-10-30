@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-Kind = Literal["note", "text", "thinking", "tool", "result", "text_delta", "thinking_delta", "user"]
+Kind = Literal["note", "text", "thinking", "tool", "result", "text_delta", "thinking_delta", "user", "taken"]
 
 
 @dataclass(frozen=True)
@@ -57,8 +57,9 @@ class Step:
     name, `detail` what it's about) or a tool call's result (`tool` the call it ends, `text` its output).
     `text_delta` and `thinking_delta` are the words of a text or thinking as they're written, before the
     whole of it comes as a `text` or `thinking` step. `user` is a message the user sent while it worked,
-    when the agent took it (`id` the message's, from the inbox). `id` is a tool call's id, `within` the id
-    of the call whose subagent took the step."""
+    passed on to the agent (`id` the message's, from the inbox), `waiting` until the agent gets to it, which
+    a `taken` step with its `id` says: lo9i sends the ones it hadn't got to again when the user stops the
+    task. `id` is a tool call's id, `within` the id of the call whose subagent took the step."""
 
     kind: Kind
     text: str = ""
@@ -66,6 +67,7 @@ class Step:
     detail: str = ""
     id: str = ""
     within: str = ""
+    waiting: bool = False
 
     def to_json(self) -> str:
         return json.dumps({k: v for k, v in asdict(self).items() if v}, ensure_ascii=False)
