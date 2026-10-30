@@ -3,7 +3,7 @@
 # updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: claude-code
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 2.4.0
+version: 2.5.0
 # The plugin format (lo9i's core/repositories/formats.py): 3 for the agent's worker.
 format: 3
 description: Hand coding tasks to Claude Code, which works on them on its own in your repositories
@@ -24,6 +24,10 @@ steps:
   - "Otherwise, with a Claude Pro or Max plan: on a computer with Claude Code, run claude setup-token and sign in. It prints a token that starts with sk-ant-oat. Or create an API key in the Anthropic Console (sk-ant-api)."
   - "A task edits files and runs commands in the repository it's given without asking, so the assistant asks you before each one starts."
 trusted: false
+# Before the field is saved, lo9i runs this with it (lo9i's docs/plugin-checks.md): it signs in to Anthropic with
+# the token, so a wrong one shows in the install dialog instead of failing the first task after minutes of retries.
+check:
+  command: "{bin}/claude-code-check"
 # A coding agent (lo9i's docs/agent-plugins.md). lo9i gives the assistant tools to start and follow its
 # tasks (start_task, task_status, list_tasks, stop_task); starting and stopping one ask the user first
 # unless the plugin is trusted. /claude <folder> in the apps hands a conversation to it: each message

@@ -32,7 +32,7 @@ TOKEN_ENV = "CLAUDE_TOKEN"
 # lo9i's Copilot login when its model is GitHub Copilot (`model_login: copilot` in server.yaml): without
 # a Claude token, Claude Code runs on the user's Copilot plan through a relay (relay.py).
 COPILOT_ENV = "LO9I_COPILOT_GITHUB_TOKEN"
-_OAUTH_PREFIX = "sk-ant-oat"
+OAUTH_PREFIX = "sk-ant-oat"
 # Tool inputs that say what a step is about, in the order they're looked for.
 _DETAILS = ("command", "file_path", "path", "pattern", "url", "query", "description")
 # The whole command or path, up to a safety cap.
@@ -67,7 +67,7 @@ async def run(task: Task, progress: Progress, inbox: Inbox, measured: Measured) 
     if token:
         return await _run(task, progress, inbox, measured, options(task, auth_env(token)))
     if not github_token:
-        raise RuntimeError(_NO_LOGIN)
+        raise RuntimeError(NO_LOGIN)
     async with Relay(github_token).running() as relay:
         progress(note("Using Claude on your GitHub Copilot plan"))
         outcome = await _run(task, progress, inbox, measured, options(task, relay.claude_env()))
@@ -252,7 +252,7 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
 
 
 def auth_env(token: str) -> dict[str, str]:
-    key = "CLAUDE_CODE_OAUTH_TOKEN" if token.startswith(_OAUTH_PREFIX) else "ANTHROPIC_API_KEY"
+    key = "CLAUDE_CODE_OAUTH_TOKEN" if token.startswith(OAUTH_PREFIX) else "ANTHROPIC_API_KEY"
     return {key: token}
 
 
@@ -317,7 +317,7 @@ def _short(text: str) -> str:
     return text if len(text) <= _LINE else text[:_LINE] + "…"
 
 
-_NO_LOGIN = (
+NO_LOGIN = (
     "No login for Claude Code: set a Claude token in the plugin's fields in Plugins, or use GitHub Copilot "
     "as the assistant's model (Settings → Model) to run it on your Copilot plan."
 )

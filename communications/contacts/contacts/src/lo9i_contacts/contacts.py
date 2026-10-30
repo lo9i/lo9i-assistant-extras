@@ -41,8 +41,9 @@ def search(query: str) -> list[Contact]:
     Mac or when access is denied."""
     if sys.platform != "darwin":
         raise ContactsError(
-            "This computer isn't a Mac, so the contacts come from a CardDAV account (iCloud, Fastmail, Nextcloud): "
-            "give the contacts plugin its URL, user name and password, removing it and installing it again in Plugins."
+            "This computer isn't a Mac, so the contacts come from Google or a CardDAV account (iCloud, Fastmail, "
+            "Nextcloud): sign in with Google in the contacts plugin's setup in Plugins, or give it a CardDAV "
+            "account's URL, user name and password, removing it and installing it again there."
         )
     import Contacts  # macOS only; the dependency is installed only there
 
