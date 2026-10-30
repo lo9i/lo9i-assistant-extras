@@ -58,8 +58,10 @@ class Handlers:
         if payload.get("type") != "block_actions" or payload.get("user", {}).get("id") != self._owner_id:
             return
         channel, message = payload["channel"]["id"], payload["message"]
+        # The text as it was sent (a reply's Markdown, which lo9i sends back to keep it when the buttons go).
+        text = html.unescape(message.get("text", ""))
         try:
-            await self._daemon.press(channel, message["ts"], message.get("text", ""), payload["actions"][0]["value"])
+            await self._daemon.press(channel, message["ts"], text, payload["actions"][0]["value"])
         except DaemonError as e:
             await SlackChat(self._web, channel).send(f"⚠️ {e}")
 

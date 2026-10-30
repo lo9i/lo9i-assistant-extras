@@ -50,8 +50,8 @@ ACCEPTED = {
     ("agent task folder", "Runner"): _NO_MESSAGES,
     ("agent task folder", "run"): _NO_MESSAGES,
     ("agent task folder", "Measured"): (
-        "Copilot's CLI doesn't say how full its context is (lo9i's docs/agent-plugins.md: context.json is optional), "
-        "so its worker has none to write while it works."
+        "Copilot's CLI says how full its context is only once it's done (--usage-output-file, usage.py), so its "
+        "worker has none to write while it works (lo9i's docs/agent-plugins.md: context.json then comes once)."
     ),
 }
 

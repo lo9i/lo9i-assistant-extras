@@ -1,11 +1,13 @@
 """Runs a task with the Copilot CLI in non-interactive mode: it works without asking (`--allow-all-tools`)
-in the task's repository, in a session named after the task, which a follow-up resumes."""
+in the task's repository, in a session named after the task, which a follow-up resumes. Once it's done, how full its
+context is comes from the usage it writes (usage.py)."""
 
 import asyncio
 import os
+import tempfile
 from pathlib import Path
 
-from copilot_tasks import cli
+from copilot_tasks import cli, usage
 from copilot_tasks.task_folder import Outcome, Progress, Task, note
 
 # The plugin's field. Copilot reads it as its login and, given in --secret-env-vars, keeps it out of the
@@ -26,8 +28,16 @@ _LINE_BYTES = 16 * 1024 * 1024
 async def run(task: Task, progress: Progress) -> Outcome:
     _require_token()
     binary = await cli.ensure(Path(os.environ[CLI_DIR_ENV]), progress)
+    with tempfile.TemporaryDirectory(prefix="copilot-usage-") as folder:
+        usage_file = Path(folder) / "usage.json"
+        outcome = await _run(binary, task, progress, usage_file)
+        context = await usage.context(usage_file, os.environ[TOKEN_ENV])
+    return Outcome(ok=outcome.ok, text=outcome.text, context=context)
+
+
+async def _run(binary: Path, task: Task, progress: Progress, usage_file: Path) -> Outcome:
     process = await asyncio.create_subprocess_exec(
-        *command(binary, task),
+        *command(binary, task, usage_file),
         cwd=task.repository,
         env=environment(),
         stdin=asyncio.subprocess.DEVNULL,
@@ -47,7 +57,7 @@ async def run(task: Task, progress: Progress) -> Outcome:
     return Outcome(ok=code == 0, text=text)
 
 
-def command(binary: Path, task: Task) -> list[str]:
+def command(binary: Path, task: Task, usage_file: Path) -> list[str]:
     return [
         str(binary),
         "--prompt",
@@ -56,6 +66,7 @@ def command(binary: Path, task: Task) -> list[str]:
         "--session-id",
         task.session,
         f"--secret-env-vars={TOKEN_ENV}",
+        f"--usage-output-file={usage_file}",
         *(["--add-dir", uploads] if (uploads := os.environ.get(UPLOADS_ENV)) else []),
     ]
 

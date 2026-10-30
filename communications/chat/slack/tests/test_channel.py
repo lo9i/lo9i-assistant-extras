@@ -50,3 +50,29 @@ async def test_what_slack_refuses_fails_the_operation():
         await channel.operate("send", {"chat": "", "text": "hi"})
     with pytest.raises(OperationError, match="voice"):
         await channel.operate("voice", {"chat": "D1", "audio": ""})
+
+
+async def test_what_answers_a_message_in_a_thread_goes_in_that_thread():
+    web = _web()
+    web.conversations_replies.return_value = {"messages": [{"ts": "3.0", "thread_ts": "3.0"}]}
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    await channel.operate("send", {"chat": "D1", "text": "Working…", "reply_to": "4.0"})
+    assert web.conversations_replies.call_args.kwargs == {"channel": "D1", "ts": "4.0", "limit": 1}
+    assert web.chat_postMessage.call_args.kwargs["thread_ts"] == "3.0"
+    # Asked once: the message's thread is kept, and so is that of what the bot sent there.
+    await channel.operate("send", {"chat": "D1", "text": "Done.", "reply_to": "4.0"})
+    await channel.operate("send", {"chat": "D1", "text": "Approved.", "reply_to": "1.0"})
+    assert web.conversations_replies.call_count == 1
+    assert web.chat_postMessage.call_args.kwargs["thread_ts"] == "3.0"
+
+
+async def test_what_answers_a_message_outside_a_thread_stays_outside():
+    web = _web()
+    web.conversations_replies.return_value = {"messages": [{"ts": "4.0"}]}
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    await channel.operate("send", {"chat": "D1", "text": "Hi.", "reply_to": "4.0"})
+    assert web.chat_postMessage.call_args.kwargs["thread_ts"] is None
+    web.conversations_replies.side_effect = SlackApiError("bad", {"error": "thread_not_found"})
+    await channel.operate("send", {"chat": "D1", "text": "Hi.", "reply_to": "8.0"})
+    await channel.operate("send", {"chat": "D1", "text": "Hi."})
+    assert web.chat_postMessage.call_args.kwargs["thread_ts"] is None

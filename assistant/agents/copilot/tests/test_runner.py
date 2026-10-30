@@ -1,12 +1,13 @@
 """The runner with a fake `copilot`: a script that prints its arguments and what it would do."""
 
+import json
 import os
 from pathlib import Path
 
 import pytest
 
-from copilot_tasks import cli, runner
-from copilot_tasks.task_folder import Task
+from copilot_tasks import cli, runner, usage
+from copilot_tasks.task_folder import Context, Task
 
 _FAKE = """#!/bin/sh
 echo "args: $*"
@@ -52,10 +53,27 @@ async def test_a_task_runs_headless_in_its_session_and_repository(fake_cli, repo
     args = steps[0]
     assert "--prompt fix the tests --allow-all-tools" in args
     assert "--session-id 6f1c8e2a-0000-4000-8000-000000000000" in args
-    assert "--secret-env-vars=COPILOT_GITHUB_TOKEN" in args
+    assert "--secret-env-vars=COPILOT_GITHUB_TOKEN" in args and "--usage-output-file=" in args
     assert "token in env: yes auto update: false" in steps and f"cwd: {repo.resolve()}" in steps
     assert "" not in steps  # blank lines aren't steps
     assert "--add-dir" not in args
+
+
+async def test_how_full_its_context_is_comes_from_the_usage_it_wrote(fake_cli, repo, monkeypatch):
+    fake_cli.write_text(
+        '#!/bin/sh\nfor a in "$@"; do case "$a" in --usage-output-file=*) file="${a#*=}";; esac; done\n'
+        'echo \'{"currentModel": "m", "lastCallInputTokens": 1200}\' > "$file"\necho "Done."\n'
+    )
+    asked = []
+
+    async def context(usage_file, token):
+        asked.append((json.loads(usage_file.read_text()), token))
+        return Context(1200, 200000)
+
+    monkeypatch.setattr(usage, "context", context)
+    outcome = await runner.run(_task(repo), lambda _: None)
+    assert outcome.context == Context(1200, 200000)
+    assert asked == [({"currentModel": "m", "lastCallInputTokens": 1200}, "github_pat_x")]
 
 
 async def test_the_files_sent_to_it_can_be_opened(fake_cli, repo, monkeypatch, tmp_path):
