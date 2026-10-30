@@ -6,7 +6,7 @@ from telegram.error import NetworkError
 from telegram.request import BaseRequest
 
 from lo9i_telegram import check
-from lo9i_telegram.app import REFUSED
+from lo9i_telegram.status import REFUSED
 
 GOOD = "123456:good"
 _BOT = {"id": 123456, "is_bot": True, "first_name": "Assistant", "username": "my_assistant_bot"}

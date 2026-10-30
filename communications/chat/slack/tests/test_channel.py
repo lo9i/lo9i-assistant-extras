@@ -9,6 +9,7 @@ from slack_sdk.web.async_client import AsyncWebClient
 
 from lo9i_slack.channel import SlackChannel
 from lo9i_slack.connection import Owner
+from lo9i_slack.i18n import Language
 from lo9i_slack.runner import OperationError
 
 
@@ -26,7 +27,7 @@ def _web() -> MagicMock:
 
 async def test_the_users_own_chat_is_the_owners_dm_and_buttons_carry_lo9is_data():
     web = _web()
-    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"), Language())
     buttons = [["✅ Approve", "ja:i1"], ["❌ Reject", "jr:i1"]]
     assert await channel.operate("send", {"chat": "", "text": "The job is waiting", "buttons": buttons}) == "1.0"
     sent = web.chat_postMessage.call_args.kwargs
@@ -36,7 +37,7 @@ async def test_the_users_own_chat_is_the_owners_dm_and_buttons_carry_lo9is_data(
 
 async def test_an_edit_without_buttons_removes_them():
     web = _web()
-    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"), Language())
     await channel.operate("edit", {"chat": "D1", "message": "5.0", "text": "Approve bash?", "buttons": []})
     assert web.chat_update.call_args.kwargs == {"channel": "D1", "ts": "5.0", "text": "Approve bash?", "blocks": []}
     assert await channel.operate("typing", {"chat": "D1"}) == ""
@@ -45,7 +46,7 @@ async def test_an_edit_without_buttons_removes_them():
 async def test_what_slack_refuses_fails_the_operation():
     web = _web()
     web.conversations_open.side_effect = SlackApiError("bad", {"error": "user_not_found"})
-    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"), Language())
     with pytest.raises(OperationError, match="user_not_found"):
         await channel.operate("send", {"chat": "", "text": "hi"})
     with pytest.raises(OperationError, match="voice"):
@@ -55,7 +56,7 @@ async def test_what_slack_refuses_fails_the_operation():
 async def test_what_answers_a_message_in_a_thread_goes_in_that_thread():
     web = _web()
     web.conversations_replies.return_value = {"messages": [{"ts": "3.0", "thread_ts": "3.0"}]}
-    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"), Language())
     await channel.operate("send", {"chat": "D1", "text": "Working…", "reply_to": "4.0"})
     assert web.conversations_replies.call_args.kwargs == {"channel": "D1", "ts": "4.0", "limit": 1}
     assert web.chat_postMessage.call_args.kwargs["thread_ts"] == "3.0"
@@ -69,7 +70,7 @@ async def test_what_answers_a_message_in_a_thread_goes_in_that_thread():
 async def test_what_answers_a_message_outside_a_thread_stays_outside():
     web = _web()
     web.conversations_replies.return_value = {"messages": [{"ts": "4.0"}]}
-    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"))
+    channel = SlackChannel(_Status(), web, Owner("Acme", "U1", "ani"), Language())
     await channel.operate("send", {"chat": "D1", "text": "Hi.", "reply_to": "4.0"})
     assert web.chat_postMessage.call_args.kwargs["thread_ts"] is None
     web.conversations_replies.side_effect = SlackApiError("bad", {"error": "thread_not_found"})

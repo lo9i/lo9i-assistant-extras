@@ -1,6 +1,7 @@
 """Keeps the channel's stream from lo9i open for as long as the process runs, and hands its events to
 the channel: lo9i's name, the apps' setup buttons, and the chat operations, each confirmed with its
-result, and the commands the channel offers. While lo9i is away it reconnects, waiting longer after each failure."""
+result, the commands the channel offers and the language its own text is in. While lo9i is away it
+reconnects, waiting longer after each failure."""
 
 import asyncio
 import logging
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 _OPERATIONS = ("send", "edit", "typing", "voice")
 _FIRST_DELAY, _MOST_DELAY = 1.0, 30.0
+_ENGLISH = "en"
 
 
 class OperationError(Exception):
@@ -24,6 +26,11 @@ Commands = list[dict[str, str]]
 
 
 class Channel(Protocol):
+    async def language(self, language: str) -> None:
+        """The language the user chose for the apps' text (en, es), which the channel's own text follows: told
+        before `hello` and whenever it changes. English when lo9i doesn't say one."""
+        ...
+
     async def hello(self, assistant_name: str, commands: Commands) -> None:
         """The stream opened: the first event of every stream. A good time to send the status."""
         ...
@@ -85,7 +92,10 @@ class Runner:
         if kind in _OPERATIONS:
             self._spawn(self._operate(kind, data))
         elif kind == "hello":
+            await _logged(self._channel.language(data.get("language", _ENGLISH)))
             await _logged(self._channel.hello(data["assistant_name"], data.get("commands", [])))
+        elif kind == "language":
+            await _logged(self._channel.language(data["language"]))
         elif kind == "commands":
             await _logged(self._channel.commands(data["commands"]))
         elif kind == "renamed":

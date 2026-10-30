@@ -7,6 +7,7 @@ from slack_sdk.web.async_client import AsyncWebClient
 
 from lo9i_slack.daemon import DaemonUnavailableError
 from lo9i_slack.handlers import Handlers
+from lo9i_slack.i18n import Language
 
 
 class FakeDaemon:
@@ -31,7 +32,7 @@ def _handlers():
     web = create_autospec(AsyncWebClient, instance=True)
     web.chat_postMessage.return_value = {"ts": "9.0"}
     daemon = FakeDaemon()
-    return Handlers(daemon, web, "xoxb-1", "U1"), daemon, web
+    return Handlers(daemon, web, "xoxb-1", "U1", Language()), daemon, web
 
 
 def _dm(**fields):
@@ -94,4 +95,4 @@ async def test_commands_are_for_the_owner_only_and_answered_with_lo9is_text():
     await handlers.command({"user_id": "U1", "command": "/claude", "text": " ~/code/app "})
     assert daemon.commands == [("clear", ""), ("claude", "~/code/app")]
     daemon.down = True
-    assert "isn't reachable" in (await handlers.command({"user_id": "U1", "command": "/clear"}))["text"]
+    assert "can't be reached" in (await handlers.command({"user_id": "U1", "command": "/clear"}))["text"]

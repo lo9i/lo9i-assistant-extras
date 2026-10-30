@@ -4,7 +4,7 @@
 # uv.lock).
 name: telegram
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 2.5.0
+version: 2.6.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Chat with the assistant on Telegram, and get its messages and reminders there
@@ -18,6 +18,17 @@ steps:
   - "Send /newbot. BotFather asks for a name, which is what the chat shows (for example: My Assistant), then a username, which must be unique and end in bot (for example: my_assistant_42_bot)."
   - "BotFather answers with a token that looks like 123456789:AAH…. Copy the whole token and paste it below. Keep it private: anyone with it can control the bot."
   - "After installing, the setup shows a pairing code. Open your new bot in Telegram (BotFather links it), press Start, and send it the code. Only accounts paired this way can talk to the assistant."
+# The text above in the apps' other languages (lo9i's core/mcp/install.py), shown in the language the app shows.
+translations:
+  es:
+    description: Chatea con el asistente en Telegram, y recibe allí sus mensajes y recordatorios
+    fields:
+      TELEGRAM_TOKEN: {label: Token del bot}
+    steps:
+      - "El asistente te habla a través de un bot de Telegram propio. Para crearlo, abre Telegram y empieza un chat con @BotFather (t.me/BotFather), el bot oficial de Telegram para crear bots."
+      - "Envía /newbot. BotFather te pide un nombre, que es lo que muestra el chat (por ejemplo: Mi Asistente), y luego un nombre de usuario, que debe ser único y terminar en bot (por ejemplo: mi_asistente_42_bot)."
+      - "BotFather responde con un token parecido a 123456789:AAH…. Copia el token completo y pégalo abajo. Mantenlo en privado: cualquiera que lo tenga puede controlar el bot."
+      - "Después de instalarlo, la configuración muestra un código de vinculación. Abre tu nuevo bot en Telegram (BotFather te da el enlace), pulsa Iniciar y envíale el código. Solo las cuentas vinculadas así pueden hablar con el asistente."
 env:
   # telegram.json (the paired accounts) lives here.
   TELEGRAM_DATA: "{data}"

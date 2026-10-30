@@ -4,11 +4,10 @@ import logging
 
 from telegram import Update, User
 
+from lo9i_telegram.i18n import Language
 from lo9i_telegram.pairing import Pairing
 
 logger = logging.getLogger(__name__)
-
-_PAIRED = "Paired ✓. You can talk to the assistant here now. /clear starts a new conversation."
 
 
 def is_allowed(pairing: Pairing, update: Update) -> bool:
@@ -19,14 +18,14 @@ def is_allowed(pairing: Pairing, update: Update) -> bool:
     return False
 
 
-async def try_pairing(pairing: Pairing, update: Update) -> bool:
+async def try_pairing(pairing: Pairing, update: Update, t: Language) -> bool:
     """Pairs the sender when the message is the open pairing code, and confirms in the chat."""
     user, message = update.effective_user, update.effective_message
     if user is None or message is None or not message.text:
         return False
     if not await pairing.pair(message.text, user.id, _display_name(user)):
         return False
-    await message.reply_text(_PAIRED)
+    await message.reply_text(t("Paired ✓. You can talk to the assistant here now. /clear starts a new conversation."))
     return True
 
 

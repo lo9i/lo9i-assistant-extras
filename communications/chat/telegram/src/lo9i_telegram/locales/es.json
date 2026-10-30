@@ -1,0 +1,12 @@
+{
+  "Bot: @{username}": "Bot: @{username}",
+  "New pairing code": "Nuevo código de vinculación",
+  "Nobody is paired yet.": "Todavía no hay nadie vinculado.",
+  "Paired ✓. You can talk to the assistant here now. /clear starts a new conversation.": "Vinculado ✓. Ya puedes hablar con el asistente aquí. /clear empieza una conversación nueva.",
+  "Paired: {names}": "Vinculados: {names}",
+  "Pairing code": "Código de vinculación",
+  "Send this code to the bot in Telegram within {minutes} minutes.": "Envía este código al bot en Telegram dentro de {minutes} minutos.",
+  "Telegram refused the bot token. Check it with @BotFather and enter it again.": "Telegram rechazó el token del bot. Revísalo con @BotFather e ingrésalo de nuevo.",
+  "Video messages aren't supported.": "Los mensajes de video no son compatibles.",
+  "⚠️ The assistant can't be reached right now. Try again in a moment.": "⚠️ No se puede contactar al asistente ahora. Vuelve a intentarlo en un momento."
+}

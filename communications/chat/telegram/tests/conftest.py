@@ -8,5 +8,6 @@ from telegram import Bot, Message
 def bot() -> MagicMock:
     """An autospec of telegram.Bot, so every call's arguments are checked against the real API."""
     bot = create_autospec(Bot, instance=True)
+    bot.username = "lo9i_bot"
     bot.send_message.return_value = create_autospec(Message, instance=True, message_id=7)
     return bot

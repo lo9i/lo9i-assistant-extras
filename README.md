@@ -170,6 +170,14 @@ protocol is in lo9i's `docs/channel-plugins.md`. A coding agent (`agent:`) is a 
 each task, which reads the task from a folder and writes its steps and result there; the protocol is in
 lo9i's `docs/agent-plugins.md`.
 
+lo9i's apps are in English and Spanish (the user picks in Settings → General). A plugin's description, steps and
+fields' labels can come in Spanish too, under `translations: es:` in its `server.yaml` (lo9i's
+`core/mcp/install.py`); the apps show them in the language they show. A chat channel's own text (its setup in the
+apps, its replies in the chat) follows the language lo9i gives on its stream (`hello`, then `language`): telegram
+and slack keep it in `i18n.py`, with a table per language in `locales/` whose keys are the English text, and a test
+that fails on a text the table lacks. whatsapp's is still only in English. A check gets the language in
+`LO9I_LANGUAGE`.
+
 A plugin that asks for a token or a password can check it when it's installed (`check:` in `server.yaml`: a
 command, or a tool of its MCP server), so a wrong one shows in the install dialog instead of on first use; what
 it writes is in lo9i's `docs/plugin-checks.md`. claude-code, telegram and contacts do.

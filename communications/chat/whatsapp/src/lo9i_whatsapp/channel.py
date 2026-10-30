@@ -48,6 +48,9 @@ class WhatsAppChannel:
         self._phone_given = phone_given
         link.subscribe(self.publish_status)
 
+    async def language(self, language: str) -> None:
+        """Its own text is in English whatever the language the user chose."""
+
     async def hello(self, assistant_name: str, commands: Commands) -> None:
         await self.publish_status()
 

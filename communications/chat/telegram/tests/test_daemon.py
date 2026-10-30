@@ -86,7 +86,10 @@ async def test_refused_and_unreachable_are_told_apart():
 
 class FakeChannel:
     def __init__(self):
-        self.names, self.done = [], asyncio.Event()
+        self.names, self.languages, self.done = [], [], asyncio.Event()
+
+    async def language(self, language):
+        self.languages.append(language)
 
     async def hello(self, assistant_name, commands):
         self.names.append(assistant_name)
@@ -115,7 +118,8 @@ async def test_each_operation_is_confirmed_with_its_result_or_its_error():
     broadcast = {"id": "op2", "chat": "", "text": "hi"}
     copies = {"id": "op3", "chat": "everyone", "text": "hi"}
     claude = [{"command": "claude", "description": "Hand this conversation to Claude Code"}]
-    events = [("hello", {"assistant_name": "Max", "commands": []}), ("commands", {"commands": claude})]
+    hello = ("hello", {"assistant_name": "Max", "commands": [], "language": "es"})
+    events = [hello, ("commands", {"commands": claude}), ("language", {"language": "en"})]
     lo9i = FakeLo9i(_sse(*events, ("send", sent), ("send", broadcast), ("send", copies)))
     channel = FakeChannel()
     running = asyncio.create_task(Runner(_daemon(lo9i), channel, LIMITS).run())
@@ -132,6 +136,8 @@ async def test_each_operation_is_confirmed_with_its_result_or_its_error():
         "op3": {"error": "", "message": "1002", "messages": ["55", "1002"]},
     }
     assert channel.names == ["Max"] and channel.offered == claude
+    # The language comes before hello, so the status hello publishes is in it.
+    assert channel.languages == ["es", "en"]
 
 
 async def test_a_malformed_event_is_skipped_and_the_stream_goes_on():

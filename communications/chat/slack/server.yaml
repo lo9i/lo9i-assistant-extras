@@ -3,7 +3,7 @@
 # scripts of its own environment (built from its uv.lock).
 name: slack
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 2.4.0
+version: 2.5.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Chat with the assistant in Slack and get its messages there, and let it search, read and post in your workspace
@@ -24,6 +24,20 @@ steps:
   - "In Basic Information → App-Level Tokens, choose Generate Token and Scopes, add the scope connections:write, and generate: that's the app token (xapp-)."
   - "In OAuth & Permissions, choose Install to your workspace, then Allow. The same page shows the Bot User OAuth Token (xoxb-) and the User OAuth Token (xoxp-)."
   - "Paste the three tokens below. Only you, the person who installed the app, can talk to the assistant: open the app under Apps in Slack's sidebar and send it a message."
+# The text above in the apps' other languages (lo9i's core/mcp/install.py), shown in the language the app shows.
+translations:
+  es:
+    description: Chatea con el asistente en Slack y recibe allí sus mensajes, y deja que busque, lea y publique en tu espacio de trabajo
+    fields:
+      SLACK_APP_TOKEN: {label: Token de la app (xapp-)}
+      SLACK_BOT_TOKEN: {label: Token del bot (xoxb-)}
+      SLACK_USER_TOKEN: {label: Token de usuario (xoxp-)}
+    steps:
+      - "Abre api.slack.com/apps, elige Create New App → From a manifest y elige tu espacio de trabajo."
+      - "Pega el manifiesto del enlace del campo Token de la app (manifest.json en los extras) y luego Next → Create."
+      - "En Basic Information → App-Level Tokens, elige Generate Token and Scopes, agrega el alcance connections:write y genéralo: ese es el token de la app (xapp-)."
+      - "En OAuth & Permissions, elige Install to your workspace y luego Allow. La misma página muestra el Bot User OAuth Token (xoxb-) y el User OAuth Token (xoxp-)."
+      - "Pega los tres tokens abajo. Solo tú, la persona que instaló la app, puedes hablar con el asistente: abre la app en Apps, en la barra lateral de Slack, y envíale un mensaje."
 trusted: false
 
 # The workspace tools: search, read and post as the user. Posting isn't marked read-only, so lo9i
