@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 from mcp import Client
 
@@ -17,12 +18,23 @@ def _read_only(tool):
 
 
 async def test_only_reading_a_transcript_is_read_only(monkeypatch):
-    monkeypatch.setattr(
-        transcripts, "fetch", lambda url, languages, timestamps: transcripts.Text("English", True, "hi")
-    )
-    tools, result = await _call("get_transcript", url="abc")
+    def fetch(url, languages, timestamps, part):
+        assert part == 2
+        return transcripts.Text("Zoo", "jawed", "0:19", "English", True, "[0:00] hi", part=2, parts=2)
+
+    monkeypatch.setattr(transcripts, "fetch", fetch)
+    tools, result = await _call("get_transcript", url="abc", part=2)
     assert {name for name, tool in tools.items() if _read_only(tool)} == {"get_transcript"}
-    assert json.loads(result.content[0].text) == {"language": "English", "generated": True, "text": "hi"}
+    assert json.loads(result.content[0].text) == {
+        "title": "Zoo",
+        "channel": "jawed",
+        "duration": "0:19",
+        "language": "English",
+        "generated": True,
+        "text": "[0:00] hi",
+        "part": 2,
+        "parts": 2,
+    }
 
 
 async def test_downloads_give_the_path(monkeypatch, tmp_path):
@@ -41,7 +53,7 @@ async def test_downloads_give_the_path(monkeypatch, tmp_path):
 async def test_download_transcript_gives_the_path_not_the_text(monkeypatch, tmp_path):
     def save(url, languages, timestamps):
         assert (languages, timestamps) == (["es"], True)
-        return transcripts.Text("Spanish", False, "hola"), tmp_path / "Zoo [abc].txt"
+        return SimpleNamespace(language="Spanish", is_generated=False), tmp_path / "Zoo [abc].txt"
 
     monkeypatch.setattr(transcripts, "save", save)
     _, result = await _call("download_transcript", url="abc", languages=["es"], timestamps=True)
