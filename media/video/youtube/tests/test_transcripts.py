@@ -10,6 +10,7 @@ from lo9i_youtube import transcripts
 class Caption:
     text: str
     start: float
+    duration: float = 2.0
 
 
 @dataclass
@@ -37,6 +38,11 @@ class FakeList:
                 if t.language_code == code:
                     return t
         raise NoTranscriptFound("abcdefghijk", codes, self)
+
+
+@pytest.fixture(autouse=True)
+def about(monkeypatch):
+    monkeypatch.setattr(transcripts, "about", lambda vid: ("Me at the zoo", "jawed"))
 
 
 @pytest.fixture
@@ -84,7 +90,8 @@ def test_without_languages_it_is_in_the_language_spoken_preferring_a_written_one
     )
     found = transcripts.fetch("jNQXAC9IVRw")
     assert (found.language, found.generated) == ("Spanish", False)
-    assert found.text == "Hello there again"
+    assert (found.title, found.channel, found.duration) == ("Me at the zoo", "jawed", "1:07")
+    assert (found.text, found.part, found.parts) == ("[0:01] Hello there again", 1, 1)
 
 
 def test_languages_go_in_order_and_missing_ones_list_what_there_is(listing):
@@ -101,6 +108,37 @@ def test_timestamps_put_each_caption_on_its_line(listing):
     assert transcripts.fetch("jNQXAC9IVRw", timestamps=True).text == "[0:01] Hi\n[1:05] later\n[1:02:05] much later"
 
 
+def test_sections_start_every_five_minutes_with_their_time(listing):
+    captions = [Caption("one", 0.5), Caption("two", 200.0), Caption("three", 301.0), Caption("four", 3700.0)]
+    listing(FakeTranscript("English", "en", True, captions))
+    assert transcripts.fetch("jNQXAC9IVRw").text == "[0:00] one two\n\n[5:01] three\n\n[1:01:40] four"
+
+
+def test_repeats_and_sound_tags_are_left_out(listing):
+    captions = [
+        Caption("[Music]", 0.0),
+        Caption("so today we talk", 1.0),
+        Caption("so today we talk", 2.0),
+        Caption("today we talk about whales", 3.0),
+        Caption("whales [Applause] are big", 4.0),
+        Caption("[Music]", 5.0),
+    ]
+    listing(FakeTranscript("English", "en", True, captions))
+    # "whales" repeats only one word: that's speech ("that that"), not a repeated caption.
+    assert transcripts.fetch("jNQXAC9IVRw").text == "[0:01] so today we talk about whales whales are big"
+
+
+def test_a_long_transcript_comes_in_parts_of_whole_sections(listing, monkeypatch):
+    monkeypatch.setattr(transcripts, "PART_BYTES", 45)
+    captions = [Caption(letter * 12, i * 300.0) for i, letter in enumerate("abcdef")]
+    listing(FakeTranscript("English", "en", True, captions))
+    first = transcripts.fetch("jNQXAC9IVRw")
+    assert (first.text, first.part, first.parts) == (f"[0:00] {'a' * 12}\n\n[5:00] {'b' * 12}", 1, 3)
+    assert transcripts.fetch("jNQXAC9IVRw", part=3).text == f"[20:00] {'e' * 12}\n\n[25:00] {'f' * 12}"
+    with pytest.raises(transcripts.TranscriptError, match="no part 4: it has 3"):
+        transcripts.fetch("jNQXAC9IVRw", part=4)
+
+
 def test_the_librarys_errors_keep_only_the_cause(listing):
     listing()
     with pytest.raises(transcripts.TranscriptError) as e:
@@ -110,11 +148,13 @@ def test_the_librarys_errors_keep_only_the_cause(listing):
 
 
 def test_save_names_the_file_after_the_title(listing, monkeypatch, tmp_path):
-    listing(FakeTranscript("English", "en", True))
+    listing(FakeTranscript("English", "en", True, [Caption("Hi", 1.0), Caption("there", 400.0)]))
     monkeypatch.setenv("YOUTUBE_DIR", str(tmp_path))
-    monkeypatch.setattr(transcripts, "title", lambda vid: 'Me at the zoo: "elephants"?')
+    monkeypatch.setattr(transcripts, "about", lambda vid: ('Me at the zoo: "elephants"?', "jawed"))
     found, path = transcripts.save("https://youtu.be/jNQXAC9IVRw")
     assert path == tmp_path / "Me at the zoo elephants [jNQXAC9IVRw].txt"
-    assert path.read_text() == found.text + "\n"
-    monkeypatch.setattr(transcripts, "title", lambda vid: "")
+    assert path.read_text() == "Hi\n\nthere\n"
+    assert found.language == "English"
+    assert transcripts.save("jNQXAC9IVRw", timestamps=True)[1].read_text() == "[0:01] Hi\n[6:40] there\n"
+    monkeypatch.setattr(transcripts, "about", lambda vid: ("", ""))
     assert transcripts.save("jNQXAC9IVRw")[1].name == "jNQXAC9IVRw [jNQXAC9IVRw].txt"

@@ -104,9 +104,11 @@ newer version later.
 - **hackernews** (`media/news/hackernews`): read Hacker News: the front page, Show HN, Ask HN and newest
   stories, search, and mentions of a word (your project's name) in stories and comments. Read-only; no account
   needed. Good for a Home section.
-- **youtube** (`media/video/youtube`): download a YouTube video (MP4, up to 1080p unless you ask
-  for more), its audio as an MP3 with tags and cover, or its transcript as a text file; or let the
-  assistant read the transcript to summarize or answer questions about the video. Files go to the
+- **youtube** (`media/video/youtube`): ask the assistant to summarize a YouTube video ("summarize
+  this video" and its link), or anything about what it says: it reads the transcript, a long one in
+  parts, and gives the main points with the time each starts at. It also downloads a video (MP4, up to
+  1080p unless you ask for more), its audio as an MP3 with tags and cover, or its transcript as a text
+  file. Files go to the
   folder you enter, your Downloads folder by default. ffmpeg and the JavaScript runtime yt-dlp needs
   come with the plugin.
 - **calendar** (`productivity/calendar/calendar`): the assistant reads and manages your calendars: what's on
