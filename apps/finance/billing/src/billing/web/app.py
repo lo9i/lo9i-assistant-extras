@@ -333,7 +333,8 @@ def _invoice_routes(app: FastAPI) -> None:
             return _render(request, "invoices.html", **ctx)
 
     @app.get("/invoices/{id}/pdf")
-    def invoice_pdf(id: int) -> Response:
+    def invoice_pdf(id: int, download: bool = False) -> Response:
+        """The invoice's PDF, shown in the browser, or saved as a file with `download`."""
         with _db() as conn:
             invoice = service.get_invoice(conn, id, db.invoices_dir())
         if invoice["status"] != "authorized":
@@ -341,7 +342,8 @@ def _invoice_routes(app: FastAPI) -> None:
         if not invoice.get("pdf_path"):
             raise BillingError(invoice.get("pdf_error") or "its PDF couldn't be made")
         path = Path(invoice["pdf_path"])
-        return FileResponse(path, media_type="application/pdf", content_disposition_type="inline", filename=path.name)
+        shown = "attachment" if download else "inline"
+        return FileResponse(path, media_type="application/pdf", content_disposition_type=shown, filename=path.name)
 
 
 def _issue(request: Request, form: dict) -> HTMLResponse:
