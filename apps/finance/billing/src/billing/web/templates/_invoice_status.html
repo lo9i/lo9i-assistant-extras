@@ -1,0 +1,6 @@
+{%- set s = r.status -%}
+{%- if s == 'authorized' -%}<span class="pill pill--ok">{{ r.invoice.full_number }}</span>
+{%- elif s == 'rejected' -%}<span class="pill pill--danger">Rejected</span>
+{%- elif s == 'sent' -%}<span class="pill pill--warn">No answer yet</span>
+{%- elif s == "can't prepare" -%}<span class="pill">Can't prepare</span>
+{%- else -%}<span class="pill">To issue</span>{%- endif -%}

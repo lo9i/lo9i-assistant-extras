@@ -1,0 +1,22 @@
+{# A new customer, or the picked one being edited, in the panel to the right. #}
+{% set editing = panel == 'edit' %}
+{% set v = form or (customer if editing else {}) %}
+<section class="details card" id="customer-form">
+  <header><h2>{{ 'Edit ' ~ customer.name if editing else 'New customer' }}</h2></header>
+  <form class="stack" hx-post="{{ 'customers/' ~ customer.id if editing else 'customers' }}" hx-target="#customers" hx-swap="outerHTML">
+    {% include "_customer_fields.html" %}
+    {% if not editing %}
+    <div class="form-grid">
+      <label><span>Monthly net amount</span><input name="monthly_net" inputmode="decimal" value="{{ v.monthly_net or '' }}"><small class="hint">Before IVA, like 7.500.000. A raise is added later, from its month.</small></label>
+    </div>
+    {% else %}
+    <p class="muted small">Invoices already issued keep the customer as it was.</p>
+    {% endif %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons">
+      {% if customer %}<button type="button" class="ghost" hx-get="customers?c={{ customer.id }}" hx-target="#customers" hx-swap="outerHTML" hx-push-url="true">Cancel</button>{% endif %}
+      <span class="spacer"></span>
+      <button class="primary">{{ 'Save' if editing else 'Add customer' }}</button>
+    </div>
+  </form>
+</section>

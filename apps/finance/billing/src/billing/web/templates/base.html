@@ -72,12 +72,10 @@
     document.body.addEventListener("input", (e) => {
       if (e.target.matches?.("input[data-lookup]") && e.target.value.replace(/\D/g, "").length === 11) lookUp(e.target);
     });
-    // Opening New customer starts at its CUIT. A toggle doesn't bubble, so it's caught on the way down.
-    document.addEventListener(
-      "toggle",
-      (e) => e.target.id === "add-customer" && e.target.open && e.target.querySelector("input[data-lookup]")?.focus(),
-      true,
-    );
+    // The new customer form starts at its CUIT (autofocus only works on a page's first load).
+    document.body.addEventListener("htmx:afterSwap", (e) => {
+      if (e.target.id === "customers") e.target.querySelector("#customer-form input[data-lookup][autofocus]")?.focus();
+    });
     document.body.addEventListener("change", (e) => {
       if (e.target.matches?.("select[name=iva_condition]")) e.target.dataset.chosen = "1";
       if (e.target.matches?.("input[data-lookup]")) lookUp(e.target);

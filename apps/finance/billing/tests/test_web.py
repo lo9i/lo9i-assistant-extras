@@ -47,7 +47,8 @@ def test_the_month_shows_each_half_to_issue(client, fake):
     page = client.get("/?month=2026-10").text
     assert "Acme S.A." in page and page.count("$ 4.537.500,00") >= 2
     assert "01/10/2026 to 15/10/2026" in page and "16/10/2026 to 31/10/2026" in page
-    assert "$ 3.750.000,00 + IVA $ 787.500,00" in page
+    # The first half to issue is picked, its amounts in the panel to the right.
+    assert "<dt>Net</dt><dd>$ 3.750.000,00</dd>" in page and "<dt>IVA 21%</dt><dd>$ 787.500,00</dd>" in page
     assert "$ 9.075.000,00" in page  # to issue
     assert "Homologación" in page and "no fiscal value" in page
     assert 'hx-confirm="Issue a Factura A to Acme S.A. for 01/10/2026 to 15/10/2026, $ 4.537.500,00' in page
@@ -82,7 +83,8 @@ def test_a_rejection_shows_why_and_offers_to_try_again(client, fake):
 def test_an_invoice_opens_at_its_month(client):
     client.post("/invoices", headers=HX, data=HALF)
     page = client.get("/invoices/1").text
-    assert 'id="invoice-1"' in page and "focused" in page and 'value="2026-10"' in page
+    assert 'class="selected" id="invoice-1"' in page and 'value="2026-10"' in page
+    assert "<dt>Factura A</dt><dd>00002-00000001</dd>" in page
     assert client.get("/invoices/9").status_code == 404
     assert client.get("/invoices/9/pdf").status_code == 404
 
@@ -119,14 +121,14 @@ def test_adding_a_customer_with_an_argentine_amount(client, path):
             "monthly_net": "1.234.567,89",
         },
     )
-    page = client.get("/customers").text
+    page = client.get("/customers", params={"c": "globex-srl"}).text
     assert "Globex SRL" in page and "Responsable Monotributo" in page and "$ 1.234.567,89" in page
 
 
 def test_a_wrong_customer_keeps_what_was_typed(client):
     resp = client.post("/customers", headers=HX, data={"name": "Bad", "cuit": "20-12345678-7"})
-    assert resp.headers["HX-Retarget"] == "#add-customer"
-    assert "verification digit" in resp.text and 'value="Bad"' in resp.text
+    form = resp.text.split('id="customer-form"')[1]  # the new customer's form, still to the right
+    assert "verification digit" in form and 'value="Bad"' in form
 
 
 def test_a_raise_from_a_later_month(client):
@@ -134,7 +136,7 @@ def test_a_raise_from_a_later_month(client):
     page = client.get("/customers").text
     assert "$ 8.000.000,00" in page and "From January 2099" in page and "From the start" in page
     # Today's amount is the one marked now.
-    assert page.index('$ 7.500.000,00 <span class="tag">now</span>') > 0
+    assert page.index('$ 7.500.000,00</strong> <span class="pill pill--ok">now</span>') > 0
     client.post("/customers/acme/prices/delete", headers=HX, data={"effective_from": "2099-01-01"})
     assert "$ 8.000.000,00" not in client.get("/customers").text
 
@@ -273,11 +275,11 @@ def test_a_cuit_is_looked_up_for_the_form(client, fake):
 def test_a_picked_iva_condition_isnt_replaced(client):
     # An edited customer's condition counts as picked, so a lookup leaves it.
     assert 'name="iva_condition" data-chosen' in client.get("/customers/acme/edit").text
-    assert 'name="iva_condition" >' in client.get("/customers").text.split('id="add-customer"')[1]
+    assert 'name="iva_condition" >' in client.get("/customers", params={"new": 1}).text.split('id="customer-form"')[1]
 
 
 def test_the_cuit_comes_first_and_emails_and_text_are_saved(client):
-    form = client.get("/customers").text.split('id="add-customer"')[1]
+    form = client.get("/customers", params={"new": 1}).text.split('id="customer-form"')[1]
     assert form.index('name="cuit"') < form.index('name="name"') < form.index('name="email"')
     assert "Adjunto la Factura A {numero}" in form  # the standard text, to edit
     client.post(
@@ -299,7 +301,7 @@ def test_the_cuit_comes_first_and_emails_and_text_are_saved(client):
 
 def test_a_wrong_address_keeps_the_form(client):
     resp = client.post("/customers", headers=HX, data={"cuit": "20-11111111-2", "name": "Juan", "email": "juan@"})
-    assert resp.headers["HX-Retarget"] == "#add-customer" and "isn&#39;t an email address" in resp.text
+    assert "isn&#39;t an email address" in resp.text.split('id="customer-form"')[1]
 
 
 def told(resp):
@@ -325,3 +327,10 @@ def test_customer_changes_say_what_they_did(client):
     assert told(raised)["message"] == "Acme S.A.'s new monthly amount is saved."
     wrong = client.post("/customers", headers=HX, data={"cuit": "20-12345678-7", "name": "Bad"})
     assert told(wrong)["ok"] is False
+
+
+def test_a_picked_row_shows_to_the_right(client):
+    page = client.get("/", params={"month": "2026-10", "row": "acme:2026-10-16:2026-10-31"}).text
+    detail = page.split('id="invoice-detail"')[1]
+    assert "16/10/2026 to 31/10/2026" in detail and "Issue a Factura A to Acme S.A. for 16/10/2026" in detail
+    assert page.count('class="selected"') == 1
