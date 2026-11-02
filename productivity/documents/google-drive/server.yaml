@@ -2,7 +2,7 @@
 # in lo9i's core/mcp/install.py. {bin} is the scripts of its own environment (built from its uv.lock).
 name: google-drive
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.0.1
 # The plugin format (lo9i's core/repositories/formats.py): 5 for oauth.
 format: 5
 description: Search and read your Google Drive files, and create and edit Google Docs and Sheets
@@ -26,3 +26,13 @@ trusted: false
 # Searching and reading are marked read-only; creating and changing Docs and Sheets aren't, so lo9i asks the user
 # before each one unless they trust the plugin.
 command: "{bin}/google-drive-mcp"
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Busca y lee tus archivos de Google Drive, y crea y edita Google Docs y Sheets"
+    steps:
+      - "Inicia sesión con una app OAuth de Google propia, en un proyecto de Google Cloud (console.cloud.google.com, gratis). Si creaste una para el plugin gmail, usa el mismo proyecto y cliente."
+      - "En APIs & Services → Library, habilita la Google Drive API, la Google Docs API y la Google Sheets API."
+      - "En Google Auth Platform (la pantalla de consentimiento OAuth), configúrala como External y publícala (In production): mientras está en Testing, Google cierra la sesión a los 7 días. Google no revisa una app que solo usas tú; al iniciar sesión, avisa que la app no está verificada: elige Advanced y continúa."
+      - "En Clients (Credentials), crea un ID de cliente OAuth de tipo Web application, con la URI de redirección que muestra la configuración del plugin como Authorized redirect URI. Una vez instalado, pega su ID de cliente y su secreto en la configuración e inicia sesión."

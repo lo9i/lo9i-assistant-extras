@@ -3,7 +3,7 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: icloud
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.1
+version: 1.1.0
 description: Send and read iCloud Mail
 # Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
 icon: icon.svg
@@ -13,5 +13,11 @@ email:
     host: smtp.mail.me.com
     port: 587
     imap_host: imap.mail.me.com
-    password_help: "iCloud needs an app-specific password: Sign-In and Security → App-Specific Passwords."
-    password_url: https://account.apple.com
+    # Markdown, with a link where it's done.
+    password_help: "iCloud needs an app-specific password: in your [Apple Account](https://account.apple.com), go to Sign-In and Security → App-Specific Passwords."
+translations:
+  es:
+    description: Envía y lee correo de iCloud Mail
+    email:
+      icloud:
+        password_help: "iCloud necesita una contraseña específica de app: en tu [cuenta de Apple](https://account.apple.com), ve a Inicio de sesión y seguridad → Contraseñas específicas de app."

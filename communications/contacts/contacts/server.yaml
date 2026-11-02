@@ -3,7 +3,7 @@
 # (built from its uv.lock).
 name: contacts
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.2.0
+version: 1.2.1
 # The plugin format (lo9i's core/repositories/formats.py): 5 for oauth.
 format: 5
 description: "Look people up in your contacts, on Google Contacts, a CardDAV account (iCloud, Fastmail, Nextcloud) or the Contacts on your Mac: their numbers, emails, birthdays and addresses"
@@ -34,3 +34,16 @@ check:
 trusted: false
 
 command: "{bin}/contacts-mcp"
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Busca personas en tus contactos, en Google Contacts, una cuenta CardDAV (iCloud, Fastmail, Nextcloud) o los Contactos de tu Mac: sus números, emails, cumpleaños y direcciones"
+    steps:
+      - "Con Google Contacts, deja los tres campos vacíos. Una vez instalado, inicia sesión con Google en la configuración del plugin, con una app OAuth de Google propia (console.cloud.google.com, gratis; el proyecto y el cliente del plugin gmail o google-drive también sirven): habilita la CardDAV API en APIs & Services → Library, configura la pantalla de consentimiento OAuth como External y publícala, y crea un ID de cliente OAuth de tipo Web application con la URI de redirección que muestra la configuración."
+      - "Con otra cuenta CardDAV, completa sus tres campos; para iCloud la URL es https://contacts.icloud.com y la contraseña, una específica de app."
+      - "Sin ninguna de las dos, en una Mac, lee los Contactos de la Mac: la primera vez, macOS pide permitir el acceso, y funciona mientras el asistente corre en tu sesión, no cuando se inició al arrancar."
+    fields:
+      CARDDAV_URL: {label: "URL de CardDAV (p. ej. https://contacts.icloud.com)"}
+      CARDDAV_USER: {label: "Usuario de CardDAV (normalmente tu dirección de correo)"}
+      CARDDAV_PASSWORD: {label: "Contraseña de CardDAV (una específica de app para iCloud)"}

@@ -3,7 +3,7 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: fastmail
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.1.0
 description: Send and read Fastmail
 email:
   - id: fastmail
@@ -11,5 +11,11 @@ email:
     host: smtp.fastmail.com
     port: 465
     imap_host: imap.fastmail.com
-    password_help: "Fastmail needs an app password: Settings → Privacy & Security → App passwords."
-    password_url: https://app.fastmail.com/settings/security/apps
+    # Markdown, with a link where it's done.
+    password_help: "Fastmail needs an app password: create one in [Settings → Privacy & Security → App passwords](https://app.fastmail.com/settings/security/apps)."
+translations:
+  es:
+    description: Envía y lee correo de Fastmail
+    email:
+      fastmail:
+        password_help: "Fastmail necesita una contraseña de aplicación: créala en [Configuración → Privacidad y seguridad → Contraseñas de aplicación](https://app.fastmail.com/settings/security/apps)."

@@ -3,7 +3,7 @@
 # (built from its uv.lock).
 name: phone
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.2.0
+version: 1.2.1
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Call people with the Phone app on your Mac, through your iPhone
@@ -23,3 +23,12 @@ login_session: true
 
 # call isn't read-only, so lo9i asks the user before it dials unless they trust the plugin.
 command: "{bin}/phone-mcp"
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Llama a personas con la app Teléfono de tu Mac, a través de tu iPhone"
+    steps:
+      - "Funciona en una Mac cuya app Teléfono puede llamar a través de tu iPhone: en el iPhone, Ajustes → Apps → Teléfono → Llamadas en otros dispositivos, con esta Mac activada."
+      - "Para llamar a personas por su nombre, instala también el plugin contacts: el asistente encuentra sus números con él."
+      - "Cada llamada te pide confirmar en la Mac, y tú hablas. Las llamadas funcionan mientras tienes la sesión iniciada en la Mac, también cuando el asistente se inicia al arrancar."

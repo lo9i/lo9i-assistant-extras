@@ -3,7 +3,7 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: yahoo
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.1.0
 description: Send and read Yahoo Mail
 email:
   - id: yahoo
@@ -11,5 +11,11 @@ email:
     host: smtp.mail.yahoo.com
     port: 465
     imap_host: imap.mail.yahoo.com
-    password_help: "Yahoo needs an app password: Account security → Generate app password."
-    password_url: https://login.yahoo.com/account/security
+    # Markdown, with a link where it's done.
+    password_help: "Yahoo needs an app password: in [Account security](https://login.yahoo.com/account/security), choose Generate app password."
+translations:
+  es:
+    description: Envía y lee correo de Yahoo Mail
+    email:
+      yahoo:
+        password_help: "Yahoo necesita una contraseña de aplicación: en [Seguridad de la cuenta](https://login.yahoo.com/account/security), genera una contraseña de aplicación."

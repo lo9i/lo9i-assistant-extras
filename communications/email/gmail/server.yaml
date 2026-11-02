@@ -3,7 +3,7 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: gmail
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.1
+version: 1.1.0
 description: Send and read Gmail
 # Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
 icon: icon.svg
@@ -13,19 +13,42 @@ email:
     host: smtp.gmail.com
     port: 587
     imap_host: imap.gmail.com
-    password_help: >-
-      Gmail needs an app password, not your Google password. Turn on 2-Step Verification in your
-      Google Account, create an app password, and paste its 16 characters without spaces.
-    password_url: https://myaccount.google.com/apppasswords
+    # Markdown: the steps as a numbered list, each link where it's done.
+    password_help: |-
+      Gmail needs an app password, not your Google password:
+
+      1. Turn on 2-Step Verification in your Google Account.
+      2. [Create an app password](https://myaccount.google.com/apppasswords).
+      3. Paste its 16 characters below, without spaces.
   - id: gmail-oauth
     name: Gmail (sign in with Google)
     host: smtp.gmail.com
     port: 587
     imap_host: imap.gmail.com
     oauth: google
-    password_help: >-
-      Sign in with Google instead of an app password. It needs an OAuth app of your own: in Google
-      Cloud Console, set up the OAuth consent screen (External, published), then create an OAuth
-      client ID of type Web application with the redirect URI shown here, and paste its client ID
-      and secret.
-    password_url: https://console.cloud.google.com/apis/credentials
+    password_help: |-
+      Sign in with Google instead of an app password. It needs an OAuth app of your own:
+
+      1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), set up the OAuth consent screen (External, published).
+      2. Create an OAuth client ID of type Web application, with the redirect URI below.
+      3. Paste its client ID and secret below.
+translations:
+  es:
+    description: Envía y lee correo de Gmail
+    email:
+      gmail:
+        name: Gmail (contraseña de aplicación)
+        password_help: |-
+          Gmail necesita una contraseña de aplicación, no tu contraseña de Google:
+
+          1. Activa la verificación en dos pasos en tu cuenta de Google.
+          2. [Crea una contraseña de aplicación](https://myaccount.google.com/apppasswords).
+          3. Pega abajo sus 16 caracteres, sin espacios.
+      gmail-oauth:
+        name: Gmail (iniciar sesión con Google)
+        password_help: |-
+          Inicia sesión con Google en vez de usar una contraseña de aplicación. Requiere una app OAuth propia:
+
+          1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials), configura la pantalla de consentimiento OAuth (Externa, publicada).
+          2. Crea un ID de cliente OAuth de tipo Aplicación web, con la URI de redirección de abajo.
+          3. Pega abajo su ID de cliente y su secreto.

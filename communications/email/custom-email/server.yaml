@@ -3,7 +3,7 @@
 # added in this plugin's details once it's installed.
 name: custom-email
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.1.0
 description: Send and read mail on any other server, such as your own domain or a work account, by entering its servers
 email:
   # No servers: you enter the SMTP host and port, and the IMAP host for reading mail. Installing this
@@ -12,3 +12,10 @@ email:
     name: Other server
     custom: true
     password_help: Most providers need an app password here, not your account password.
+translations:
+  es:
+    description: Envía y lee correo en cualquier otro servidor, como tu propio dominio o una cuenta del trabajo, ingresando sus servidores
+    email:
+      custom:
+        name: Otro servidor
+        password_help: La mayoría de los proveedores necesitan aquí una contraseña de aplicación, no la de tu cuenta.

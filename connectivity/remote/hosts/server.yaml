@@ -3,7 +3,7 @@
 # of its own environment (built from its uv.lock), {socket} where the web page listens.
 name: hosts
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.6.1
+version: 0.6.2
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}, 4 for data_key.
 format: 4
 description: Your Linux hosts, kept encrypted by the plugin (imported once from ~/.ssh/config, which it never changes), with a terminal in the web app that keeps running when the connection drops (Herdr), SSH tunnels you add and switch on and off from the hosts table, and tools for the assistant to run commands there and to add, switch and delete tunnels when you ask
@@ -30,3 +30,8 @@ trusted: false
 page:
   command: "{bin}/hosts-web"
   args: [--socket, "{socket}"]
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Tus hosts Linux, guardados cifrados por el plugin (importados una vez desde ~/.ssh/config, que nunca modifica), con una terminal en la app web que sigue corriendo cuando se corta la conexión (Herdr), túneles SSH que agregas y activas o desactivas desde la tabla de hosts, y herramientas para que el asistente ejecute comandos allí y agregue, active y borre túneles cuando se lo pidas"

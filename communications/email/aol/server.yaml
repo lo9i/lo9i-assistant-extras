@@ -3,7 +3,7 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: aol
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.1.0
 description: Send and read AOL Mail
 email:
   - id: aol
@@ -11,5 +11,11 @@ email:
     host: smtp.aol.com
     port: 465
     imap_host: imap.aol.com
-    password_help: "AOL needs an app password: Account security → Generate app password."
-    password_url: https://login.aol.com/account/security
+    # Markdown, with a link where it's done.
+    password_help: "AOL needs an app password: in [Account security](https://login.aol.com/account/security), choose Generate app password."
+translations:
+  es:
+    description: Envía y lee correo de AOL Mail
+    email:
+      aol:
+        password_help: "AOL necesita una contraseña de aplicación: en [Seguridad de la cuenta](https://login.aol.com/account/security), genera una contraseña de aplicación."

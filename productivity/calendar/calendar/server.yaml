@@ -2,7 +2,7 @@
 # in lo9i's core/mcp/install.py. {bin} is the scripts of its own environment (built from its uv.lock).
 name: calendar
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.1
+version: 1.0.2
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Read and manage your calendars, in the Calendar app on your Mac and on a CalDAV server (iCloud, Fastmail, Nextcloud)
@@ -26,3 +26,16 @@ trusted: false
 # Reading is marked read-only; adding, changing and deleting events isn't, so lo9i asks the user before each
 # one unless they trust the plugin. lo9i gives the server the user's time zone as TZ.
 command: "{bin}/calendar-mcp"
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Lee y gestiona tus calendarios, en la app Calendario de tu Mac y en un servidor CalDAV (iCloud, Fastmail, Nextcloud)"
+    steps:
+      - "En una Mac, el asistente usa los calendarios de la app Calendario, de todas sus cuentas (iCloud, Google, Exchange). La primera vez, macOS pide permitir el acceso a Calendarios: elige Permitir acceso total. Funciona mientras el asistente corre en tu sesión, no cuando se inició al arrancar."
+      - "Para calendarios que la Mac no tiene, o en Linux, ingresa una cuenta CalDAV: su servidor, tu usuario y una contraseña de aplicación, que creas en los ajustes de la cuenta de tu proveedor (no tu contraseña habitual). iCloud: https://caldav.icloud.com con tu Apple ID. Fastmail: https://caldav.fastmail.com. Nextcloud: https://tu-servidor/remote.php/dav. No ingreses una cuenta que la app Calendario ya tiene, o sus eventos se muestran dos veces."
+      - "Google Calendar: agrega tu cuenta de Google a la Mac en Ajustes del Sistema → Cuentas de internet. El CalDAV propio de Google necesita un inicio de sesión de Google que este plugin no hace."
+    fields:
+      CALDAV_URL: {label: "Servidor CalDAV"}
+      CALDAV_USERNAME: {label: "Usuario de CalDAV"}
+      CALDAV_PASSWORD: {label: "Contraseña de aplicación de CalDAV"}

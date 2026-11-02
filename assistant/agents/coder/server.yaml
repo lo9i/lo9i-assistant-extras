@@ -2,7 +2,7 @@
 # in lo9i's core/mcp/install.py. A named subagent runs nothing of its own (lo9i's core/mcp/subagents.py).
 name: coder
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.0.1
 # The plugin format (lo9i's core/repositories/formats.py): 6 for subagent.
 format: 6
 description: A coding subagent the assistant hands small programming tasks to; it works in a folder with the shell and reports what it changed and verified
@@ -15,3 +15,8 @@ subagent:
   # Code is where a stronger model pays off: the user's main model.
   model: main
   tools: [bash, list_skills, use_skill]
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Un subagente de programación al que el asistente le pasa tareas pequeñas; trabaja en una carpeta con la terminal e informa qué cambió y qué verificó"

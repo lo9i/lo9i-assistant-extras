@@ -2,7 +2,7 @@
 # in lo9i's core/mcp/install.py. A named subagent runs nothing of its own (lo9i's core/mcp/subagents.py).
 name: researcher
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.0
+version: 1.0.1
 # The plugin format (lo9i's core/repositories/formats.py): 6 for subagent.
 format: 6
 description: A research subagent the assistant hands questions to; it reads many web pages and answers with its sources
@@ -15,3 +15,8 @@ subagent:
   # Reading many pages is most of its work: the user's worker model keeps it cheap.
   model: worker
   tools: [web_search, web_extract, search_memory]
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Un subagente de investigación al que el asistente le pasa preguntas; lee muchas páginas web y responde con sus fuentes"

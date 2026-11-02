@@ -4,7 +4,7 @@
 # web page listens.
 name: factory
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.2.3
+version: 1.2.4
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: A team of models debates a coding task in one of your repositories, you approve each step, and a coding agent builds it on a local branch
@@ -35,3 +35,15 @@ trusted: false
 page:
   command: "{bin}/factory-web"
   args: [--socket, "{socket}"]
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Un equipo de modelos debate una tarea de programación en uno de tus repositorios, tú apruebas cada paso, y un agente de programación la construye en una rama local"
+    steps:
+      - "Cada rol del equipo (arquitecto, implementador, revisor, tester, seguridad, juez) corre en el modelo que eliges para él en Settings de la página Factory: Anthropic, OpenAI o GitHub Copilot."
+      - "Ingresa las claves de API de los proveedores que quieras usar. GitHub Copilot no necesita nada aquí: usa el inicio de sesión de Copilot del propio asistente."
+      - "El agente de programación (Claude Code, o Codex) construye el plan aprobado en una rama propia, con ANTHROPIC_API_KEY u OPENAI_API_KEY; Claude Code puede usar en su lugar los modelos Claude de GitHub Copilot, sin clave. Por defecto corre en Docker, solo con la carpeta de esa rama: mantén Docker Desktop abierto. En modo local corre en esta computadora, y te pregunta antes de cada comando."
+    fields:
+      ANTHROPIC_API_KEY: {label: "Clave de API de Anthropic"}
+      OPENAI_API_KEY: {label: "Clave de API de OpenAI"}

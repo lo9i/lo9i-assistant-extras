@@ -3,7 +3,7 @@
 # updates leave alone, {bin} the scripts of its own environment (built from its uv.lock).
 name: claude-code
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 2.5.1
+version: 2.5.2
 # The plugin format (lo9i's core/repositories/formats.py): 3 for the agent's worker.
 format: 3
 description: Hand coding tasks to Claude Code, which works on them on its own in your repositories
@@ -39,3 +39,14 @@ agent:
   command: claude
   name: Claude Code
   worker: "{bin}/claude-code-worker"
+
+# Its description, steps and fields in Spanish, for the apps shown in Spanish.
+translations:
+  es:
+    description: "Delega tareas de programación en Claude Code, que trabaja en ellas por su cuenta en tus repositorios"
+    steps:
+      - "Con GitHub Copilot como modelo del asistente, deja el campo vacío: Claude Code usa tu plan de Copilot."
+      - "Si no, con un plan Claude Pro o Max: en una computadora con Claude Code, ejecuta claude setup-token e inicia sesión. Imprime un token que empieza con sk-ant-oat. O crea una clave de API en la Anthropic Console (sk-ant-api)."
+      - "Una tarea edita archivos y ejecuta comandos en el repositorio que se le da sin preguntar, así que el asistente te pregunta antes de que empiece cada una."
+    fields:
+      CLAUDE_TOKEN: {label: "Token de Claude o clave de API de Anthropic"}
