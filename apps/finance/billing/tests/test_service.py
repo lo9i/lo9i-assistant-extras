@@ -253,6 +253,8 @@ def test_a_rejection_is_kept_and_the_period_can_be_issued_later(conn, fake, issu
     fake.reject = (10013, "Para comprobantes clase A el receptor debe ser CUIT")
     with pytest.raises(service.RejectedError, match="10013"):
         issue()
+    preview = service.prepare_month(conn, "acme", "2026-10", on=NOW.date())["invoices"][0]
+    assert preview["status"] == "rejected" and preview["last_errors"][0]["code"] == 10013
     (rejected,) = service.list_invoices(conn)
     assert rejected["status"] == "rejected" and rejected["number"] is None
     assert rejected["errors"] == [] and rejected["observations"][0]["code"] == 10013

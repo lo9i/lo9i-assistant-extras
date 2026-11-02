@@ -1,0 +1,49 @@
+{# Customers with their details and monthly amounts. A new amount applies from its month; issued invoices keep
+   theirs. #}
+<section id="customers">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  {% include "_add_customer.html" %}
+
+  {% for c in customers %}
+  <div class="card group">
+    <div class="group-head" id="customer-{{ c.id }}">
+      <div class="main">
+        <div class="title">{{ c.name }} <span class="tag">{{ IVA_CONDITIONS[c.iva_condition] }}</span></div>
+        <div class="muted small">CUIT {{ c.cuit }}{% if c.email %} · {{ c.email }}{% endif %}</div>
+        {% if c.address %}<div class="muted small">{{ c.address }}</div>{% endif %}
+        <div class="muted small">Invoice line: {{ c.description }}</div>
+      </div>
+      <div class="actions">
+        <button class="ghost small" hx-get="customers/{{ c.id }}/edit" hx-target="#customer-{{ c.id }}" hx-swap="outerHTML">Edit</button>
+      </div>
+    </div>
+
+    <div class="list">
+      <h3>Monthly net amount</h3>
+      {% for p in c.prices | reverse %}
+      <div class="row">
+        <div class="main">
+          <div class="title">{{ p.monthly_net | money }}{% if p.current %} <span class="tag">now</span>{% endif %}</div>
+          <div class="muted small">{{ p.effective_from | since }} · {{ (p.monthly_net / 2) | money }} per half, plus IVA</div>
+        </div>
+        <div class="actions">
+          <button class="ghost small danger" hx-post="customers/{{ c.id }}/prices/delete" hx-vals='{"effective_from": "{{ p.effective_from or '' }}"}' hx-target="#customers" hx-swap="outerHTML" hx-confirm="Remove {{ p.monthly_net | money }} ({{ p.effective_from | since | lower }})? Issued invoices keep their amounts.">Remove</button>
+        </div>
+      </div>
+      {% else %}
+      <p class="empty">No monthly amount: it isn't billed each month.</p>
+      {% endfor %}
+    </div>
+    <details class="sub">
+      <summary>+ New monthly amount</summary>
+      <form class="inline" hx-post="customers/{{ c.id }}/prices" hx-target="#customers" hx-swap="outerHTML">
+        <label>Net amount <input name="monthly_net" inputmode="decimal" placeholder="8.000.000" required></label>
+        <label>From <input type="month" name="effective_from" value="{{ today.strftime('%Y-%m') }}"></label>
+        <div class="buttons"><button class="primary">Add</button></div>
+      </form>
+    </details>
+  </div>
+  {% else %}
+  <p class="card empty">No customers yet.</p>
+  {% endfor %}
+</section>

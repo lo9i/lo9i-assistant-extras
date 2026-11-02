@@ -1,0 +1,2 @@
+{% if error %}<span class="error">{{ error }}</span>
+{% else %}<span class="ok">ARCA answered: in {{ ENVIRONMENTS[result.environment] }}, point of sale {{ '%05d' % result.point_of_sale }}'s last Factura A is {{ result.last_factura_a or 'none yet' }}; the next is {{ result.next_factura_a }}.</span>{% endif %}

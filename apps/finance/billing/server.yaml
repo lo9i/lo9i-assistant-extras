@@ -1,9 +1,10 @@
 # Installed by lo9i from this repository (Install in /mcp or /skills). The format is in lo9i's
 # core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that updates leave
-# alone, {bin} the scripts of its own environment (built from its uv.lock).
+# alone, {bin} the scripts of its own environment (built from its uv.lock), {socket} where the web page
+# listens.
 name: billing
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.1.0
+version: 0.2.0
 # The plugin format (lo9i's core/repositories/formats.py): 7 for `approve`.
 format: 7
 description: Argentine electronic invoices (Factura A) authorized by ARCA, with their PDF
@@ -17,14 +18,20 @@ trusted: false
 # Issuing an invoice can't be undone (only a credit note cancels it): it asks the user every time, even
 # once the server is trusted.
 approve: [create_invoice]
+
+# The page lo9i shows as Billing in its web app. It gets the env above and listens on {socket};
+# lo9i signs the user in and serves it under /billing/ (X-Forwarded-Prefix).
+page:
+  command: "{bin}/billing-web"
+  args: [--socket, "{socket}"]
 steps:
   - In ARCA, create a certificate for web services (WSASS for homologación, Administración de Certificados Digitales for producción) and associate it with the wsfe service.
   - Create a point of sale of type "RECE para aplicativo y web services" (producción).
-  - Ask the assistant to set billing up with your CUIT, business details and the certificate's and key's paths.
+  - Enter your CUIT, business details and the certificate's and key's paths in the Billing page's Settings, or ask the assistant to set billing up with them.
 translations:
   es:
     description: Facturas electrónicas argentinas (Factura A) autorizadas por ARCA, con su PDF
     steps:
       - En ARCA, crea un certificado para web services (WSASS para homologación, Administración de Certificados Digitales para producción) y asócialo al servicio wsfe.
       - Crea un punto de venta del tipo "RECE para aplicativo y web services" (producción).
-      - Pide al asistente que configure la facturación con tu CUIT, tus datos y las rutas del certificado y la clave.
+      - Ingresa tu CUIT, tus datos y las rutas del certificado y la clave en Settings, en la página Billing, o pide al asistente que configure la facturación con ellos.

@@ -1,0 +1,55 @@
+{# The issuer, the environment, and each environment's certificate. Only the files' paths are kept. #}
+{% set v = form or issuer %}
+<section id="settings">
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  {% if saved %}<p class="notice">Saved.{% if issuer.ready %} Check it with ARCA below.{% else %} Issuing still needs {{ issuer.missing | join(', ') }}.{% endif %}</p>{% endif %}
+  <form class="stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML">
+    <div class="card stack">
+      <h3>Issuer</h3>
+      <div class="grid">
+        <label>CUIT <input name="cuit" value="{{ v.cuit or '' }}" placeholder="20-12345678-6"></label>
+        <label>Razón social <input name="business_name" value="{{ v.business_name or '' }}"></label>
+        <label class="wide">Domicilio comercial <input name="address" value="{{ v.address or '' }}"></label>
+        <label>IVA condition <input value="IVA Responsable Inscripto" disabled></label>
+        <label>Inicio de actividades <input type="date" name="activity_start" value="{{ v.activity_start or '' }}"></label>
+        <label>Ingresos Brutos <input name="iibb" value="{{ v.iibb or '' }}" placeholder="901-123456-7 or Exento"></label>
+        <label><span>Point of sale <span class="hint">RECE</span></span><input type="number" min="1" max="99998" name="point_of_sale" value="{{ v.point_of_sale or '' }}"></label>
+        <label><span>Payment due <span class="hint">days after issuing</span></span><input type="number" min="0" max="365" name="payment_days" value="{{ v.payment_days if v.payment_days is not none else 10 }}"></label>
+        <label>Condición de venta <input name="sale_condition" value="{{ v.sale_condition or '' }}"></label>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h3>ARCA</h3>
+      <label>Environment
+        <select name="environment">
+          {% for key, name in ENVIRONMENTS.items() %}
+          <option value="{{ key }}" {{ 'selected' if v.environment == key }}>{{ name }}{{ ' (tests, no fiscal value)' if key == 'homologacion' else ' (real invoices)' }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% for key, name in ENVIRONMENTS.items() %}
+      {% set cert = issuer.certificates.get(key, {}) %}
+      <div class="env-block{{ ' current' if issuer.environment == key }}">
+        <div class="title">{{ name }} certificate{% if issuer.environment == key %} <span class="tag">in use</span>{% endif %}</div>
+        <div class="grid">
+          <label class="wide"><span>Certificate <span class="hint">full path of the .crt from ARCA</span></span><input name="certificate_{{ key }}" value="{{ (form or {}).get('certificate_' ~ key) or cert.certificate_path or '' }}" placeholder="/Users/you/arca/arca_{{ key[:4] }}.crt"></label>
+          <label class="wide"><span>Private key <span class="hint">full path; only the path is kept</span></span><input name="key_{{ key }}" value="{{ (form or {}).get('key_' ~ key) or cert.key_path or '' }}" placeholder="/Users/you/arca/arca_{{ key[:4] }}.key"></label>
+        </div>
+        {% if cert.error %}<p class="error">{{ cert.error }}</p>
+        {% elif cert.subject %}<p class="muted small">{{ cert.subject }} · CUIT {{ cert.cuit or '?' }} · {% if cert.expired %}<span class="warn">expired {{ cert.valid_until[:10] | day }}</span>{% else %}valid until {{ cert.valid_until[:10] | day }}{% endif %}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="buttons"><button class="primary">Save</button></div>
+  </form>
+
+  <div class="card stack">
+    <h3>Check with ARCA</h3>
+    <p class="muted small">Signs in with {{ ENVIRONMENTS[issuer.environment] }}'s certificate and reads the point of sale's last Factura A. Issues nothing.</p>
+    <div class="buttons">
+      <button class="small" {{ 'disabled' if issuer.missing }} hx-post="settings/check" hx-target="#check-result" hx-swap="innerHTML" hx-disabled-elt="this"><span class="idle">Check</span><span class="busy">Asking ARCA…</span></button>
+      <span id="check-result"></span>
+    </div>
+  </div>
+</section>

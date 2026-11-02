@@ -55,3 +55,7 @@ Approving each `create_invoice` happens on Telegram, where the job's approval re
 3. For produccion: the user creates a production certificate in ARCA (Administración de Certificados Digitales), authorizes it for "Facturación electrónica" (wsfe) in the Administrador de Relaciones de Clave Fiscal, and creates a point of sale of type "RECE para aplicativo y web services". Then `setup` with `environment: produccion`, that certificate and key, and that `point_of_sale`; `check_arca` again. Switching environments switches which invoices `list_invoices` shows: each environment numbers its own.
 
 Only the files' paths are kept; never ask the user to paste a private key into the chat.
+
+## The Billing page
+
+The user has a **Billing** page in the web app's sidebar: each month's invoices per customer (issued ones with their PDF, the rest with an Issue button that asks them to confirm), the customers and their monthly amounts, and the setup with a Check with ARCA button. Point them there for setting up, adding customers, or issuing by hand; an invoice's `page_path` opens it there.
