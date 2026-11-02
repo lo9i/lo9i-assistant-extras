@@ -36,7 +36,7 @@ Emailing is done with the assistant's email (`send_email`), never by this plugin
 
 1. `get_invoice` gives the invoice, `pdf_path` (made again if it's missing) and the customer's email (`customer_email`).
 2. Show the user who it goes to, the subject and the text, and wait for their yes. A short text in Spanish: "Adjunto la Factura A 00002-00000042 por los servicios del 01/10/2026 al 15/10/2026, por $ 4.537.500,00. Vence el 12/11/2026."
-3. Send it with the PDF attached (`pdf_path`). If `send_email` can't attach files, don't send the email without the invoice: tell the user, and give them the PDF's path to send it themselves.
+3. Send it with `send_email`, passing the PDF's path (`pdf_path`) in `attachments`. If the file is missing, don't send the email without the invoice: tell the user.
 
 Never email an invoice from homologacion to a customer: its PDF has no fiscal value.
 
