@@ -233,7 +233,9 @@ def test_the_certificate_request_is_shown_to_copy_and_downloaded(client):
 
 def test_check_with_arca(client, fake):
     fake.last[(2, 1)] = 7
-    assert "last Factura A is 7; the next is 8" in client.post("/settings/check", headers=HX).text
+    page = client.post("/settings/check", headers=HX).text
+    assert "last Factura A is 7; the next is 8" in page
+    assert "Enabled for web services: 2 (CAE - Ri Iva), 9 (CAE - Monotributo)." in page
 
 
 # --- Serving ---

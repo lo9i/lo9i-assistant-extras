@@ -26,7 +26,7 @@ Errors, and what to do:
 - `RejectedError`: ARCA said no and nothing was issued. Its messages (code: text) say why; tell the user, fix what can be fixed (a customer's CUIT or IVA condition, a date) and try again. An issue date earlier than the point of sale's last invoice is rejected; so is one more than 10 days from today.
 - `UnconfirmedError`: it was sent and no answer came back. Don't issue anything else for that customer and period by other means: call `create_invoice` again later with the same arguments; it asks ARCA first and records the invoice if ARCA has it.
 - `AlreadyIssuedError`: that period is already invoiced. An issued invoice can't be changed or deleted; correcting one takes a credit note, which this plugin doesn't issue: the user does it in ARCA.
-- `NotReadyError`: the setup is missing something; ask the user for it and call `setup`.
+- `NotReadyError`: the setup is missing something; ask the user for it and call `setup`. When it says the point of sale isn't enabled for web services, it lists the ones that are: ask the user which to use (a Factura A needs one of a responsable inscripto, "Ri Iva") and `setup` it as `point_of_sale`; nothing was issued.
 - ARCA may require a Factura de Crédito Electrónica MiPyME (FCE) instead of a Factura A for some large customers and amounts. This plugin doesn't issue FCE: if ARCA's rejection says so, tell the user.
 
 Write amounts the Argentine way ($ 4.537.500,00); tools take and return plain numbers in pesos.

@@ -905,6 +905,10 @@ def create_invoice(
     client = wsfe()
     try:
         number = client.last_number(point_of_sale, arca.FACTURA_A) + 1
+    except arca.RefusedError as e:
+        if _not_enabled(e):
+            raise NotReadyError(f"{_points_of_sale_note(client, point_of_sale, env)} Nothing was issued.") from None
+        raise BillingError(f"couldn't get the next number from ARCA, nothing was issued: {e}") from None
     except arca.ArcaError as e:
         raise BillingError(f"couldn't get the next number from ARCA, nothing was issued: {e}") from None
     # Saved before sending: without an answer, the next try asks ARCA about this number.
@@ -1086,6 +1090,11 @@ def check(conn: sqlite3.Connection, send: arca.Post = arca.post, now: datetime |
     point_of_sale = int(values["point_of_sale"])
     try:
         last = client.last_number(point_of_sale, arca.FACTURA_A)
+        enabled = [p for p in client.points_of_sale() if p.usable]
+    except arca.RefusedError as e:
+        if _not_enabled(e):
+            raise NotReadyError(_points_of_sale_note(client, point_of_sale, values["environment"])) from None
+        raise BillingError(f"ARCA's invoicing service (WSFEv1) refused: {e}") from None
     except arca.ArcaError as e:
         raise BillingError(f"ARCA's invoicing service (WSFEv1) refused: {e}") from None
     return {
@@ -1093,7 +1102,31 @@ def check(conn: sqlite3.Connection, send: arca.Post = arca.post, now: datetime |
         "point_of_sale": point_of_sale,
         "last_factura_a": last,
         "next_factura_a": last + 1,
+        "points_of_sale": [{"number": p.number, "kind": p.kind} for p in enabled],
     }
+
+
+def _not_enabled(error: arca.RefusedError) -> bool:
+    return any(m.code == arca.POINT_OF_SALE_NOT_ENABLED for m in error.messages)
+
+
+def _points_of_sale_note(client: arca.Wsfe, point_of_sale: int, env: str) -> str:
+    """Why a point of sale ARCA hasn't enabled for web services can't issue, and which ones can."""
+    said = f"Point of sale {point_of_sale} isn't enabled for web services in ARCA ({env})"
+    try:
+        usable = [p for p in client.points_of_sale() if p.usable]
+    except arca.ArcaError:
+        return f"{said}: in Settings, pick one of type RECE para aplicativo y web services."
+    if not usable:
+        return (
+            f"{said}, and none is: create one of type RECE para aplicativo y web services in ARCA (Administración de"
+            " puntos de venta y domicilios), then pick it in Settings."
+        )
+    listed = ", ".join(f"{p.number} ({p.kind})" for p in usable)
+    return (
+        f"{said}. The ones that are: {listed}. Pick one in Settings; a Factura A is issued at one of a responsable"
+        " inscripto (Ri Iva)."
+    )
 
 
 def lookup_cuit(conn: sqlite3.Connection, value: str, send: arca.Post = arca.post, now: datetime | None = None) -> dict:
