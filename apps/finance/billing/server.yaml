@@ -1,0 +1,30 @@
+# Installed by lo9i from this repository (Install in /mcp or /skills). The format is in lo9i's
+# core/mcp/install.py. {dir} is this folder once installed, {data} a folder for its data that updates leave
+# alone, {bin} the scripts of its own environment (built from its uv.lock).
+name: billing
+# Shown in the Plugins page; raise it with every change worth updating to.
+version: 0.1.0
+# The plugin format (lo9i's core/repositories/formats.py): 7 for `approve`.
+format: 7
+description: Argentine electronic invoices (Factura A) authorized by ARCA, with their PDF
+# Shown beside it in the apps (lo9i's core/repositories/icons.py): a Lucide icon, or an SVG in this folder.
+icon: file-text
+command: "{bin}/billing-mcp"
+env:
+  BILLING_DB: "{data}/billing.db"
+  BILLING_INVOICES: "{data}/invoices"
+trusted: false
+# Issuing an invoice can't be undone (only a credit note cancels it): it asks the user every time, even
+# once the server is trusted.
+approve: [create_invoice]
+steps:
+  - In ARCA, create a certificate for web services (WSASS for homologación, Administración de Certificados Digitales for producción) and associate it with the wsfe service.
+  - Create a point of sale of type "RECE para aplicativo y web services" (producción).
+  - Ask the assistant to set billing up with your CUIT, business details and the certificate's and key's paths.
+translations:
+  es:
+    description: Facturas electrónicas argentinas (Factura A) autorizadas por ARCA, con su PDF
+    steps:
+      - En ARCA, crea un certificado para web services (WSASS para homologación, Administración de Certificados Digitales para producción) y asócialo al servicio wsfe.
+      - Crea un punto de venta del tipo "RECE para aplicativo y web services" (producción).
+      - Pide al asistente que configure la facturación con tu CUIT, tus datos y las rutas del certificado y la clave.
