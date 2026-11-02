@@ -271,3 +271,29 @@ def test_a_picked_iva_condition_isnt_replaced(client):
     # An edited customer's condition counts as picked, so a lookup leaves it.
     assert 'name="iva_condition" data-chosen' in client.get("/customers/acme/edit").text
     assert 'name="iva_condition" >' in client.get("/customers").text.split('id="add-customer"')[1]
+
+
+def test_the_cuit_comes_first_and_emails_and_text_are_saved(client):
+    form = client.get("/customers").text.split('id="add-customer"')[1]
+    assert form.index('name="cuit"') < form.index('name="name"') < form.index('name="email"')
+    assert "Adjunto la Factura A {numero}" in form  # the standard text, to edit
+    client.post(
+        "/customers",
+        headers=HX,
+        data={
+            "cuit": "20-11111111-2",
+            "name": "Juan Perez",
+            "iva_condition": "monotributo",
+            "email": "juan@perez.example, admin@perez.example",
+            "email_text": "Hola {cliente}, va la {numero}.",
+        },
+    )
+    page = client.get("/customers").text
+    assert "juan@perez.example, admin@perez.example" in page
+    edit = client.get("/customers/juan-perez/edit").text
+    assert "Hola {cliente}, va la {numero}.</textarea>" in edit
+
+
+def test_a_wrong_address_keeps_the_form(client):
+    resp = client.post("/customers", headers=HX, data={"cuit": "20-11111111-2", "name": "Juan", "email": "juan@"})
+    assert resp.headers["HX-Retarget"] == "#add-customer" and "isn&#39;t an email address" in resp.text

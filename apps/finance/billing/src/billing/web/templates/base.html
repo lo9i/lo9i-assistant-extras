@@ -32,22 +32,21 @@
       setTimeout(() => (toast.hidden = true), 6000);
     });
 
-    // A customer's CUIT, once typed: ARCA's padrón fills the name and address still empty, and the IVA condition
-    // unless one was picked (customers/lookup).
-    document.body.addEventListener("change", async (e) => {
-      const input = e.target;
-      if (input.matches?.("select[name=iva_condition]")) input.dataset.chosen = "1";
-      if (!input.matches?.("input[data-lookup]")) return;
+    // A customer's CUIT, once typed (its 11 digits, or on leaving the field): ARCA's padrón fills the name and
+    // address still empty, and the IVA condition unless one was picked (customers/lookup).
+    async function lookUp(input) {
+      const cuit = input.value.trim();
+      if (!cuit || input.dataset.looked === cuit) return;
+      input.dataset.looked = cuit;
       const form = input.form;
       const status = form.querySelector("[data-lookup-status]");
-      const cuit = input.value.trim();
-      if (!cuit) return;
       status.textContent = "Looking it up in ARCA…";
       let found;
       try {
         found = await (await fetch(`customers/lookup?cuit=${encodeURIComponent(cuit)}`)).json();
       } catch {
         found = { found: false, message: "Couldn't ask ARCA." };
+        delete input.dataset.looked;
       }
       if (input.value.trim() !== cuit) return; // typed again meanwhile
       status.textContent = found.message;
@@ -58,6 +57,19 @@
       }
       const iva = form.elements["iva_condition"];
       if (iva && found.iva_condition && !iva.dataset.chosen) iva.value = found.iva_condition;
+    }
+    document.body.addEventListener("input", (e) => {
+      if (e.target.matches?.("input[data-lookup]") && e.target.value.replace(/\D/g, "").length === 11) lookUp(e.target);
+    });
+    // Opening New customer starts at its CUIT. A toggle doesn't bubble, so it's caught on the way down.
+    document.addEventListener(
+      "toggle",
+      (e) => e.target.id === "add-customer" && e.target.open && e.target.querySelector("input[data-lookup]")?.focus(),
+      true,
+    );
+    document.body.addEventListener("change", (e) => {
+      if (e.target.matches?.("select[name=iva_condition]")) e.target.dataset.chosen = "1";
+      if (e.target.matches?.("input[data-lookup]")) lookUp(e.target);
     });
   </script>
 </body>

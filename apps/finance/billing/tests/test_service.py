@@ -488,3 +488,66 @@ def test_the_certificate_request_needs_a_key_and_an_rsa_one(conn, tmp_path):
     service.set_certificate(conn, "produccion", None, str(key_path))
     with pytest.raises(service.InvalidError, match="RSA"):
         service.certificate_request(conn, "produccion")
+
+
+# --- Emailing ---
+
+
+def test_a_customer_has_several_addresses(conn):
+    customer = service.update_customer(conn, "acme", email="pagos@acme.example; Ana@Acme.example ,pagos@ACME.example")
+    assert customer["emails"] == ["pagos@acme.example", "Ana@Acme.example"]
+    assert customer["email"] == "pagos@acme.example, Ana@Acme.example"
+    with pytest.raises(service.InvalidError, match="'ana' isn't an email address"):
+        service.update_customer(conn, "acme", email="pagos@acme.example, ana")
+
+
+def test_the_email_text_is_the_standard_one_until_changed(conn):
+    assert service.list_customers(conn)[0]["email_text"] == service.EMAIL_TEXT
+    service.update_customer(conn, "acme", email_text=service.EMAIL_TEXT.replace("\n", "\r\n"))
+    assert conn.execute("SELECT email_text FROM customers").fetchone()[0] == ""
+    with pytest.raises(service.InvalidError, match=r"\{monto\}: its placeholders are \{cliente\}"):
+        service.update_customer(conn, "acme", email_text="Total: {monto}")
+
+
+def test_an_issued_invoice_comes_with_its_email(conn, issue, tmp_path):
+    service.update_customer(
+        conn,
+        "acme",
+        email="pagos@acme.example, ana@acme.example",
+        email_text="Estimados de {cliente}: la {numero} del {periodo}, {total}, vence el {vencimiento}.",
+    )
+    invoice = service.get_invoice(conn, issue()["id"], tmp_path / "invoices")
+    assert invoice["email"] == {
+        "to": ["pagos@acme.example", "ana@acme.example"],
+        "subject": "Factura A 00002-00000001 - Ana Pérez Software",
+        "body": "Estimados de Acme S.A.: la 00002-00000001 del 01/10/2026 al 15/10/2026, $ 4.537.500,00, vence el"
+        " 12/11/2026.",
+    }
+
+
+def test_the_standard_email(conn, issue, tmp_path):
+    body = service.get_invoice(conn, issue()["id"], tmp_path / "invoices")["email"]["body"]
+    assert body.startswith("Hola,\n\nAdjunto la Factura A 00002-00000001 por los servicios del 01/10/2026 al")
+    assert body.endswith("Vence el 12/11/2026.\n\nSaludos,\nAna Pérez Software")
+
+
+def test_a_database_from_before_gets_the_email_text(tmp_path):
+    import sqlite3
+
+    from billing import db
+
+    path = str(tmp_path / "old.db")
+    old = sqlite3.connect(path)
+    old.execute(
+        "CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, cuit TEXT NOT NULL UNIQUE,"
+        " iva_condition TEXT NOT NULL, address TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',"
+        " description TEXT NOT NULL, created_at TEXT NOT NULL)"
+    )
+    old.execute(
+        "INSERT INTO customers VALUES ('acme', 'Acme', ?, 'responsable_inscripto', '', 'a@b.co', 'S', '')",
+        (CUSTOMER_CUIT,),
+    )
+    old.commit()
+    old.close()
+    conn = db.connect(path)
+    assert service.list_customers(conn)[0]["email_text"] == service.EMAIL_TEXT
