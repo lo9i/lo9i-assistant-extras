@@ -110,6 +110,8 @@ class FakeArca:
         self.lose_answer = False  # the next FECAESolicitar is authorized, and its answer lost
         self.lose_request = False  # the next FECAESolicitar is lost on its way
         self.reject = None  # the next FECAESolicitar is rejected with these (code, message)
+        # The points of sale enabled for web services: number -> EmisionTipo.
+        self.points_of_sale = {2: "CAE - Ri Iva", 9: "CAE - Monotributo"}
         self.tokens: dict[str, str] = {}  # each ticket's token, and the service it's for
         self.people = dict(PEOPLE)  # the padrón: CUIT -> getPersona_v2's personaReturn
 
@@ -172,10 +174,37 @@ class FakeArca:
 
     def _FECompUltimoAutorizado(self, op):  # noqa: N802 - named after ARCA's operations
         key = (int(op.findtext("{*}PtoVta")), int(op.findtext("{*}CbteTipo")))
+        if key[0] not in self.points_of_sale:
+            return _soap(
+                f'<FECompUltimoAutorizadoResponse xmlns="{arca.FE}"><FECompUltimoAutorizadoResult>'
+                f"<PtoVta>{key[0]}</PtoVta><CbteTipo>{key[1]}</CbteTipo><Errors><Err><Code>11002</Code><Msg>El punto"
+                " de venta no se encuentra habilitado a usar en el presente WS. Ver metodo FEParamGetPtosVenta</Msg>"
+                "</Err></Errors></FECompUltimoAutorizadoResult></FECompUltimoAutorizadoResponse>"
+            )
         return _soap(
             f'<FECompUltimoAutorizadoResponse xmlns="{arca.FE}"><FECompUltimoAutorizadoResult>'
             f"<PtoVta>{key[0]}</PtoVta><CbteTipo>{key[1]}</CbteTipo><CbteNro>{self.last.get(key, 0)}</CbteNro>"
             "</FECompUltimoAutorizadoResult></FECompUltimoAutorizadoResponse>"
+        )
+
+    def _FEParamGetPtosVenta(self, op):  # noqa: N802 - named after ARCA's operations
+        if not self.points_of_sale:
+            inner = (
+                "<Errors><Err><Code>602</Code><Msg>Sin Resultados: - Metodo FEParamGetPtosVenta</Msg></Err></Errors>"
+            )
+        else:
+            inner = (
+                "<ResultGet>"
+                + "".join(
+                    f"<PtoVenta><Nro>{n}</Nro><EmisionTipo>{kind}</EmisionTipo><Bloqueado>N</Bloqueado>"
+                    "<FchBaja>NULL</FchBaja></PtoVenta>"
+                    for n, kind in self.points_of_sale.items()
+                )
+                + "</ResultGet>"
+            )
+        return _soap(
+            f'<FEParamGetPtosVentaResponse xmlns="{arca.FE}"><FEParamGetPtosVentaResult>{inner}'
+            "</FEParamGetPtosVentaResult></FEParamGetPtosVentaResponse>"
         )
 
     def _FECAESolicitar(self, op):  # noqa: N802 - named after ARCA's operations

@@ -55,8 +55,10 @@ WSAA_NS = "http://wsaa.view.sua.dvadac.desein.afip.gov"
 FE = "http://ar.gov.afip.dif.FEV1/"
 PADRON_NS = "http://a5.soap.ws.server.puc.sr/"
 
-# WSFEv1's "no such invoice" in FECompConsultar.
+# WSFEv1's "no such invoice" in FECompConsultar, and "none" in FEParamGetPtosVenta.
 NOT_FOUND = 602
+# WSFEv1's "this point of sale isn't enabled for web services".
+POINT_OF_SALE_NOT_ENABLED = 11002
 
 Post = Callable[[str, str, bytes], bytes]
 
@@ -289,6 +291,20 @@ class Found:
     processed_at: datetime | None
 
 
+@dataclass(frozen=True)
+class PointOfSale:
+    """A point of sale ARCA has enabled for web services (FEParamGetPtosVenta)."""
+
+    number: int
+    kind: str  # its EmisionTipo, like "CAE - Ri Iva"
+    blocked: bool
+    ended: date | None
+
+    @property
+    def usable(self) -> bool:
+        return not self.blocked and self.ended is None
+
+
 class Wsfe:
     def __init__(self, environment: str, token: str, sign: str, cuit: str, send: Post = post):
         self.url = URLS[environment]["wsfe"]
@@ -315,6 +331,24 @@ class Wsfe:
         if errors := _messages(result, "Errors/{*}Err"):
             raise RefusedError(errors)
         return int(result.findtext("{*}CbteNro") or 0)
+
+    def points_of_sale(self) -> list[PointOfSale]:
+        """The points of sale ARCA has enabled for web services, for this CUIT."""
+        result = self._call("FEParamGetPtosVenta", "")
+        errors = _messages(result, "Errors/{*}Err")
+        if any(e.code == NOT_FOUND for e in errors):
+            return []
+        if errors:
+            raise RefusedError(errors)
+        return [
+            PointOfSale(
+                number=int(p.findtext("{*}Nro") or 0),
+                kind=_text(p.findtext("{*}EmisionTipo")),
+                blocked=p.findtext("{*}Bloqueado") == "S",
+                ended=_parse_date(p.findtext("{*}FchBaja")),
+            )
+            for p in result.findall("{*}ResultGet/{*}PtoVenta")
+        ]
 
     def authorize(self, v: Voucher) -> Authorization:
         """FECAESolicitar for one invoice. Errors and rejections come back in the Authorization."""

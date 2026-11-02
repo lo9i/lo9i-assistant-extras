@@ -318,6 +318,7 @@ def test_check_says_the_next_number(conn, fake):
         "point_of_sale": 2,
         "last_factura_a": 7,
         "next_factura_a": 8,
+        "points_of_sale": [{"number": 2, "kind": "CAE - Ri Iva"}, {"number": 9, "kind": "CAE - Monotributo"}],
     }
 
 
@@ -551,3 +552,35 @@ def test_a_database_from_before_gets_the_email_text(tmp_path):
     old.close()
     conn = db.connect(path)
     assert service.list_customers(conn)[0]["email_text"] == service.EMAIL_TEXT
+
+
+# --- Points of sale ---
+
+
+def test_a_point_of_sale_not_enabled_says_which_ones_are(conn, fake, issue):
+    fake.points_of_sale = {1: "CAE - Monotributo", 3: "CAE - Ri Iva"}
+    with pytest.raises(service.NotReadyError) as e:
+        issue()
+    assert str(e.value) == (
+        "Point of sale 2 isn't enabled for web services in ARCA (homologacion). The ones that are: 1 (CAE -"
+        " Monotributo), 3 (CAE - Ri Iva). Pick one in Settings; a Factura A is issued at one of a responsable"
+        " inscripto (Ri Iva). Nothing was issued."
+    )
+    assert service.list_invoices(conn)[0]["status"] == "draft"
+    with pytest.raises(service.NotReadyError, match="The ones that are: 1"):
+        service.check(conn, fake, NOW)
+    service.setup(conn, point_of_sale=3)
+    assert issue()["full_number"] == "00003-00000001"
+
+
+def test_with_no_point_of_sale_enabled_it_says_to_create_one(conn, fake, issue):
+    fake.points_of_sale = {}
+    with pytest.raises(service.NotReadyError, match="none is: create one of type RECE para aplicativo"):
+        issue()
+
+
+def test_check_lists_the_enabled_points_of_sale(conn, fake):
+    assert service.check(conn, fake, NOW)["points_of_sale"] == [
+        {"number": 2, "kind": "CAE - Ri Iva"},
+        {"number": 9, "kind": "CAE - Monotributo"},
+    ]
