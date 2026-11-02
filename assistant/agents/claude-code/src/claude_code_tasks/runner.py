@@ -52,7 +52,11 @@ _UNDER_LO9I = (
     "before you reply, and any daemon you start from it. To restart it, for example so lo9i code changes "
     "take effect, run `curl -s -X POST --unix-socket ~/.lo9i/daemon.sock -H 'X-Lo9i-Client: claude-code' "
     "http://lo9i/system/restart`: it restarts once your reply is in, so tell the user the change applies "
-    "from their next message."
+    "from their next message. When your reply ends with a question the user answers by picking one of a "
+    "few clear answers (yes or no, or two to four short options), end it with a line of its own listing "
+    "them, which lo9i shows as buttons: `<!-- choices: Yes | No -->` or `<!-- choices: Push | Commit only "
+    "| Cancel -->`. Each choice is what the user would type, in their language. Never write that marker "
+    "anywhere else in a reply."
 )
 # Shown when the user interrupts it, and as the result of each call it stopped.
 _INTERRUPTED = "Interrupted: waiting for your next message"
