@@ -109,6 +109,8 @@ templates.env.globals |= {
     "asset": asset_url,
     "ENVIRONMENTS": ENVIRONMENT_NAMES,
     "IVA_CONDITIONS": {k: label for k, (_, label) in service.IVA_CONDITIONS.items()},
+    "EMAIL_TEXT": service.EMAIL_TEXT,
+    "EMAIL_FIELDS": service.EMAIL_FIELDS,
 }
 templates.env.filters |= {
     "money": money,
@@ -329,6 +331,7 @@ def _customer_args(form: dict) -> dict[str, Any]:
         "iva_condition": _text(form, "iva_condition") or "responsable_inscripto",
         "address": _text(form, "address"),
         "email": _text(form, "email"),
+        "email_text": _text(form, "email_text"),
         "description": _text(form, "description") or "Servicios",
     }
 

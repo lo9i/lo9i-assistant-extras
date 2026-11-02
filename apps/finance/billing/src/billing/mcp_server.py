@@ -38,6 +38,13 @@ Amounts are plain numbers in pesos.
 mcp = MCPServer("billing", instructions=INSTRUCTIONS)
 
 READ_ONLY = ToolAnnotations(read_only_hint=True)
+
+EMAILS = "Where its invoices are emailed: one or more addresses, separated by commas"
+EMAIL_TEXT = (
+    "The text its invoices' emails say, with these placeholders: "
+    + ", ".join(f"{{{k}}} ({v})" for k, v in service.EMAIL_FIELDS.items())
+    + "; empty: the standard text"
+)
 # Only reads when given none of its arguments: lo9i asks the user only for a call that changes something
 # (lo9i's core/mcp/hub.py::read_only_with).
 READ_ONLY_WITHOUT_ARGUMENTS = {"lo9i/read_only_with": []}
@@ -157,7 +164,8 @@ def add_customer(
         ),
     ] = None,
     address: Annotated[str | None, Field(description="Absent: the padrón's fiscal address when it's looked up")] = None,
-    email: Annotated[str, Field(description="Where invoices are emailed")] = "",
+    email: Annotated[str, Field(description=EMAILS)] = "",
+    email_text: Annotated[str, Field(description=EMAIL_TEXT)] = "",
     description: Annotated[
         str, Field(description='The invoice\'s line, followed by the period, like "Servicios de desarrollo"')
     ] = "Servicios",
@@ -187,6 +195,7 @@ def add_customer(
             iva_condition=iva_condition or found.get("iva_condition") or "responsable_inscripto",
             address=address if address is not None else found.get("address", ""),
             email=email,
+            email_text=email_text,
             description=description,
             monthly_net=monthly_net,
             effective_from=effective_from,
@@ -209,7 +218,8 @@ def update_customer(
     cuit: str | None = None,
     iva_condition: str | None = None,
     address: str | None = None,
-    email: str | None = None,
+    email: Annotated[str | None, Field(description=EMAILS + "; replaces them all")] = None,
+    email_text: Annotated[str | None, Field(description=EMAIL_TEXT)] = None,
     description: str | None = None,
     monthly_net: Annotated[
         float | None, Field(description="A new monthly net amount, from effective_from on; earlier months keep theirs")
@@ -229,6 +239,7 @@ def update_customer(
             iva_condition=iva_condition,
             address=address,
             email=email,
+            email_text=email_text,
             description=description,
             monthly_net=monthly_net,
             effective_from=effective_from,
@@ -301,7 +312,8 @@ def list_invoices(
 
 @mcp.tool(annotations=READ_ONLY)
 def get_invoice(id: int) -> dict:
-    """One invoice, with the path of its PDF (made again if it's missing)."""
+    """One invoice, with the path of its PDF (made again if it's missing) and, once issued, the `email` that sends
+    it: to, subject and body, for send_email with the PDF attached."""
     with _db() as conn:
         return _linked(service.get_invoice(conn, id, db.invoices_dir()))
 

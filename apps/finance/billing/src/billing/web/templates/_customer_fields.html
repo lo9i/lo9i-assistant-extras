@@ -1,11 +1,13 @@
+{# The CUIT first: once it's typed, ARCA's padrón fills in the razón social, address and IVA condition (base.html). #}
 <div class="form-grid">
+  <label class="wide"><span>CUIT</span><input name="cuit" value="{{ v.cuit or '' }}" required data-lookup inputmode="numeric" autocomplete="off" {{ 'autofocus' if not v.cuit }}><small class="hint" data-lookup-status>Type it first: ARCA's padrón fills in the razón social, address and IVA condition.</small></label>
   <label><span>Razón social</span><input name="name" value="{{ v.name or '' }}" required></label>
-  <label><span>CUIT</span><input name="cuit" value="{{ v.cuit or '' }}" required data-lookup><small class="hint" data-lookup-status>With or without dashes. ARCA's padrón fills in the rest.</small></label>
   <label><span>IVA condition</span>
     <select name="iva_condition" {{ 'data-chosen' if v.iva_condition }}>{% for k, label in IVA_CONDITIONS.items() %}<option value="{{ k }}" {{ 'selected' if (v.iva_condition or 'responsable_inscripto') == k }}>{{ label }}</option>{% endfor %}</select>
     <small class="hint">A Factura A goes to responsables inscriptos and monotributistas.</small>
   </label>
-  <label><span>Email</span><input type="email" name="email" value="{{ v.email or '' }}"><small class="hint">Where its invoices are sent.</small></label>
   <label class="wide"><span>Address</span><input name="address" value="{{ v.address or '' }}"></label>
   <label class="wide"><span>Invoice line</span><input name="description" value="{{ v.description or 'Servicios' }}"><small class="hint">What the invoice says it's for, followed by the period: “Servicios (01/10/2026 al 15/10/2026)”.</small></label>
+  <label class="wide"><span>Emails</span><input type="email" multiple name="email" value="{{ v.email or '' }}"><small class="hint">Where its invoices are sent. Several, separated by commas.</small></label>
+  <label class="wide"><span>Email text</span><textarea name="email_text" rows="7">{{ v.email_text or EMAIL_TEXT }}</textarea><small class="hint">Sent with each invoice, its PDF attached. {% for k, what in EMAIL_FIELDS.items() %}<code>{{ '{' ~ k ~ '}' }}</code> {{ what }}{{ ', ' if not loop.last else '.' }}{% endfor %}</small></label>
 </div>

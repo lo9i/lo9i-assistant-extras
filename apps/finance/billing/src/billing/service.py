@@ -380,6 +380,51 @@ def _ready(conn: sqlite3.Connection) -> dict[str, str]:
 
 # --- Customers ---
 
+# The text of an invoice's email when the customer has none of its own, and the placeholders a text can use.
+EMAIL_TEXT = """Hola,
+
+Adjunto la Factura A {numero} por los servicios del {periodo}, por {total}. Vence el {vencimiento}.
+
+Saludos,
+{emisor}"""
+EMAIL_FIELDS = {
+    "cliente": "the customer's razón social",
+    "numero": "the invoice's number, like 00002-00000042",
+    "periodo": "the period, like 01/10/2026 al 15/10/2026",
+    "total": "the total, like $ 4.537.500,00",
+    "vencimiento": "the payment due date",
+    "emisor": "your razón social",
+}
+EMAIL = re.compile(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+")
+
+
+def emails(value: str | list[str]) -> list[str]:
+    """Addresses separated by commas, semicolons or spaces, each checked; each once."""
+    found = re.split(r"[\s,;]+", value) if isinstance(value, str) else value
+    out: list[str] = []
+    for address in (a.strip() for a in found):
+        if not address:
+            continue
+        if not EMAIL.fullmatch(address):
+            raise InvalidError(f"{address!r} isn't an email address")
+        if address.lower() not in (a.lower() for a in out):
+            out.append(address)
+    return out
+
+
+def _email_text(value: str) -> str:
+    """'' when it's the standard text, so a customer without one of its own follows it if it changes."""
+    text = value.replace("\r\n", "\n").strip()
+    if text == EMAIL_TEXT:
+        return ""
+    unknown = {f for f in re.findall(r"{(\w+)}", text) if f not in EMAIL_FIELDS}
+    if unknown:
+        raise InvalidError(
+            f"the email text has {', '.join('{' + f + '}' for f in sorted(unknown))}: its placeholders are"
+            f" {', '.join('{' + f + '}' for f in EMAIL_FIELDS)}"
+        )
+    return text
+
 
 def _customer(conn: sqlite3.Connection, row: sqlite3.Row, on: date | None = None) -> dict:
     prices = conn.execute(
@@ -394,6 +439,8 @@ def _customer(conn: sqlite3.Connection, row: sqlite3.Row, on: date | None = None
         "iva_condition": row["iva_condition"],
         "address": row["address"],
         "email": row["email"],
+        "emails": emails(row["email"]),
+        "email_text": row["email_text"] or EMAIL_TEXT,
         "description": row["description"],
         "monthly_net": float(current) if current is not None else None,
         "prices": [
@@ -426,7 +473,8 @@ def add_customer(
     *,
     iva_condition: str = "responsable_inscripto",
     address: str = "",
-    email: str = "",
+    email: str | list[str] = "",
+    email_text: str = "",
     description: str = "Servicios",
     monthly_net: float | None = None,
     effective_from: str | None = None,
@@ -445,15 +493,16 @@ def add_customer(
         if conn.execute("SELECT 1 FROM customers WHERE id = ? OR cuit = ?", (customer_id, digits)).fetchone():
             raise InvalidError(f"there's already a customer {customer_id!r} or with CUIT {digits}: update_customer")
         conn.execute(
-            "INSERT INTO customers (id, name, cuit, iva_condition, address, email, description, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+            "INSERT INTO customers (id, name, cuit, iva_condition, address, email, email_text, description,"
+            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
             (
                 customer_id,
                 name,
                 digits,
                 _iva_condition(iva_condition),
                 address.strip(),
-                email.strip(),
+                ", ".join(emails(email)),
+                _email_text(email_text),
                 _required(description, "description"),
             ),
         )
@@ -472,7 +521,8 @@ def update_customer(
     cuit_: str | None = None,
     iva_condition: str | None = None,
     address: str | None = None,
-    email: str | None = None,
+    email: str | list[str] | None = None,
+    email_text: str | None = None,
     description: str | None = None,
     monthly_net: float | None = None,
     effective_from: str | None = None,
@@ -490,7 +540,9 @@ def update_customer(
     if address is not None:
         changes["address"] = address.strip()
     if email is not None:
-        changes["email"] = email.strip()
+        changes["email"] = ", ".join(emails(email))
+    if email_text is not None:
+        changes["email_text"] = _email_text(email_text)
     if description is not None:
         changes["description"] = _required(description, "description")
     if effective_from is not None and monthly_net is None:
@@ -651,12 +703,36 @@ def list_invoices(
 
 
 def get_invoice(conn: sqlite3.Connection, invoice_id: int, pdf_dir: Path) -> dict:
-    """With its PDF, made again when it's missing."""
+    """With its PDF, made again when it's missing, and the email that sends it."""
     row = _get(conn, invoice_id)
     out = _invoice(row)
     if row["status"] == "authorized":
         out |= _ensure_pdf(conn, row, pdf_dir)
+        out["email"] = invoice_email(conn, row)
     return out
+
+
+def invoice_email(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+    """The email that sends an issued invoice: to the customer's addresses as they are now, with its text (or the
+    standard one) filled in. The PDF goes attached."""
+    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (row["customer_id"],)).fetchone()
+    issuer = json.loads(row["issuer"])
+    invoice = _invoice(row)
+    start, end, due = (date.fromisoformat(row[k]) for k in ("period_from", "period_to", "due_date"))
+    values = {
+        "cliente": json.loads(row["customer"])["name"],
+        "numero": invoice["full_number"],
+        "periodo": f"{start:%d/%m/%Y} al {end:%d/%m/%Y}",
+        "total": f"$ {pdf.pesos(Decimal(row['total']))}",
+        "vencimiento": f"{due:%d/%m/%Y}",
+        "emisor": issuer["business_name"],
+    }
+    text = (customer["email_text"] if customer is not None else "") or EMAIL_TEXT
+    return {
+        "to": emails(customer["email"]) if customer is not None else [],
+        "subject": f"Factura A {invoice['full_number']} - {issuer['business_name']}",
+        "body": re.sub(r"{(\w+)}", lambda m: values.get(m[1], m[0]), text),
+    }
 
 
 def prepare_month(

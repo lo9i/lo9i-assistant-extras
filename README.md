@@ -45,7 +45,7 @@ newer version later.
   its page, which keeps a copy only you can read, or give their paths; from the key, it makes the request ARCA
   issues the certificate for. A **Billing** page in the web app shows each month's invoices (issue one, open
   its PDF), the customers and their monthly amounts, and the setup, which it checks with ARCA. The skill tells the
-  assistant how to email the PDF (asking you first) and how to schedule the monthly run, approved on Telegram. It
+  assistant how to email the PDF to each customer's addresses with its own text (asking you first) and how to schedule the monthly run, approved on Telegram. It
   needs an ARCA certificate for web services, authorized for `wsfe` (invoices) and `ws_sr_padron_a5`: with that, a
   customer's CUIT fills in its name, address and IVA condition from ARCA's padrón, on the page as you type it or when
   you ask the assistant to add a customer by its CUIT. Needs lo9i with `approve` (plugin format 7).

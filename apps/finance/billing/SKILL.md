@@ -8,7 +8,7 @@ The invoices live in the `billing` MCP server; its tools are named `mcp__billing
 ## The model
 
 - **Setup** (`setup`): the issuer (CUIT, razón social, domicilio, IVA condition, which must be responsable inscripto, inicio de actividades, Ingresos Brutos, punto de venta), and for each **environment** the paths of the ARCA certificate and its private key. `homologacion` is ARCA's test environment: its invoices are real-looking but have no fiscal value, and their PDFs say so. `produccion` issues real invoices. `setup` without arguments shows everything and what's `missing`; `check_arca` signs in to ARCA and reads the point of sale's last Factura A, which proves the setup works without issuing anything.
-- **Customers** have a CUIT, IVA condition, address, email, the line their invoices carry (`description`), and a **monthly net amount** with the date it applies from. A raise is `update_customer` with the new `monthly_net` and `effective_from` (a month like `2027-01`): earlier months keep the old amount.
+- **Customers** have a CUIT, IVA condition, address, the addresses their invoices are emailed to (`email`, one or more separated by commas) and the email's text (`email_text`), the line their invoices carry (`description`), and a **monthly net amount** with the date it applies from. A raise is `update_customer` with the new `monthly_net` and `effective_from` (a month like `2027-01`): earlier months keep the old amount.
 - **Looking a CUIT up**: `lookup_cuit` asks ARCA's padrón (constancia de inscripción) for a CUIT's name, fiscal address and IVA condition. `add_customer` with only `cuit` (no `name`) fills those in from it, so a new customer needs just the CUIT, the monthly amount and the email; tell the user what ARCA said. If the padrón gives no IVA condition, ask the user. It needs the certificate authorized for `ws_sr_padron_a5` too (see Setting up); until then, ask the user for the name, address and IVA condition.
 - **Invoices** are Factura A for services (concepto 2), 21% IVA, in pesos, with the service period, the payment due date (issue date + `payment_days`), the CAE and its due date, and a PDF (`pdf_path`). Each month is billed in **two halves**: the 1st to the 15th and the 16th to the month's end, each half the monthly net plus IVA. For 7.500.000 a month: 3.750.000 + 787.500 IVA = 4.537.500 per invoice.
 
@@ -35,9 +35,9 @@ Write amounts the Argentine way ($ 4.537.500,00); tools take and return plain nu
 
 Emailing is done with the assistant's email (`send_email`), never by this plugin, and **only after the user approves sending it**:
 
-1. `get_invoice` gives the invoice, `pdf_path` (made again if it's missing) and the customer's email (`customer_email`).
-2. Show the user who it goes to, the subject and the text, and wait for their yes. A short text in Spanish: "Adjunto la Factura A 00002-00000042 por los servicios del 01/10/2026 al 15/10/2026, por $ 4.537.500,00. Vence el 12/11/2026."
-3. Send it with `send_email`, passing the PDF's path (`pdf_path`) in `attachments`. If the file is missing, don't send the email without the invoice: tell the user.
+1. `get_invoice` gives the invoice, `pdf_path` (made again if it's missing) and its `email`: `to` (every address the customer has), `subject` and `body` (the customer's email text, or the standard one, filled in for this invoice).
+2. Show the user the addresses, the subject and the text, and wait for their yes. They may add addresses or change the text for this email: use what they say. To keep a change for the customer's next invoices, `update_customer` (`email` with all the addresses, separated by commas; `email_text` with the placeholders its description lists).
+3. Send it with `send_email`: `to` the addresses (one email to all of them), the subject and body, and the PDF's path (`pdf_path`) in `attachments`. If the file is missing, don't send the email without the invoice: tell the user. If the customer has no address, ask the user for one.
 
 Never email an invoice from homologacion to a customer: its PDF has no fiscal value.
 

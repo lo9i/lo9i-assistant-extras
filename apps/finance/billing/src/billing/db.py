@@ -21,7 +21,10 @@ CREATE TABLE IF NOT EXISTS customers (
     cuit TEXT NOT NULL UNIQUE,
     iva_condition TEXT NOT NULL,
     address TEXT NOT NULL DEFAULT '',
+    -- Where its invoices are emailed: one or more addresses, separated by ", ".
     email TEXT NOT NULL DEFAULT '',
+    -- The email's text, with service.EMAIL_FIELDS' placeholders; '' for service.EMAIL_TEXT.
+    email_text TEXT NOT NULL DEFAULT '',
     -- The invoice's line, followed by its period.
     description TEXT NOT NULL,
     created_at TEXT NOT NULL
@@ -101,6 +104,9 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
+    # Columns added after a database was made.
+    if "email_text" not in {r["name"] for r in conn.execute("PRAGMA table_info(customers)")}:
+        conn.execute("ALTER TABLE customers ADD COLUMN email_text TEXT NOT NULL DEFAULT ''")
     return conn
 
 

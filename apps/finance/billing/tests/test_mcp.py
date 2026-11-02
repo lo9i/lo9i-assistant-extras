@@ -66,6 +66,7 @@ def test_set_up_add_a_customer_prepare_and_issue_a_month(tmp_path, fake):
 
     (got,) = call(("get_invoice", {"id": issued["id"]}))
     assert payload(got)["pdf_path"] == issued["pdf_path"]
+    assert payload(got)["email"]["subject"] == "Factura A 00002-00000001 - Ana Pérez Software"
 
 
 def test_setup_only_reads_without_arguments():
