@@ -61,6 +61,13 @@
         </div>
         {% if cert.error %}<p class="error">{{ cert.error }}</p>
         {% elif cert.subject and cert.cuit %}<p class="muted small">For CUIT {{ cert.cuit }}.</p>{% endif %}
+        {% if cert.key_path %}
+        <div class="request">
+          <button type="button" class="small" hx-get="settings/request/{{ key }}" hx-target="#request-{{ key }}" hx-swap="innerHTML">Make the certificate request</button>
+          <small class="hint">{{ 'For a new certificate' if cert.subject else 'For ARCA to issue the certificate' }}, from this key, your CUIT and razón social.</small>
+          <div class="request-made" id="request-{{ key }}"></div>
+        </div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>

@@ -22,7 +22,8 @@ and makes their PDF.
 
 - setup holds the issuer's details and, for each environment (homologacion for tests, produccion for real
   invoices), the paths of the ARCA certificate and its private key. Call it without arguments to see it and
-  what's missing; check_arca tries the setup against ARCA.
+  what's missing; check_arca tries the setup against ARCA. With only the key set, certificate_request makes the
+  request ARCA issues the certificate for.
 - Customers have a monthly net amount with the date it applies from, so a raise is a new amount from a
   later date. add_customer with only a CUIT takes the name, address and IVA condition from ARCA's padrón
   (lookup_cuit says them without adding anyone).
@@ -117,6 +118,18 @@ def check_arca() -> dict:
     Factura A. Issues nothing."""
     with _db() as conn:
         return service.check(conn, SEND)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def certificate_request(
+    environment: Annotated[str | None, Field(description="homologacion or produccion; absent: the current one")] = None,
+) -> dict:
+    """The certificate signing request (CSR, PEM) for ARCA, made from the environment's private key with the
+    issuer's CUIT and razón social. The user pastes it in WSASS (homologacion) or uploads it as a .csr file in
+    Administración de Certificados Digitales (produccion); ARCA gives back the certificate, set with setup. The
+    Billing page's Settings offers it too, to copy or download. Changes nothing."""
+    with _db() as conn:
+        return service.certificate_request(conn, environment)
 
 
 # --- Customers ---

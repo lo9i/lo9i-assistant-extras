@@ -303,6 +303,11 @@ small.hint { font-size: 11px; line-height: 1.35; }
 .pick { display: flex; gap: 8px; align-items: center; }
 .pick input { flex: 1; min-width: 0; }
 .pick button { min-height: 38px; }
+/* The certificate request, to copy or download. */
+.request { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; margin-top: 12px; }
+.request-made { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.request-made:empty { display: none; }
+.request textarea.csr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.35; }
 
 /* The environment, as two cards to pick from. */
 .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 4px; }

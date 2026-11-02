@@ -5,6 +5,10 @@ from decimal import Decimal
 
 import pytest
 from conftest import CUSTOMER_CUIT, ISSUER_CUIT, NOW, make_certificate
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.x509.oid import NameOID
 
 from billing import pdf, service
 
@@ -449,3 +453,38 @@ def test_a_certificate_not_authorized_for_the_padron_says_so(conn, fake):
 
     with pytest.raises(service.BillingError, match="ws_sr_padron_a5 looks CUITs up"):
         service.lookup_cuit(conn, CUSTOMER_CUIT, refuse, NOW)
+
+
+# --- The certificate request ---
+
+
+def test_the_certificate_request_is_made_from_the_key_with_the_cuit_and_razon_social(conn, tmp_path):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    key_path = tmp_path / "new.key"
+    key_path.write_bytes(
+        key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    )
+    service.set_certificate(conn, "produccion", None, str(key_path))
+    made = service.certificate_request(conn, "produccion")
+    request = x509.load_pem_x509_csr(made["csr"].encode())
+    assert request.is_signature_valid and made["file_name"] == "arca-produccion.csr"
+    assert request.public_key().public_numbers() == key.public_key().public_numbers()
+    name = {a.oid: a.value for a in request.subject}
+    assert (
+        name[NameOID.SERIAL_NUMBER] == f"CUIT {ISSUER_CUIT}" and name[NameOID.ORGANIZATION_NAME] == "Ana Pérez Software"
+    )
+    assert name[NameOID.COUNTRY_NAME] == "AR" and name[NameOID.COMMON_NAME] == service.REQUEST_NAME
+
+
+def test_the_certificate_request_needs_a_key_and_an_rsa_one(conn, tmp_path):
+    with pytest.raises(service.NotReadyError, match="key_path"):
+        service.certificate_request(conn, "produccion")
+    key_path = tmp_path / "ec.key"
+    key_path.write_bytes(
+        ec.generate_private_key(ec.SECP256R1()).private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+        )
+    )
+    service.set_certificate(conn, "produccion", None, str(key_path))
+    with pytest.raises(service.InvalidError, match="RSA"):
+        service.certificate_request(conn, "produccion")

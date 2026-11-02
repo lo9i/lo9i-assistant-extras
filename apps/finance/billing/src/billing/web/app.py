@@ -473,6 +473,22 @@ def _settings_routes(app: FastAPI) -> None:
                 certificate_files.forget_unused(service.settings(conn))
             return _render(request, "_settings.html", **_settings_ctx(conn, saved=True))
 
+    @app.get("/settings/request/{environment}", response_class=HTMLResponse)
+    def certificate_request(request: Request, environment: str) -> HTMLResponse:
+        """The request ARCA issues the environment's certificate for, to copy or download (_request.html)."""
+        with _db() as conn:
+            try:
+                return _render(request, "_request.html", **service.certificate_request(conn, environment))
+            except BillingError as e:
+                return _render(request, "_request.html", error=str(e))
+
+    @app.get("/settings/request/{environment}/file")
+    def certificate_request_file(environment: str) -> Response:
+        with _db() as conn:
+            made = service.certificate_request(conn, environment)
+        disposition = f'attachment; filename="{made["file_name"]}"'
+        return Response(made["csr"], media_type="application/pkcs10", headers={"Content-Disposition": disposition})
+
     @app.post("/settings/check", response_class=HTMLResponse)
     def check(request: Request) -> HTMLResponse:
         """Sign in to ARCA and read the point of sale's last Factura A, as check_arca does."""

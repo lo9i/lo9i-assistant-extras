@@ -1,0 +1,15 @@
+{# The certificate request (CSR) for an environment, made from its key (service.certificate_request): to paste in
+   WSASS or upload in Administración de Certificados Digitales. #}
+{% if error %}
+<p class="error">{{ error }}</p>
+{% else %}
+<p class="muted small">For {{ subject }}.
+  {% if environment == 'homologacion' %}In WSASS, create a certificate (Nuevo certificado) and paste this request in it.
+  {% else %}In Administración de Certificados Digitales, add an alias and upload this file.{% endif %}
+  Then authorize the certificate for wsfe and ws_sr_padron_a5, and Browse to the certificate ARCA gives you above.</p>
+<textarea class="csr" readonly rows="8" spellcheck="false" onclick="this.select()">{{ csr }}</textarea>
+<div class="buttons">
+  <button type="button" class="small" onclick="const t = this.closest('.request-made').querySelector('textarea'); t.select(); document.execCommand('copy'); this.textContent = 'Copied'">Copy</button>
+  <a class="button" href="settings/request/{{ environment }}/file" download="{{ file_name }}">Download {{ file_name }}</a>
+</div>
+{% endif %}

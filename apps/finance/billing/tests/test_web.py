@@ -218,6 +218,17 @@ def test_a_picked_key_of_another_certificate_saves_nothing_and_isnt_kept(client,
     assert kept == sorted([cert.read_bytes(), key.read_bytes()])
 
 
+def test_the_certificate_request_is_shown_to_copy_and_downloaded(client):
+    assert "Make the certificate request" in client.get("/settings").text
+    shown = client.get("/settings/request/homologacion", headers=HX).text
+    assert "BEGIN CERTIFICATE REQUEST" in shown and "In WSASS" in shown
+    assert 'href="settings/request/homologacion/file"' in shown
+    file = client.get("/settings/request/homologacion/file")
+    assert file.headers["content-disposition"] == 'attachment; filename="arca-homologacion.csr"'
+    assert file.text.startswith("-----BEGIN CERTIFICATE REQUEST-----")
+    assert "needs key_path" in client.get("/settings/request/produccion", headers=HX).text
+
+
 def test_check_with_arca(client, fake):
     fake.last[(2, 1)] = 7
     assert "last Factura A is 7; the next is 8" in client.post("/settings/check", headers=HX).text

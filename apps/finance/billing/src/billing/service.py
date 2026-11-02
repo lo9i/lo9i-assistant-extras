@@ -312,6 +312,33 @@ def _certificate_info(path: str, now: datetime) -> dict:
     }
 
 
+# The certificate's name in the request (its CN); ARCA's own name for it, the alias or DN name, is chosen there.
+REQUEST_NAME = "lo9i-billing"
+
+
+def certificate_request(conn: sqlite3.Connection, environment: str | None = None) -> dict:
+    """The request (CSR) ARCA issues `environment`'s certificate for, made from its private key with the issuer's
+    CUIT and razón social. Changes nothing: the certificate ARCA gives back is set as any other."""
+    values = settings(conn)
+    env = environment or values["environment"]
+    if env not in arca.ENVIRONMENTS:
+        raise InvalidError(f"environment must be {' or '.join(arca.ENVIRONMENTS)}")
+    key_path = values.get(f"key_path.{env}")
+    lacking = [k for k in ("cuit", "business_name") if not values.get(k)] + ([] if key_path else ["key_path"])
+    if lacking:
+        raise NotReadyError(f"the certificate request for {env} needs {', '.join(lacking)} in setup")
+    try:
+        pem = arca.certificate_request(_read_key(key_path), values["cuit"], values["business_name"], REQUEST_NAME)
+    except ValueError as e:
+        raise InvalidError(f"the private key at {key_path}: {e}") from None
+    return {
+        "environment": env,
+        "subject": f"C=AR, O={values['business_name']}, CN={REQUEST_NAME}, serialNumber=CUIT {values['cuit']}",
+        "file_name": f"arca-{env}.csr",
+        "csr": pem.decode(),
+    }
+
+
 def missing(values: dict[str, str]) -> list[str]:
     env = values["environment"]
     needed = [*REQUIRED, f"certificate_path.{env}", f"key_path.{env}"]

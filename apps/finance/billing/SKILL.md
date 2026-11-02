@@ -51,9 +51,9 @@ Approving each `create_invoice` happens on Telegram, where the job's approval re
 
 ## Setting up, for the first time
 
-1. In homologacion: the user creates a key and a certificate for ARCA's testing services (WSASS), authorizes it for `wsfe` (invoices) and `ws_sr_padron_a5` (looking CUITs up), and gives you the files' paths. Call `setup` with their business details and those paths, then `check_arca`.
+1. In homologacion: the user has a private key (RSA, 2048 bits). With their business details and that key set (`setup` with `key_path`, or the Billing page's Settings), `certificate_request` makes the request (CSR) ARCA issues the certificate for: they paste it in ARCA's testing services (WSASS), authorize the certificate for `wsfe` (invoices) and `ws_sr_padron_a5` (looking CUITs up), and give you the certificate's path. Call `setup` with it, then `check_arca`.
 2. Add the customers (`add_customer`), `prepare_month`, and issue one test invoice to see its PDF.
-3. For produccion: the user creates a production certificate in ARCA (Administración de Certificados Digitales), authorizes it for "Facturación electrónica" (wsfe) and for "Consulta de constancia de inscripción" (ws_sr_padron_a5) in the Administrador de Relaciones de Clave Fiscal, and creates a point of sale of type "RECE para aplicativo y web services". Then `setup` with `environment: produccion`, that certificate and key, and that `point_of_sale`; `check_arca` again. Switching environments switches which invoices `list_invoices` shows: each environment numbers its own.
+3. For produccion: the user creates a production certificate in ARCA (Administración de Certificados Digitales, uploading the request `certificate_request` makes with `environment: produccion` from that environment's key), authorizes it for "Facturación electrónica" (wsfe) and for "Consulta de constancia de inscripción" (ws_sr_padron_a5) in the Administrador de Relaciones de Clave Fiscal, and creates a point of sale of type "RECE para aplicativo y web services". Then `setup` with `environment: produccion`, that certificate and key, and that `point_of_sale`; `check_arca` again. Switching environments switches which invoices `list_invoices` shows: each environment numbers its own.
 
 Only the files' paths are kept; never ask the user to paste a private key into the chat.
 

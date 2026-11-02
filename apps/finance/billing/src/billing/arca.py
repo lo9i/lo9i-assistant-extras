@@ -20,7 +20,9 @@ import certifi
 import httpx
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs7
+from cryptography.x509.oid import NameOID
 
 AR = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -172,6 +174,25 @@ def load_key(data: bytes):
     if b"-----BEGIN" in data:
         return serialization.load_pem_private_key(data, password=None)
     return serialization.load_der_private_key(data, password=None)
+
+
+def certificate_request(key, cuit: str, organization: str, name: str) -> bytes:
+    """The request ARCA issues a web services certificate for (a CSR in PEM), signed with the private key the
+    certificate will go with: C=AR, O=the razón social, CN=a name for it, serialNumber=CUIT <its 11 digits>."""
+    if not isinstance(key, rsa.RSAPrivateKey):
+        raise ValueError("ARCA only issues certificates for RSA keys")
+    if key.key_size < 2048:
+        raise ValueError(f"ARCA needs a key of 2048 bits or more, and this one has {key.key_size}")
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "AR"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, organization),
+            x509.NameAttribute(NameOID.COMMON_NAME, name),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, f"CUIT {cuit}"),
+        ]
+    )
+    request = x509.CertificateSigningRequestBuilder().subject_name(subject).sign(key, hashes.SHA256())
+    return request.public_bytes(serialization.Encoding.PEM)
 
 
 def login_request(service: str, now: datetime) -> bytes:

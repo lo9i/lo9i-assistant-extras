@@ -91,7 +91,15 @@ def test_only_reading_tools_are_read_only():
 
     tools = asyncio.run(run())
     read_only = {t.name for t in tools if t.annotations and t.annotations.read_only_hint}
-    assert read_only == {"check_arca", "lookup_cuit", "list_customers", "prepare_month", "list_invoices", "get_invoice"}
+    assert read_only == {
+        "check_arca",
+        "certificate_request",
+        "lookup_cuit",
+        "list_customers",
+        "prepare_month",
+        "list_invoices",
+        "get_invoice",
+    }
     assert {t.name for t in tools} - read_only == {"setup", "add_customer", "update_customer", "create_invoice"}
 
 
