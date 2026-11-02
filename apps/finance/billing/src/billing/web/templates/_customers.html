@@ -1,52 +1,47 @@
-{# Customers with their details and monthly amounts. A new amount applies from its month; issued invoices keep
-   theirs. #}
-<section id="customers" class="narrow">
-  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
-  <div class="section-head">
-    <div>
-      <h2>Customers</h2>
-      <p class="muted small">Who you bill each month. Each gets two invoices a month, each for half the monthly amount plus IVA.</p>
+{# Customers as lo9i lays a list out: a table, and the picked row's detail to the right (app.py's _customers_ctx).
+   A new amount applies from its month; issued invoices keep theirs. #}
+<section id="customers" class="screen">
+  <section class="table-card card">
+    <header class="toolbar">
+      <div>
+        <h2>Customers</h2>
+        <p class="muted small">Who you bill each month: two invoices a month, each half the monthly amount plus IVA.</p>
+      </div>
+      <button class="primary small" hx-get="customers?new=1" hx-target="#customers" hx-swap="outerHTML" hx-push-url="true">+ Add customer</button>
+    </header>
+    <div class="scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>CUIT</th>
+            <th class="num">Monthly net</th>
+            <th class="hide-narrow">Emails</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in customers %}
+          <tr class="{{ 'selected' if customer and c.id == customer.id and panel != 'new' }}" hx-get="customers?c={{ c.id }}" hx-target="#customers" hx-swap="outerHTML" hx-push-url="true">
+            <td><button class="row-button">{{ c.name }}</button></td>
+            <td class="muted">{{ c.cuit }}</td>
+            <td class="num">{{ c.monthly_net | money if c.monthly_net is not none else '—' }}</td>
+            <td class="muted hide-narrow">{{ c.emails | join(', ') or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td class="empty muted" colspan="4">No customers yet: add the ones you bill each month.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-  </div>
-  {% include "_add_customer.html" %}
+  </section>
 
-  {% for c in customers %}
-  <article class="card customer">
-    <div class="group-head" id="customer-{{ c.id }}">
-      <div class="main">
-        <div class="title">{{ c.name }} <span class="tag">{{ IVA_CONDITIONS[c.iva_condition] }}</span></div>
-        <div class="muted small">CUIT {{ c.cuit }}{% if c.email %} · {{ c.email }}{% endif %}{% if c.address %} · {{ c.address }}{% endif %}</div>
-        <div class="muted small">Invoice line: “{{ c.description }}”</div>
-      </div>
-      <div class="actions">
-        <button class="ghost small" hx-get="customers/{{ c.id }}/edit" hx-target="#customer-{{ c.id }}" hx-swap="outerHTML">Edit</button>
-      </div>
-    </div>
-
-    <div class="list">
-      <h3>Monthly net amount</h3>
-      {% for p in c.prices | reverse %}
-      <div class="row">
-        <div class="main">
-          <div class="title">{{ p.monthly_net | money }}{% if p.current %} <span class="tag">now</span>{% endif %}</div>
-          <div class="muted small">{{ p.effective_from | since }} · two invoices of {{ (p.monthly_net / 2) | money }} plus IVA</div>
-        </div>
-        <div class="actions">
-          <button class="ghost small danger" hx-post="customers/{{ c.id }}/prices/delete" hx-vals='{"effective_from": "{{ p.effective_from or '' }}"}' hx-target="#customers" hx-swap="outerHTML" hx-confirm="Remove {{ p.monthly_net | money }} ({{ p.effective_from | since | lower }})? Issued invoices keep their amounts.">Remove</button>
-        </div>
-      </div>
-      {% else %}
-      <p class="empty">No monthly amount yet, so it isn't billed each month.</p>
-      {% endfor %}
-    </div>
-    <details class="sub">
-      <summary>{{ '+ A new monthly amount, from a month on' if c.prices else '+ Add the monthly amount' }}</summary>
-      <form class="form-grid" hx-post="customers/{{ c.id }}/prices" hx-target="#customers" hx-swap="outerHTML">
-        <label><span>Net amount</span><input name="monthly_net" inputmode="decimal" required><small class="hint">Before IVA, for the whole month, like 8.000.000.</small></label>
-        <label><span>From</span><input type="month" name="effective_from" value="{{ today.strftime('%Y-%m') }}"><small class="hint">Earlier months keep the amount they had.</small></label>
-        <div class="buttons wide"><button class="primary small">Add</button></div>
-      </form>
-    </details>
-  </article>
-  {% endfor %}
+  <aside class="column">
+    {% if panel == 'new' %}
+      {% include "_customer_form.html" %}
+    {% elif panel == 'edit' %}
+      {% include "_customer_form.html" %}
+    {% else %}
+      {% include "_customer_detail.html" %}
+    {% endif %}
+  </aside>
 </section>

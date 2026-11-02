@@ -213,9 +213,12 @@ def _shift(month: str, months: int) -> str:
     return f"{total // 12:04d}-{total % 12 + 1:02d}"
 
 
-def _invoices_ctx(conn: sqlite3.Connection, month: str | None, **extra: Any) -> dict[str, Any]:
-    """The month's two halves per customer with a monthly amount (service.prepare_month), the month's other
-    invoices, and the totals."""
+def _invoices_ctx(
+    conn: sqlite3.Connection, month: str | None, picked: str | None = None, focus: int | None = None, **extra: Any
+) -> dict[str, Any]:
+    """The month's two halves per customer with a monthly amount (service.prepare_month) and its other invoices,
+    as the table's rows, the totals, and the row the panel to the right shows: `picked` (a row's key), the one of
+    invoice `focus`, or the first still to issue."""
     month = month or last_month(service.today())
     preview = service.prepare_month(conn, None, month)
     cards: dict[str, dict[str, Any]] = {}
@@ -225,6 +228,21 @@ def _invoices_ctx(conn: sqlite3.Connection, month: str | None, **extra: Any) -> 
     invoices = service.list_invoices(conn, month=month)
     issued = [i for i in invoices if i["status"] == "authorized"]
     issuer = service.issuer(conn)
+    emails = {c["id"]: c["emails"] for c in service.list_customers(conn)}
+    rows = [
+        _invoice_row(e["customer"]["id"], e["customer"]["name"], e, e.get("invoice"), emails)
+        for e in preview["invoices"]
+    ] + [
+        _invoice_row(i["customer_id"], i["customer_name"], None, i, emails)
+        for i in invoices
+        if (i["customer_id"], i["period_from"], i["period_to"]) not in shown
+    ]
+    row = (
+        next((r for r in rows if r["key"] == picked), None)
+        or next((r for r in rows if focus and r["invoice"] and r["invoice"]["id"] == focus), None)
+        or next((r for r in rows if r["status"] in ("not issued", "draft", "rejected", "sent")), None)
+        or (rows[0] if rows else None)
+    )
     steps = [
         {
             "title": "Your details",
@@ -259,7 +277,9 @@ def _invoices_ctx(conn: sqlite3.Connection, month: str | None, **extra: Any) -> 
         "steps": steps,
         "set_up": all(s["done"] for s in steps),
         "cards": list(cards.values()),
-        "others": [i for i in invoices if (i["customer_id"], i["period_from"], i["period_to"]) not in shown],
+        "rows": rows,
+        "row": row,
+        "focus": focus,
         "issued_total": sum(i["total"] for i in issued),
         "issued_count": len(issued),
         "to_issue_total": preview["total_to_issue"],
@@ -269,11 +289,32 @@ def _invoices_ctx(conn: sqlite3.Connection, month: str | None, **extra: Any) -> 
     }
 
 
+def _invoice_row(
+    customer_id: str, name: str, entry: dict | None, invoice: dict | None, emails: dict[str, list[str]]
+) -> dict[str, Any]:
+    """A row of the table: one of a customer's halves (`entry`, from prepare_month, with its `invoice` once
+    issued), or another invoice of the month."""
+    period = entry or invoice or {}
+    key = f"{customer_id}:{period['period_from']}:{period['period_to']}" if entry else f"invoice-{invoice['id']}"
+    return {
+        "key": key,
+        "customer_id": customer_id,
+        "customer_name": name,
+        "period_from": period["period_from"],
+        "period_to": period["period_to"],
+        "status": entry["status"] if entry else invoice["status"],
+        "total": invoice["total"] if invoice else entry.get("total"),
+        "entry": entry,
+        "invoice": invoice,
+        "emails": emails.get(customer_id, []),
+    }
+
+
 def _invoice_routes(app: FastAPI) -> None:
     @app.get("/", response_class=HTMLResponse)
-    def invoices(request: Request, month: str | None = None) -> HTMLResponse:
+    def invoices(request: Request, month: str | None = None, row: str | None = None) -> HTMLResponse:
         with _db() as conn:
-            return _page(request, "invoices.html", "_invoices.html", **_invoices_ctx(conn, month or None))
+            return _page(request, "invoices.html", "_invoices.html", **_invoices_ctx(conn, month or None, row))
 
     @app.post("/invoices", response_class=HTMLResponse)
     async def issue(request: Request) -> HTMLResponse:
@@ -316,7 +357,8 @@ def _issue(request: Request, form: dict) -> HTMLResponse:
                 send=SEND,
             )
         except BillingError as e:
-            return _render(request, "_invoices.html", **_invoices_ctx(conn, month, banner=str(e)))
+            picked = f"{_text(form, 'customer')}:{_text(form, 'period_from')}:{_text(form, 'period_to')}"
+            return _render(request, "_invoices.html", **_invoices_ctx(conn, month, picked, banner=str(e)))
         if invoice["already_issued"]:
             notice = f"Already issued as Factura A {invoice['full_number']}: nothing was issued again."
         else:
@@ -327,15 +369,22 @@ def _issue(request: Request, form: dict) -> HTMLResponse:
 # --- Customers ---
 
 
-def _customers_ctx(conn: sqlite3.Connection, **extra: Any) -> dict[str, Any]:
-    """Customers, each price marked `current` when it's the one in effect today."""
+def _customers_ctx(
+    conn: sqlite3.Connection, picked: str | None = None, panel: str = "show", **extra: Any
+) -> dict[str, Any]:
+    """Customers for the table, each price marked `current` when it's the one in effect today, and what the panel to
+    the right shows: the `picked` customer (the first when none is), a new customer's form (`panel="new"`, also
+    when there's none yet), or the picked one's (`panel="edit"`)."""
     today = service.today()
     customers = service.list_customers(conn)
     for c in customers:
         started = [p for p in c["prices"] if (p["effective_from"] or "") <= today.isoformat()]
         for p in c["prices"]:
             p["current"] = bool(started) and p is started[-1]
-    return {"nav": "customers", "customers": customers, "today": today, **extra}
+    customer = next((c for c in customers if c["id"] == picked), customers[0] if customers else None)
+    if customer is None:
+        panel = "new"
+    return {"nav": "customers", "customers": customers, "customer": customer, "panel": panel, "today": today, **extra}
 
 
 def _customer_args(form: dict) -> dict[str, Any]:
@@ -350,10 +399,14 @@ def _customer_args(form: dict) -> dict[str, Any]:
 
 
 def _customer_routes(app: FastAPI) -> None:
+    def shown(request: Request, conn: sqlite3.Connection, **ctx: Any) -> HTMLResponse:
+        return _page(request, "customers.html", "_customers.html", **_customers_ctx(conn, **ctx))
+
     @app.get("/customers", response_class=HTMLResponse)
-    def customers(request: Request) -> HTMLResponse:
+    def customers(request: Request, c: str | None = None, new: bool = False) -> HTMLResponse:
+        """The table, with customer `c` (or the first) to the right, or a new customer's form."""
         with _db() as conn:
-            return _page(request, "customers.html", "_customers.html", **_customers_ctx(conn))
+            return shown(request, conn, picked=c, panel="new" if new else "show")
 
     @app.get("/customers/lookup")
     def lookup(cuit: str) -> JSONResponse:
@@ -365,11 +418,8 @@ def _customer_routes(app: FastAPI) -> None:
     @app.get("/customers/{id}/edit", response_class=HTMLResponse)
     def edit_customer(request: Request, id: str) -> HTMLResponse:
         with _db() as conn:
-            customer = service.list_customers(conn)
-            found = next((c for c in customer if c["id"] == id), None)
-            if found is None:
-                raise service.NotFoundError(f"no customer {id!r}")
-            return _render(request, "_edit_customer.html", customer=found, form=None)
+            service.find_customer(conn, id)  # 404 for one that isn't there
+            return shown(request, conn, picked=id, panel="edit")
 
     @app.post("/customers", response_class=HTMLResponse)
     async def add_customer(request: Request) -> HTMLResponse:
@@ -386,11 +436,8 @@ def _customer_routes(app: FastAPI) -> None:
                     **args,
                 )
             except BillingError as e:
-                ctx = _customers_ctx(conn, form=form, error=str(e), open=True)
-                return _told(_form_error(request, "_add_customer.html", "#add-customer", **ctx), str(e), ok=False)
-            return _told(
-                _render(request, "_customers.html", **_customers_ctx(conn)), _sentence(f"Added {added['name']}")
-            )
+                return _told(shown(request, conn, panel="new", form=form, error=str(e)), str(e), ok=False)
+            return _told(shown(request, conn, picked=added["id"]), _sentence(f"Added {added['name']}"))
 
     @app.post("/customers/{id}", response_class=HTMLResponse)
     async def save_customer(request: Request, id: str) -> HTMLResponse:
@@ -399,14 +446,8 @@ def _customer_routes(app: FastAPI) -> None:
             try:
                 saved = service.update_customer(conn, id, cuit_=_text(form, "cuit"), **_customer_args(form))
             except BillingError as e:
-                customer = next(c for c in service.list_customers(conn) if c["id"] == id)
-                failed = _form_error(
-                    request, "_edit_customer.html", f"#customer-{id}", customer=customer, form=form, error=str(e)
-                )
-                return _told(failed, str(e), ok=False)
-            return _told(
-                _render(request, "_customers.html", **_customers_ctx(conn)), _sentence(f"Saved {saved['name']}")
-            )
+                return _told(shown(request, conn, picked=id, panel="edit", form=form, error=str(e)), str(e), ok=False)
+            return _told(shown(request, conn, picked=id), _sentence(f"Saved {saved['name']}"))
 
     @app.post("/customers/{id}/prices", response_class=HTMLResponse)
     async def add_price(request: Request, id: str) -> HTMLResponse:
@@ -420,13 +461,8 @@ def _customer_routes(app: FastAPI) -> None:
                     conn, id, monthly_net=amount, effective_from=_opt(form, "effective_from")
                 )
             except BillingError as e:
-                return _told(
-                    _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e))), str(e), ok=False
-                )
-            return _told(
-                _render(request, "_customers.html", **_customers_ctx(conn)),
-                f"{saved['name']}'s new monthly amount is saved.",
-            )
+                return _told(shown(request, conn, picked=id, price_error=str(e)), str(e), ok=False)
+            return _told(shown(request, conn, picked=id), f"{saved['name']}'s new monthly amount is saved.")
 
     @app.post("/customers/{id}/prices/delete", response_class=HTMLResponse)
     async def remove_price(request: Request, id: str) -> HTMLResponse:
@@ -435,12 +471,8 @@ def _customer_routes(app: FastAPI) -> None:
             try:
                 kept = service.remove_price(conn, id, _opt(form, "effective_from"))
             except BillingError as e:
-                return _told(
-                    _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e))), str(e), ok=False
-                )
-            return _told(
-                _render(request, "_customers.html", **_customers_ctx(conn)), _sentence(f"Removed from {kept['name']}")
-            )
+                return _told(shown(request, conn, picked=id), str(e), ok=False)
+            return _told(shown(request, conn, picked=id), _sentence(f"Removed from {kept['name']}"))
 
 
 def _lookup(conn: sqlite3.Connection, cuit: str) -> dict[str, Any]:

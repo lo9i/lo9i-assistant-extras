@@ -1,0 +1,38 @@
+{# The picked row: its amounts and dates, and what can be done with it: open the issued invoice's PDF, or issue it. #}
+{% set r = row %}{% set inv = r.invoice %}{% set e = r.entry %}
+<section class="details card" id="invoice-detail">
+  <header>
+    <h2>{{ r.customer_name }}</h2>
+    {% include "_invoice_status.html" %}
+  </header>
+  <p class="muted small">{{ r.period_from | day }} to {{ r.period_to | day }}</p>
+  {% if r.status == "can't prepare" %}
+  <p class="error">{{ e.error }}</p>
+  {% else %}
+  {% set it = inv or e %}
+  <dl>
+    {% if inv %}<dt>Factura A</dt><dd>{{ inv.full_number }}</dd>{% endif %}
+    <dt>Net</dt><dd>{{ it.net | money }}</dd>
+    <dt>IVA 21%</dt><dd>{{ it.iva | money }}</dd>
+    <dt>Total</dt><dd class="total">{{ it.total | money }}</dd>
+    <dt>{{ 'Issued' if inv else 'Issue date' }}</dt><dd>{{ it.issue_date | day }}</dd>
+    <dt>Payment due</dt><dd>{{ it.due_date | day }}</dd>
+    {% if inv and inv.cae %}<dt>CAE</dt><dd>{{ inv.cae }}</dd><dt>CAE due</dt><dd>{{ inv.cae_due | day }}</dd>{% endif %}
+  </dl>
+  {% if e and e.last_errors %}<p class="error">{% for x in e.last_errors %}{{ x.code }}: {{ x.message }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
+  {% if e and e.note %}<p class="muted small">ARCA didn't answer when it was sent: issuing asks ARCA first, and never issues it twice.</p>{% endif %}
+  {% if inv and inv.status == 'authorized' %}
+  <div class="actions"><a class="button primary" href="invoices/{{ inv.id }}/pdf" target="_blank" rel="noopener">Open PDF</a></div>
+  <p class="muted small">{% if r.emails %}Its email goes to {{ r.emails | join(', ') }}: ask the assistant to send it.{% else %}No email address: add one in <a href="customers?c={{ r.customer_id }}">Customers</a>.{% endif %}</p>
+  {% elif e %}
+  <div class="actions">
+    <button class="primary" {{ 'disabled title="Finish setting billing up first"' if not set_up }}
+      hx-post="invoices" hx-target="#invoices" hx-swap="outerHTML" hx-disabled-elt="this"
+      hx-vals='{"customer": "{{ r.customer_id }}", "period_from": "{{ r.period_from }}", "period_to": "{{ r.period_to }}", "month": "{{ month }}"}'
+      hx-confirm="Issue a Factura A to {{ r.customer_name }} for {{ r.period_from | day }} to {{ r.period_to | day }}, {{ r.total | money }}, in {{ ENVIRONMENTS[env] }}?{{ " This is a real invoice and it can't be undone." if env == "produccion" else " It's a test, with no fiscal value." }}">
+      <span class="idle">{{ 'Check with ARCA' if r.status == 'sent' else ('Issue again' if r.status == 'rejected' else 'Issue') }}</span><span class="busy">Asking ARCA…</span>
+    </button>
+  </div>
+  {% endif %}
+  {% endif %}
+</section>
