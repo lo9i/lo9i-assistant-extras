@@ -1,6 +1,6 @@
 [project]
 name = "lo9i-phone"
-version = "1.1.0"
+version = "1.2.0"
 description = "Calls with the Mac's Phone app, for lo9i"
 requires-python = ">=3.12"
 dependencies = [

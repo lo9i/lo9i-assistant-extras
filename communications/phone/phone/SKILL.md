@@ -10,4 +10,4 @@ The `phone` MCP server's tool is `mcp__phone__call`; numbers come from the `cont
 3. `call` with the number and the person's name. macOS shows a confirmation on the Mac; the call starts when the user accepts it.
 4. Say whom you're calling and that they need to confirm on the Mac. You can't hear or speak on the call: if the user wanted something said, tell them what to say instead.
 
-If `find_contact` says there's no access to Contacts, tell the user where to allow it (the error says). If `call` says the Phone app didn't open, lo9i was probably started at boot, outside their login session: calls need it running in their session.
+If `find_contact` says there's no access to Contacts, tell the user where to allow it (the error says). If `call` says nobody is logged in on the Mac, tell the user calls need them logged in on it (the Phone app opens on its screen). If it says the Phone app didn't open for another reason, say what it said.

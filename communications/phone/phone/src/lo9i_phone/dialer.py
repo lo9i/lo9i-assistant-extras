@@ -1,13 +1,22 @@
 """Dialing through the Mac's Phone app: a `tel:` link opens it with the number, and macOS asks the user
-to confirm before it calls, through their iPhone (Continuity's Calls from iPhone)."""
+to confirm before it calls, through their iPhone (Continuity's Calls from iPhone).
+
+Opening it needs the user's login session: there's a screen there. When lo9i runs in it, the link is opened here
+with `open`. When it started at boot, outside the session, lo9i gives the session helper's socket in
+LO9I_LOGIN_SESSION, and the helper opens it in the session (lo9i's docs/login-session.md)."""
 
 import asyncio
+import json
+import os
 import re
 import sys
 from pathlib import Path
 
 _PHONE_APP = Path("/System/Applications/Phone.app")
 _OPEN = "/usr/bin/open"
+SESSION_ENV = "LO9I_LOGIN_SESSION"
+# Long enough for the Mac to open the Phone app.
+_ANSWER_SECONDS = 15
 # What people write between digits: spaces, dashes, dots, parentheses.
 _SEPARATORS = re.compile(r"[\s\-.()]")
 _NUMBER = re.compile(r"^\+?\d{3,15}$")
@@ -35,15 +44,39 @@ async def dial(number: str) -> str:
     if not available():
         raise DialError("Calling needs a Mac with the Phone app.")
     target = normalize(number)
-    process = await asyncio.create_subprocess_exec(
-        _OPEN, f"tel:{target}", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
-    )
-    output, _ = await process.communicate()
-    if process.returncode != 0:
-        raise DialError(f"The Phone app didn't open: {output.decode(errors='replace').strip()}. {_NO_SESSION}")
+    session = os.environ.get(SESSION_ENV, "")
+    await (_open_in_session(Path(session), f"tel:{target}") if session else _open_here(f"tel:{target}"))
     return target
 
 
-# `open` fails when lo9i runs from boot (/startup), outside the user's login session: there's no screen to
-# show the Phone app on.
-_NO_SESSION = "Calls work only while lo9i runs in your login session, not when it was started at boot."
+async def _open_here(link: str) -> None:
+    process = await asyncio.create_subprocess_exec(
+        _OPEN, link, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+    )
+    output, _ = await process.communicate()
+    if process.returncode != 0:
+        raise DialError(f"The Phone app didn't open: {output.decode(errors='replace').strip()}.")
+
+
+async def _open_in_session(socket: Path, link: str) -> None:
+    """Through lo9i's session helper, which answers while the user is logged in on the Mac."""
+    try:
+        reader, writer = await asyncio.open_unix_connection(str(socket))
+    except OSError:
+        raise DialError(_NOBODY_LOGGED_IN) from None
+    try:
+        writer.write(json.dumps({"op": "open", "url": link}).encode() + b"\n")
+        await writer.drain()
+        line = await asyncio.wait_for(reader.readline(), _ANSWER_SECONDS)
+    except (OSError, TimeoutError):
+        raise DialError(_NOBODY_LOGGED_IN) from None
+    finally:
+        writer.close()
+    answer = json.loads(line) if line else {"error": "the helper didn't answer"}
+    if "error" in answer:
+        raise DialError(f"The Phone app didn't open: {answer['error']}.")
+
+
+_NOBODY_LOGGED_IN = (
+    "Nobody is logged in on the Mac: the Phone app opens on its screen, so log in on the Mac and try again."
+)
