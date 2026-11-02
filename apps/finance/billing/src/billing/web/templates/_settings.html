@@ -11,9 +11,7 @@
 {% set v = form or issuer %}
 {% set env = v.environment or issuer.environment %}
 <section id="settings" class="narrow">
-  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
-  {% if saved %}<p class="notice">Saved.{% if issuer.ready %} Check it with ARCA below.{% else %} Issuing still needs {{ issuer.missing | map('field') | join(', ') }}.{% endif %}</p>{% endif %}
-  <form class="stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML" hx-encoding="multipart/form-data">
+  <form class="stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML" hx-encoding="multipart/form-data" hx-disabled-elt="find .buttons button">
     <div class="card section">
       <header>
         <h2>Your details</h2>
@@ -71,7 +69,10 @@
       </div>
       {% endfor %}
     </div>
-    <div class="buttons"><button class="primary">Save</button></div>
+    {# What saving did, by the button that saved, since the form's top is often out of view by then. #}
+    {% if banner %}<p class="banner">Not saved: {{ banner }}</p>{% endif %}
+    {% if saved %}<p class="notice">Saved.{% if issuer.ready %} Check it with ARCA below.{% else %} Issuing still needs {{ issuer.missing | map('field') | join(', ') }}.{% endif %}</p>{% endif %}
+    <div class="buttons"><button class="primary"><span class="idle">Save</span><span class="busy">Saving…</span></button></div>
   </form>
 
   <div class="card section">

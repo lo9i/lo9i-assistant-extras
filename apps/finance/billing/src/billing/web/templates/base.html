@@ -24,13 +24,24 @@
     {% block main %}{% endblock %}
   </main>
   <script>
-    // Errors outside forms come back as plain text; show them instead of failing silently.
-    document.body.addEventListener("htmx:responseError", (e) => {
+    // A message at the bottom of the screen, whatever is scrolled into view: what a save did (the server's
+    // billing:told, app.py's _told), or an error outside a form, which comes back as plain text.
+    let hiding;
+    function tell(message, ok) {
       const toast = document.getElementById("toast");
-      toast.textContent = e.detail.xhr.responseText || "Something went wrong";
+      toast.textContent = message;
+      toast.className = ok ? "notice" : "banner";
       toast.hidden = false;
-      setTimeout(() => (toast.hidden = true), 6000);
+      clearTimeout(hiding);
+      hiding = setTimeout(() => (toast.hidden = true), ok ? 3500 : 8000);
+    }
+    document.body.addEventListener("billing:told", (e) => tell(e.detail.message, e.detail.ok));
+    // Settings says what saving did by its Save button: that's brought into view, even when Enter was pressed
+    // in a field near the top.
+    document.body.addEventListener("htmx:afterSwap", (e) => {
+      if (e.target.id === "settings") e.target.querySelector("form > .notice, form > .banner")?.scrollIntoView({ block: "center" });
     });
+    document.body.addEventListener("htmx:responseError", (e) => tell(e.detail.xhr.responseText || "Something went wrong", false));
 
     // A customer's CUIT, once typed (its 11 digits, or on leaving the field): ARCA's padrón fills the name and
     // address still empty, and the IVA condition unless one was picked (customers/lookup).
