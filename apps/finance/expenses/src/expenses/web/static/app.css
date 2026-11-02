@@ -139,11 +139,13 @@ details > summary:hover { color: var(--color-text-primary); }
 .bill-card.quiet .card-head { border-bottom: 0; padding-bottom: 0; }
 .bill-card.quiet .card-head .title { color: var(--color-text-muted); }
 .bill-card .empty { padding: 8px 16px 12px; }
-.bill-card .month + .month { border-top: 1px solid var(--color-divider); }
-.bill-card .month > h3 { display: flex; justify-content: space-between; gap: 12px; margin: 0; padding: 12px 16px 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); font-variant-numeric: tabular-nums; }
-/* This month's bills: the app's accent on their heading and a faint wash of it behind them. */
-.bill-card .month.now { background: color-mix(in srgb, var(--color-accent) 6%, transparent); box-shadow: inset 3px 0 0 var(--color-accent); }
-.bill-card .month.now > h3 { color: var(--color-accent); }
+/* A section per month on the Bills page: a heading with its total, then its asset cards. This month's in the accent. */
+.month-section { margin-top: 20px; }
+.month-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 2px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.month-head .small { letter-spacing: 0; text-transform: none; font-weight: 500; }
+.month-section.now .month-head { color: var(--color-accent); }
+.month-section.now .bill-card { box-shadow: inset 3px 0 0 var(--color-accent); }
+.month-section.past .month-head { color: var(--color-warning, var(--color-text-muted)); }
 
 /* A bill: its name and amount, then when it's due and what to do with it. */
 .row.bill { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; }

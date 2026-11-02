@@ -202,8 +202,9 @@ def test_missing_bill_is_a_plain_error(client):
 
 
 def test_landing_page_shows_unpaid_by_default(client):
-    client.post("/bills", headers=HX, data={"amount": "50", "due_date": "2026-10-10", "category": "tax"})
-    client.post("/bills", headers=HX, data={"amount": "7", "due_date": "2026-10-11", "category": "tax"})
+    month = date.today().strftime("%Y-%m")
+    client.post("/bills", headers=HX, data={"amount": "50", "due_date": f"{month}-10", "category": "tax"})
+    client.post("/bills", headers=HX, data={"amount": "7", "due_date": f"{month}-11", "category": "tax"})
     client.post("/bills/2/status", headers=HX, data={"status": "paid"})
 
     html = client.get("/").text
@@ -225,20 +226,29 @@ def test_bills_are_listed_in_their_assets_cards(client):
     client.post("/bills", headers=HX, data={"amount": "5", "due_date": "2026-10-12", "category": "tax", "asset_id": "boni"})
 
     html = client.get("/?f_scope=all&f_status=").text
-    boni, rest = html.split('id="card-boni"')[1].split('id="card-hr-v"')
-    car, general = rest.split('id="card-none"')
+    boni, general = html.split('id="card-2026-10-boni"')[1].split('id="card-2026-10-none"')
     assert 'id="bill-1"' in boni and 'id="bill-3"' in boni and "$105,00" in boni
-    assert "No bills here." in car and 'id="bill-' not in car
     assert 'id="bill-2"' in general and "General" in general and "$30,00" in general
+    assert "card-2026-10-hr-v" not in html  # No bills that month: no card.
 
     # One asset picked: only its card.
     html = client.get("/?f_scope=all&f_status=&f_asset=boni").text
-    assert 'id="card-boni"' in html and 'id="card-hr-v"' not in html and 'id="card-none"' not in html
+    assert 'id="card-2026-10-boni"' in html and 'id="card-2026-10-none"' not in html
+
+
+def test_months_this_one_first_then_ahead_then_earlier(client):
+    today = date.today().replace(day=15)
+    prev = (today - timedelta(days=31)).isoformat()
+    nxt = (today + timedelta(days=31)).isoformat()
+    for due in (prev, nxt, today.isoformat()):
+        client.post("/bills", headers=HX, data={"amount": "5", "due_date": due, "category": "tax"})
+    html = client.get("/?f_scope=all&f_status=").text
+    now, ahead, earlier = (html.index(f'id="month-{d[:7]}"') for d in (today.isoformat(), nxt, prev))
+    assert now < ahead < earlier
 
 
 def test_no_asset_card_shows_only_when_needed(client):
-    assert 'id="card-none"' not in client.get("/").text
-    assert 'id="card-none"' in client.get("/?f_asset=none").text
+    assert '-none"' not in client.get("/").text
 
 
 def test_pressing_bills_and_this_month_stand_out(client):
@@ -254,7 +264,7 @@ def test_pressing_bills_and_this_month_stand_out(client):
     assert 'class="row bill pending due-overdue" id="bill-1"' in html
     assert 'class="row bill pending" id="bill-5"' in html  # A month away.
     assert 'class="row bill paid" id="bill-6"' in html  # Paid: nothing pressing.
-    assert html.count('class="month now"') == 1 and "· this month" in html
+    assert html.count('month-section now') == 1 and "· this month" in html
 
 
 

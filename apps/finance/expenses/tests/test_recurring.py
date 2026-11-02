@@ -101,6 +101,8 @@ def test_generates_next_month_when_asked(conn):
     from expenses import recurring, repo, service
 
     service.add_obligation(conn, name="Gas", category="gas", due_day=4, expected_amount=10.0)
+    for b in repo.list_bills(conn):  # add_obligation already made one for the real today's month.
+        repo.delete_bill(conn, b.id)
     recurring.generate(conn, today=date(2026, 12, 21), months=2)
     assert [b.period for b in repo.list_bills(conn)] == ["2027-01"]
     assert [b.period for b in service.month_bills(conn, date(2026, 12, 21), months=2)] == ["2027-01"]

@@ -219,40 +219,36 @@ def _labels(conn: sqlite3.Connection) -> tuple[dict[int, Obligation], dict[str, 
     return obligations, assets
 
 
-def _bill_cards(bills: list[Bill], assets: list[Asset], filters: Filters) -> list[dict[str, Any]]:
-    """A card per asset with its bills, by month, and their totals; then one for bills of no asset. Assets
-    with nothing to show come after those that have something, and the no-asset card only shows when it
-    has bills or is all there is (or the asset filter picks it)."""
-    by_asset: dict[str | None, list[Bill]] = {}
+def _month_sections(bills: list[Bill], assets: list[Asset], this_month: str) -> list[dict[str, Any]]:
+    """The bills by month, this month first, then the months ahead, then earlier ones (newest first); in
+    each month a card per asset that has bills there, in the assets' order, then one for bills of no asset."""
+    order = {a.id: i for i, a in enumerate(assets)}
+    names = {a.id: a for a in assets}
+    months: dict[str, list[Bill]] = {}
     for b in bills:
-        by_asset.setdefault(b.asset_id, []).append(b)
-    known = {a.id for a in assets}
+        months.setdefault(b.period or b.due_date[:7], []).append(b)
 
-    def card(key: str, asset: Asset | None, name: str, bills: list[Bill]) -> dict[str, Any]:
-        months: dict[str, list[Bill]] = {}
-        for b in bills:
-            months.setdefault(b.period or b.due_date[:7], []).append(b)
-        return {
-            "key": key,
-            "asset": asset,
-            "name": name,
-            "bills": bills,
-            "totals": service.totals(bills),
-            "months": [
-                {"month": m, "bills": mb, "total": round(sum(b.amount for b in mb), 2)}
-                for m, mb in sorted(months.items())
-            ],
-        }
+    def month_key(m: str) -> tuple[int, str]:
+        if m >= this_month:
+            return (0, m)
+        return (1, "".join(chr(255 - ord(ch)) for ch in m))  # Earlier months, newest first.
 
-    shown = [a for a in assets if not filters.asset or filters.asset == a.id]
-    cards = [card(a.id, a, a.name, by_asset.get(a.id, [])) for a in shown]
-    # Bills of an asset that's gone (none should be: an asset with bills can't be deleted).
-    cards += [card(k, None, k, v) for k, v in by_asset.items() if k is not None and k not in known]
-    cards.sort(key=lambda c: not c["bills"])
-    loose = by_asset.get(None, [])
-    if loose or not cards or filters.asset == NO_ASSET:
-        cards.append(card(NO_ASSET, None, "General", loose))
-    return cards
+    sections = []
+    for m in sorted(months, key=month_key):
+        by_asset: dict[str | None, list[Bill]] = {}
+        for b in months[m]:
+            by_asset.setdefault(b.asset_id, []).append(b)
+        keys = sorted((k for k in by_asset if k is not None), key=lambda k: (order.get(k, len(order)), k))
+        cards = [
+            {"key": k, "asset": names.get(k), "name": names[k].name if k in names else k,
+             "bills": by_asset[k], "totals": service.totals(by_asset[k])}
+            for k in keys
+        ]
+        if None in by_asset:
+            cards.append({"key": NO_ASSET, "asset": None, "name": "General", "bills": by_asset[None],
+                          "totals": service.totals(by_asset[None])})
+        sections.append({"month": m, "totals": service.totals(months[m]), "cards": cards})
+    return sections
 
 
 SOON_DAYS = 7
@@ -289,7 +285,7 @@ def _month_ctx(conn: sqlite3.Connection, filters: Filters, **extra: Any) -> dict
         "this_month": today.strftime("%Y-%m"),
         "filters": filters,
         "bills": bills,
-        "cards": _bill_cards(bills, service.list_assets(conn), filters),
+        "sections": _month_sections(bills, service.list_assets(conn), today.strftime("%Y-%m")),
         "totals": service.totals(bills),
         "obligations": obligations,
         "assets": assets,
