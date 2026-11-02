@@ -242,6 +242,9 @@ button.danger, button.ghost.danger { color: var(--color-danger); }
 button.danger:hover { background: color-mix(in srgb, var(--color-danger) 10%, transparent); color: var(--color-danger); }
 button.ok, button.ghost.ok { color: var(--color-success); }
 .buttons { display: flex; gap: 8px; align-items: center; }
+/* ARCA's answer beside Check: a block that wraps as a whole, however long. */
+.check-result { flex: 1; min-width: 0; }
+.check-result p { margin: 0; }
 .spacer { flex: 1; }
 
 form.inline { display: flex; gap: 8px; }

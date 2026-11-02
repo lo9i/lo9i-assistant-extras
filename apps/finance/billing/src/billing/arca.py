@@ -95,8 +95,11 @@ class Message:
 _HINTS = {
     "coe.alreadyAuthenticated": "ARCA already gave this certificate a ticket that is still valid, for up to 12"
     " hours, and this plugin doesn't have it: wait until it expires",
-    "coe.notAuthorized": "the certificate isn't authorized for this service in ARCA: wsfe issues invoices,"
-    " ws_sr_padron_a5 looks CUITs up",
+    "coe.notAuthorized": "the certificate isn't authorized for this service in ARCA (wsfe issues invoices,"
+    " ws_sr_padron_a5 looks CUITs up). For producción, in Administrador de Relaciones de Clave Fiscal add a Nueva"
+    " relación: ARCA, WebServices, Facturación Electrónica (or Consulta de constancia de inscripción), with the"
+    " certificate's computador as representante. For homologación, in WSASS, create an authorization for the"
+    " service with the certificate",
     "cms.cert.expired": "the certificate expired: create a new one in ARCA",
     "cms.cert.untrusted": "ARCA didn't issue this certificate for this environment: homologación and"
     " producción certificates are different",

@@ -81,7 +81,7 @@
     </header>
     <div class="buttons">
       <button class="small" {{ 'disabled title="Save your details and certificate first"' if issuer.missing }} hx-post="settings/check" hx-target="#check-result" hx-swap="innerHTML" hx-disabled-elt="this"><span class="idle">Check</span><span class="busy">Asking ARCA…</span></button>
-      <span id="check-result">{% if issuer.missing %}<span class="muted small">Needs {{ issuer.missing | map('field') | join(', ') }}.</span>{% endif %}</span>
+      <div id="check-result" class="check-result">{% if issuer.missing %}<span class="muted small">Needs {{ issuer.missing | map('field') | join(', ') }}.</span>{% endif %}</div>
     </div>
   </div>
 </section>
