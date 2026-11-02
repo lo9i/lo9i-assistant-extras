@@ -36,6 +36,9 @@ Amounts are plain numbers in pesos.
 mcp = MCPServer("billing", instructions=INSTRUCTIONS)
 
 READ_ONLY = ToolAnnotations(read_only_hint=True)
+# Only reads when given none of its arguments: lo9i asks the user only for a call that changes something
+# (lo9i's core/mcp/hub.py::read_only_with).
+READ_ONLY_WITHOUT_ARGUMENTS = {"lo9i/read_only_with": []}
 
 # How ARCA is reached; tests put a fake here.
 SEND: arca.Post = arca.post
@@ -58,7 +61,7 @@ def _linked(invoice: dict) -> dict:
     return invoice | {"page_path": f"invoices/{invoice['id']}"}
 
 
-@mcp.tool()
+@mcp.tool(meta=READ_ONLY_WITHOUT_ARGUMENTS)
 def setup(
     cuit: Annotated[str | None, Field(description="The issuer's CUIT, like 20-12345678-6")] = None,
     business_name: Annotated[str | None, Field(description="Razón social")] = None,

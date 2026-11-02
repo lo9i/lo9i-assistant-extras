@@ -68,6 +68,16 @@ def test_set_up_add_a_customer_prepare_and_issue_a_month(tmp_path, fake):
     assert payload(got)["pdf_path"] == issued["pdf_path"]
 
 
+def test_setup_only_reads_without_arguments():
+    async def run():
+        async with Client(mcp) as client:
+            return (await client.list_tools()).tools
+
+    tools = {t.name: t for t in asyncio.run(run())}
+    assert tools["setup"].meta == {"lo9i/read_only_with": []}
+    assert all(not t.meta for name, t in tools.items() if name != "setup")
+
+
 def test_service_errors_reach_the_model():
     (result,) = call(("create_invoice", {"customer": "nobody", "period_from": "2026-10-01", "period_to": "2026-10-15"}))
     assert result.is_error
