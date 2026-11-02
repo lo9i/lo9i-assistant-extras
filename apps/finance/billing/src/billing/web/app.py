@@ -46,6 +46,18 @@ MONTH_NAMES = [
 SEND: arca.Post = arca.post
 
 ENVIRONMENT_NAMES = {"homologacion": "Homologación", "produccion": "Producción"}
+# What service.missing names, as the page says it.
+FIELD_LABELS = {
+    "cuit": "your CUIT",
+    "business_name": "razón social",
+    "address": "domicilio comercial",
+    "iva_condition": "IVA condition",
+    "activity_start": "inicio de actividades",
+    "iibb": "Ingresos Brutos",
+    "point_of_sale": "point of sale",
+    "certificate_path": "ARCA certificate",
+    "key_path": "private key",
+}
 
 
 def asset_url(name: str) -> str:
@@ -97,7 +109,14 @@ templates.env.globals |= {
     "ENVIRONMENTS": ENVIRONMENT_NAMES,
     "IVA_CONDITIONS": {k: label for k, (_, label) in service.IVA_CONDITIONS.items()},
 }
-templates.env.filters |= {"money": money, "day": day, "month_name": month_name, "since": since, "plain": plain}
+templates.env.filters |= {
+    "money": money,
+    "day": day,
+    "month_name": month_name,
+    "since": since,
+    "plain": plain,
+    "field": lambda key: FIELD_LABELS.get(key, key),
+}
 
 
 @contextlib.contextmanager
@@ -189,12 +208,40 @@ def _invoices_ctx(conn: sqlite3.Connection, month: str | None, **extra: Any) -> 
     shown = {(e["customer"]["id"], e["period_from"], e["period_to"]) for e in preview["invoices"]}
     invoices = service.list_invoices(conn, month=month)
     issued = [i for i in invoices if i["status"] == "authorized"]
+    issuer = service.issuer(conn)
+    steps = [
+        {
+            "title": "Your details",
+            "text": "CUIT, razón social, domicilio, inicio de actividades, Ingresos Brutos and point of sale, as"
+            " your invoices show them.",
+            "done": not any(k in issuer["missing"] for k in service.REQUIRED),
+            "href": "settings",
+            "action": "Open Settings",
+        },
+        {
+            "title": "ARCA certificate",
+            "text": f"The certificate and private key ARCA gives you for web services, for"
+            f" {ENVIRONMENT_NAMES[issuer['environment']]}. Only their paths are kept.",
+            "done": not ({"certificate_path", "key_path"} & set(issuer["missing"])),
+            "href": "settings#arca",
+            "action": "Add it",
+        },
+        {
+            "title": "A customer",
+            "text": "Who you bill each month, with the monthly net amount before IVA.",
+            "done": bool(cards),
+            "href": "customers",
+            "action": "Add one",
+        },
+    ]
     return {
         "nav": "invoices",
         "month": month,
         "previous": _shift(month, -1),
         "next": _shift(month, 1),
-        "issuer": service.issuer(conn),
+        "issuer": issuer,
+        "steps": steps,
+        "set_up": all(s["done"] for s in steps),
         "cards": list(cards.values()),
         "others": [i for i in invoices if (i["customer_id"], i["period_from"], i["period_to"]) not in shown],
         "issued_total": sum(i["total"] for i in issued),
