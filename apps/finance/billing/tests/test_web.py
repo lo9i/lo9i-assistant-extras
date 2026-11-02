@@ -219,7 +219,7 @@ def test_a_picked_key_of_another_certificate_saves_nothing_and_isnt_kept(client,
 
 
 def test_the_certificate_request_is_shown_to_copy_and_downloaded(client):
-    assert "Make the certificate request" in client.get("/settings").text
+    assert "Create certificate request (CSR)" in client.get("/settings").text
     shown = client.get("/settings/request/homologacion", headers=HX).text
     assert "BEGIN CERTIFICATE REQUEST" in shown and "In WSASS" in shown
     assert 'href="settings/request/homologacion/file"' in shown
