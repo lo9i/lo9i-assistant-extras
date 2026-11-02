@@ -319,6 +319,9 @@ small.hint { font-size: 11px; line-height: 1.35; }
 .choice small { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: 400; }
 .env-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-divider); }
 .env-block > p { margin: 8px 0 0; }
+/* Only the certificate of the environment picked above shows, so a file isn't picked for the other one. */
+#arca:has(input[name="environment"][value="homologacion"]:checked) .env-block[data-env="produccion"],
+#arca:has(input[name="environment"][value="produccion"]:checked) .env-block[data-env="homologacion"] { display: none; }
 .env-title { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .chip { padding: 2px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
 .chip.good { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 14%, transparent); }

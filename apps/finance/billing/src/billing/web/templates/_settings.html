@@ -46,7 +46,7 @@
       </div>
       {% for key, name in ENVIRONMENTS.items() %}
       {% set cert = issuer.certificates.get(key, {}) %}
-      <div class="env-block">
+      <div class="env-block" data-env="{{ key }}">
         <div class="env-title">
           <strong>{{ name }} certificate</strong>
           {% if cert.error %}<span class="chip bad">Can't read it</span>

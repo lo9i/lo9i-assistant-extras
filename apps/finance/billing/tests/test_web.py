@@ -153,6 +153,8 @@ def test_editing_a_customer(client):
 
 def test_settings_show_the_certificate(client):
     page = client.get("/settings").text
+    # Each environment's certificate is marked, for the page to show only the one picked.
+    assert 'data-env="homologacion"' in page and 'data-env="produccion"' in page
     assert 'value="20123456786"' in page and "For CUIT 20123456786." in page and "Valid until 31/12/2027" in page
 
 
