@@ -16,6 +16,7 @@ Routes that wait on ARCA (issuing, checking the setup) run in a thread: an answe
 import argparse
 import contextlib
 import hashlib
+import json
 import os
 import re
 import socket
@@ -172,6 +173,18 @@ def _int(form: dict, key: str) -> int | None:
 
 def _render(request: Request, template: str, **ctx: Any) -> HTMLResponse:
     return templates.TemplateResponse(request, template, ctx)
+
+
+def _sentence(text: str) -> str:
+    """With a period at the end, unless it has one already: "Saved Acme S.A.", not "Saved Acme S.A.."."""
+    return text if text.endswith(".") else text + "."
+
+
+def _told(response: HTMLResponse, message: str, ok: bool = True) -> HTMLResponse:
+    """The response, and a message the page shows at the bottom of the screen whatever is scrolled into view
+    (base.html), so a save says it saved even when the form's top is out of view."""
+    response.headers["HX-Trigger"] = json.dumps({"billing:told": {"message": message, "ok": ok}})
+    return response
 
 
 def _form_error(request: Request, template: str, target: str, **ctx: Any) -> HTMLResponse:
@@ -364,7 +377,7 @@ def _customer_routes(app: FastAPI) -> None:
         with _db() as conn:
             try:
                 args = _customer_args(form)
-                service.add_customer(
+                added = service.add_customer(
                     conn,
                     args.pop("name"),
                     _text(form, "cuit"),
@@ -374,21 +387,26 @@ def _customer_routes(app: FastAPI) -> None:
                 )
             except BillingError as e:
                 ctx = _customers_ctx(conn, form=form, error=str(e), open=True)
-                return _form_error(request, "_add_customer.html", "#add-customer", **ctx)
-            return _render(request, "_customers.html", **_customers_ctx(conn))
+                return _told(_form_error(request, "_add_customer.html", "#add-customer", **ctx), str(e), ok=False)
+            return _told(
+                _render(request, "_customers.html", **_customers_ctx(conn)), _sentence(f"Added {added['name']}")
+            )
 
     @app.post("/customers/{id}", response_class=HTMLResponse)
     async def save_customer(request: Request, id: str) -> HTMLResponse:
         form = dict(await request.form())
         with _db() as conn:
             try:
-                service.update_customer(conn, id, cuit_=_text(form, "cuit"), **_customer_args(form))
+                saved = service.update_customer(conn, id, cuit_=_text(form, "cuit"), **_customer_args(form))
             except BillingError as e:
                 customer = next(c for c in service.list_customers(conn) if c["id"] == id)
-                return _form_error(
+                failed = _form_error(
                     request, "_edit_customer.html", f"#customer-{id}", customer=customer, form=form, error=str(e)
                 )
-            return _render(request, "_customers.html", **_customers_ctx(conn))
+                return _told(failed, str(e), ok=False)
+            return _told(
+                _render(request, "_customers.html", **_customers_ctx(conn)), _sentence(f"Saved {saved['name']}")
+            )
 
     @app.post("/customers/{id}/prices", response_class=HTMLResponse)
     async def add_price(request: Request, id: str) -> HTMLResponse:
@@ -398,20 +416,31 @@ def _customer_routes(app: FastAPI) -> None:
                 amount = _amount(form, "monthly_net")
                 if amount is None:
                     raise service.InvalidError("monthly_net is required")
-                service.update_customer(conn, id, monthly_net=amount, effective_from=_opt(form, "effective_from"))
+                saved = service.update_customer(
+                    conn, id, monthly_net=amount, effective_from=_opt(form, "effective_from")
+                )
             except BillingError as e:
-                return _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e)))
-            return _render(request, "_customers.html", **_customers_ctx(conn))
+                return _told(
+                    _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e))), str(e), ok=False
+                )
+            return _told(
+                _render(request, "_customers.html", **_customers_ctx(conn)),
+                f"{saved['name']}'s new monthly amount is saved.",
+            )
 
     @app.post("/customers/{id}/prices/delete", response_class=HTMLResponse)
     async def remove_price(request: Request, id: str) -> HTMLResponse:
         form = dict(await request.form())
         with _db() as conn:
             try:
-                service.remove_price(conn, id, _opt(form, "effective_from"))
+                kept = service.remove_price(conn, id, _opt(form, "effective_from"))
             except BillingError as e:
-                return _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e)))
-            return _render(request, "_customers.html", **_customers_ctx(conn))
+                return _told(
+                    _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e))), str(e), ok=False
+                )
+            return _told(
+                _render(request, "_customers.html", **_customers_ctx(conn)), _sentence(f"Removed from {kept['name']}")
+            )
 
 
 def _lookup(conn: sqlite3.Connection, cuit: str) -> dict[str, Any]:

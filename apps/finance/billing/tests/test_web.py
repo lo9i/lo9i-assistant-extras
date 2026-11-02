@@ -1,3 +1,4 @@
+import json
 import os
 import stat
 import tempfile
@@ -299,3 +300,28 @@ def test_the_cuit_comes_first_and_emails_and_text_are_saved(client):
 def test_a_wrong_address_keeps_the_form(client):
     resp = client.post("/customers", headers=HX, data={"cuit": "20-11111111-2", "name": "Juan", "email": "juan@"})
     assert resp.headers["HX-Retarget"] == "#add-customer" and "isn&#39;t an email address" in resp.text
+
+
+def told(resp):
+    return json.loads(resp.headers["HX-Trigger"])["billing:told"]
+
+
+def test_settings_say_what_saving_did_by_the_save_button(client):
+    resp = client.post("/settings", headers=HX, data={"business_name": "Ana Pérez SRL"})
+    assert resp.text.index("Saved.") > resp.text.index("Domicilio comercial")  # by the button, not above the form
+    assert resp.text.index("Saved.") < resp.text.index('<span class="idle">Save</span>')
+    failed = client.post("/settings", headers=HX, data={"cuit": "20-12345678-7"}).text
+    assert failed.index("Not saved: CUIT") > failed.index("Domicilio comercial")
+
+
+def test_customer_changes_say_what_they_did(client):
+    added = client.post("/customers", headers=HX, data={"cuit": "20-11111111-2", "name": "Juan Perez"})
+    assert told(added) == {"message": "Added Juan Perez.", "ok": True}
+    saved = client.post("/customers/acme", headers=HX, data={"cuit": CUSTOMER_CUIT, "name": "Acme S.A."})
+    assert told(saved)["message"] == "Saved Acme S.A."
+    raised = client.post(
+        "/customers/acme/prices", headers=HX, data={"monthly_net": "8.000.000", "effective_from": "2099-01"}
+    )
+    assert told(raised)["message"] == "Acme S.A.'s new monthly amount is saved."
+    wrong = client.post("/customers", headers=HX, data={"cuit": "20-12345678-7", "name": "Bad"})
+    assert told(wrong)["ok"] is False
