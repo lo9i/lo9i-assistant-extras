@@ -384,7 +384,8 @@ a.button, span.button {
 a.button:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
 a.button.ghost { border-color: transparent; background: transparent; color: var(--color-text-muted); }
 a.button.ghost:hover { background: var(--color-bg-card-hover); color: var(--color-text-primary); }
-span.button.primary { background: var(--color-action-primary); color: var(--color-action-on-primary); border-color: var(--color-action-primary); }
+a.button.primary, span.button.primary { background: var(--color-action-primary); color: var(--color-action-on-primary); border-color: var(--color-action-primary); }
+a.button.primary:hover { background: var(--color-action-primary); filter: brightness(0.92); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* While ARCA answers, a button says so (htmx marks it with htmx-request). */

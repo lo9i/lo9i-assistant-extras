@@ -69,7 +69,11 @@ def test_issuing_a_half_from_the_page(client, path, fake):
     assert fake.calls.count("FECAESolicitar") == 1
     pdf = client.get("/invoices/1/pdf")
     assert pdf.headers["content-type"] == "application/pdf" and pdf.content.startswith(b"%PDF-")
+    assert pdf.headers["content-disposition"].startswith("inline;")
     assert "HOMOLOGACION-FA-00002-00000001.pdf" in pdf.headers["content-disposition"]
+    saved = client.get("/invoices/1/pdf", params={"download": 1})
+    assert saved.headers["content-disposition"].startswith("attachment;") and saved.content == pdf.content
+    assert 'href="invoices/1/pdf?download=1" download' in client.get("/invoices/1").text
 
 
 def test_a_rejection_shows_why_and_offers_to_try_again(client, fake):

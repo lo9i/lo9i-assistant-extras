@@ -22,7 +22,10 @@
   {% if e and e.last_errors %}<p class="error">{% for x in e.last_errors %}{{ x.code }}: {{ x.message }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
   {% if e and e.note %}<p class="muted small">ARCA didn't answer when it was sent: issuing asks ARCA first, and never issues it twice.</p>{% endif %}
   {% if inv and inv.status == 'authorized' %}
-  <div class="actions"><a class="button primary" href="invoices/{{ inv.id }}/pdf" target="_blank" rel="noopener">Open PDF</a></div>
+  <div class="actions">
+    <a class="button primary" href="invoices/{{ inv.id }}/pdf" target="_blank" rel="noopener">Open PDF</a>
+    <a class="button" href="invoices/{{ inv.id }}/pdf?download=1" download>Download</a>
+  </div>
   <p class="muted small">{% if r.emails %}Its email goes to {{ r.emails | join(', ') }}: ask the assistant to send it.{% else %}No email address: add one in <a href="customers?c={{ r.customer_id }}">Customers</a>.{% endif %}</p>
   {% elif e %}
   <div class="actions">
