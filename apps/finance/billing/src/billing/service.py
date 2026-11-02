@@ -937,17 +937,23 @@ def _wsfe(conn: sqlite3.Connection, values: dict[str, str], send: arca.Post, now
 
 
 def ticket_for(
-    conn: sqlite3.Connection, env: str, certificate_path: str, key_path: str, send: arca.Post, now: datetime
+    conn: sqlite3.Connection,
+    env: str,
+    certificate_path: str,
+    key_path: str,
+    send: arca.Post,
+    now: datetime,
+    service: str = arca.INVOICES,
 ) -> arca.Ticket:
-    """WSAA's ticket for wsfe, kept until a few minutes before it expires: WSAA gives a certificate no
-    other while one is valid."""
+    """WSAA's ticket for `service`, kept until a few minutes before it expires: WSAA gives a certificate no
+    other for a service while one is valid."""
     try:
         certificate = Path(certificate_path).read_bytes()
     except OSError as e:
         raise NotReadyError(f"can't read the certificate at {certificate_path}: {e.strerror}") from None
     fingerprint = arca.load_certificate(certificate).fingerprint(hashes.SHA256()).hex()
     row = conn.execute(
-        "SELECT * FROM tickets WHERE environment = ? AND service = 'wsfe' AND certificate = ?", (env, fingerprint)
+        "SELECT * FROM tickets WHERE environment = ? AND service = ? AND certificate = ?", (env, service, fingerprint)
     ).fetchone()
     if row is not None and datetime.fromisoformat(row["expires_at"]) > now + TICKET_MARGIN:
         return arca.Ticket(row["token"], row["sign"], datetime.fromisoformat(row["expires_at"]))
@@ -956,15 +962,15 @@ def ticket_for(
     except OSError as e:
         raise NotReadyError(f"can't read the private key at {key_path}: {e.strerror}") from None
     try:
-        ticket = arca.login(env, arca.sign(arca.login_request("wsfe", now), certificate, key), send)
+        ticket = arca.login(env, arca.sign(arca.login_request(service, now), certificate, key), send)
     except arca.ArcaError as e:
-        raise BillingError(f"ARCA's sign-in (WSAA, {env}) failed: {e}") from None
+        raise BillingError(f"ARCA's sign-in (WSAA, {env}, for {service}) failed: {e}") from None
     conn.execute(
         "INSERT INTO tickets (environment, service, certificate, token, sign, expires_at)"
-        " VALUES (?, 'wsfe', ?, ?, ?, ?)"
+        " VALUES (?, ?, ?, ?, ?, ?)"
         " ON CONFLICT (environment, service, certificate) DO UPDATE SET token = excluded.token,"
         " sign = excluded.sign, expires_at = excluded.expires_at",
-        (env, fingerprint, ticket.token, ticket.sign, ticket.expires_at.isoformat()),
+        (env, service, fingerprint, ticket.token, ticket.sign, ticket.expires_at.isoformat()),
     )
     return ticket
 
@@ -984,4 +990,33 @@ def check(conn: sqlite3.Connection, send: arca.Post = arca.post, now: datetime |
         "point_of_sale": point_of_sale,
         "last_factura_a": last,
         "next_factura_a": last + 1,
+    }
+
+
+def lookup_cuit(conn: sqlite3.Connection, value: str, send: arca.Post = arca.post, now: datetime | None = None) -> dict:
+    """Who a CUIT is, from ARCA's padrón A5: name, fiscal address and IVA condition, for filling a customer in.
+    Needs the issuer's CUIT and the environment's certificate, authorized in ARCA for ws_sr_padron_a5."""
+    wanted = cuit(value)
+    now = now or datetime.now(arca.AR)
+    values = settings(conn)
+    env = values["environment"]
+    lacking = [k for k in missing(values) if k in ("cuit", "certificate_path", "key_path")]
+    if lacking:
+        raise NotReadyError(f"looking a CUIT up in ARCA needs {', '.join(lacking)} in setup")
+    ticket = ticket_for(conn, env, values[f"certificate_path.{env}"], values[f"key_path.{env}"], send, now, arca.PADRON)
+    try:
+        person = arca.padron_person(env, ticket.token, ticket.sign, values["cuit"], wanted, send)
+    except arca.ArcaError as e:
+        raise BillingError(f"ARCA's padrón ({arca.PADRON}, {env}) refused: {e}") from None
+    if person is None:
+        return {"cuit": wanted, "found": False}
+    return {
+        "cuit": wanted,
+        "found": True,
+        "name": person.name,
+        "address": person.address,
+        "iva_condition": person.iva_condition,
+        "iva_condition_label": IVA_CONDITIONS[person.iva_condition][1] if person.iva_condition else None,
+        "active": person.active,
+        "notes": person.notes,
     }

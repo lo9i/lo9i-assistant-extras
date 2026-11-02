@@ -41,11 +41,13 @@ newer version later.
   for services, 21% IVA, in pesos, with its CAE and a PDF in ARCA's layout with the RG 4291 QR. Customers have a
   monthly net amount that can change from a given month; each month is billed in two halves (1st to 15th, 16th to
   the end), previewed first and issued one by one, each asking you, and never twice for the same period. It signs in
-  to ARCA's web services (WSAA, WSFEv1) with your certificate, homologación (tests) or producción, and keeps only the
-  certificate's and key's paths. A **Billing** page in the web app shows each month's invoices (issue one, open
+  to ARCA's web services (WSAA, WSFEv1) with your certificate, homologación (tests) or producción: pick the certificate and key with Browse on
+  its page, which keeps a copy only you can read, or give their paths. A **Billing** page in the web app shows each month's invoices (issue one, open
   its PDF), the customers and their monthly amounts, and the setup, which it checks with ARCA. The skill tells the
-  assistant how to email the PDF (asking you first) and how to schedule the monthly run, approved on Telegram. It needs an ARCA certificate for web services, associated with
-  `wsfe`. Needs lo9i with `approve` (plugin format 7).
+  assistant how to email the PDF (asking you first) and how to schedule the monthly run, approved on Telegram. It
+  needs an ARCA certificate for web services, authorized for `wsfe` (invoices) and `ws_sr_padron_a5`: with that, a
+  customer's CUIT fills in its name, address and IVA condition from ARCA's padrón, on the page as you type it or when
+  you ask the assistant to add a customer by its CUIT. Needs lo9i with `approve` (plugin format 7).
 - **watchlist** (`apps/media/watchlist`): the movies and TV shows you want to watch or are watching,
   and the YouTube channels you follow. Movies and shows come from TMDB, with posters, release dates
   and episodes; for each show it keeps the last episode you watched and counts the ones aired since.

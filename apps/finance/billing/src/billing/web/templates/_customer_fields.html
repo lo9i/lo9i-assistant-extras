@@ -1,8 +1,8 @@
 <div class="form-grid">
   <label><span>Razón social</span><input name="name" value="{{ v.name or '' }}" required></label>
-  <label><span>CUIT</span><input name="cuit" value="{{ v.cuit or '' }}" required><small class="hint">With or without dashes.</small></label>
+  <label><span>CUIT</span><input name="cuit" value="{{ v.cuit or '' }}" required data-lookup><small class="hint" data-lookup-status>With or without dashes. ARCA's padrón fills in the rest.</small></label>
   <label><span>IVA condition</span>
-    <select name="iva_condition">{% for k, label in IVA_CONDITIONS.items() %}<option value="{{ k }}" {{ 'selected' if (v.iva_condition or 'responsable_inscripto') == k }}>{{ label }}</option>{% endfor %}</select>
+    <select name="iva_condition" {{ 'data-chosen' if v.iva_condition }}>{% for k, label in IVA_CONDITIONS.items() %}<option value="{{ k }}" {{ 'selected' if (v.iva_condition or 'responsable_inscripto') == k }}>{{ label }}</option>{% endfor %}</select>
     <small class="hint">A Factura A goes to responsables inscriptos and monotributistas.</small>
   </label>
   <label><span>Email</span><input type="email" name="email" value="{{ v.email or '' }}"><small class="hint">Where its invoices are sent.</small></label>

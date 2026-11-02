@@ -395,3 +395,57 @@ def test_an_issued_invoice_has_its_pdf(conn, issue, tmp_path):
 def test_pesos_are_written_the_argentine_way():
     assert pdf.pesos(4537500) == "4.537.500,00"
     assert pdf.pesos(0.5) == "0,50"
+
+
+# --- Looking a CUIT up ---
+
+
+def test_a_cuit_is_looked_up_with_a_padron_ticket_of_its_own(conn, fake, issue):
+    issue()
+    found = service.lookup_cuit(conn, "30-71234567-1", fake, NOW)
+    again = service.lookup_cuit(conn, "20111111112", fake, NOW)
+    assert found == {
+        "cuit": CUSTOMER_CUIT,
+        "found": True,
+        "name": "ACME SOCIEDAD ANONIMA",
+        "address": "AV DEL LIBERTADOR 500, VICENTE LOPEZ (1638), BUENOS AIRES",
+        "iva_condition": "responsable_inscripto",
+        "iva_condition_label": "IVA Responsable Inscripto",
+        "active": True,
+        "notes": [],
+    }
+    assert again["iva_condition"] == "monotributo"
+    # One ticket for invoices, one for the padrón, each kept.
+    assert len(fake.logins) == 2
+    assert {r[0] for r in conn.execute("SELECT service FROM tickets")} == {"wsfe", "ws_sr_padron_a5"}
+
+
+def test_a_cuit_nobody_has(conn, fake):
+    assert service.lookup_cuit(conn, "20333333334", fake, NOW) == {"cuit": "20333333334", "found": False}
+
+
+def test_a_wrong_cuit_isnt_sent(conn, fake):
+    with pytest.raises(service.InvalidError, match="verification digit"):
+        service.lookup_cuit(conn, "20-12345678-7", fake, NOW)
+    assert fake.calls == []
+
+
+def test_looking_up_needs_the_certificate(fake):
+    from billing import db
+
+    conn = db.connect(":memory:")
+    service.setup(conn, cuit_=ISSUER_CUIT)
+    with pytest.raises(service.NotReadyError, match="certificate_path, key_path"):
+        service.lookup_cuit(conn, CUSTOMER_CUIT, fake, NOW)
+
+
+def test_a_certificate_not_authorized_for_the_padron_says_so(conn, fake):
+    def refuse(url, action, body):
+        if b"loginCms" in body:
+            from conftest import _fault
+
+            return _fault("ns1:coe.notAuthorized", "Computador no autorizado a acceder al servicio")
+        return fake(url, action, body)
+
+    with pytest.raises(service.BillingError, match="ws_sr_padron_a5 looks CUITs up"):
+        service.lookup_cuit(conn, CUSTOMER_CUIT, refuse, NOW)

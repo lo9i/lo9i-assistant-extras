@@ -4,7 +4,7 @@
 # listens.
 name: billing
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.2.3
+version: 0.3.0
 # The plugin format (lo9i's core/repositories/formats.py): 7 for `approve`.
 format: 7
 description: Argentine electronic invoices (Factura A) authorized by ARCA, with their PDF
@@ -25,13 +25,13 @@ page:
   command: "{bin}/billing-web"
   args: [--socket, "{socket}"]
 steps:
-  - In ARCA, create a certificate for web services (WSASS for homologación, Administración de Certificados Digitales for producción) and associate it with the wsfe service.
+  - In ARCA, create a certificate for web services (WSASS for homologación, Administración de Certificados Digitales for producción) and authorize it for the wsfe service (invoices) and ws_sr_padron_a5 (looking a customer's CUIT up).
   - Create a point of sale of type "RECE para aplicativo y web services" (producción).
   - Enter your CUIT, business details and the certificate's and key's paths in the Billing page's Settings, or ask the assistant to set billing up with them.
 translations:
   es:
     description: Facturas electrónicas argentinas (Factura A) autorizadas por ARCA, con su PDF
     steps:
-      - En ARCA, crea un certificado para web services (WSASS para homologación, Administración de Certificados Digitales para producción) y asócialo al servicio wsfe.
+      - En ARCA, crea un certificado para web services (WSASS para homologación, Administración de Certificados Digitales para producción) y autorízalo para el servicio wsfe (facturas) y ws_sr_padron_a5 (buscar el CUIT de un cliente).
       - Crea un punto de venta del tipo "RECE para aplicativo y web services" (producción).
       - Ingresa tu CUIT, tus datos y las rutas del certificado y la clave en Settings, en la página Billing, o pide al asistente que configure la facturación con ellos.

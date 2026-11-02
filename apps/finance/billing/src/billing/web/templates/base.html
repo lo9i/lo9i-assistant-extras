@@ -31,6 +31,34 @@
       toast.hidden = false;
       setTimeout(() => (toast.hidden = true), 6000);
     });
+
+    // A customer's CUIT, once typed: ARCA's padrón fills the name and address still empty, and the IVA condition
+    // unless one was picked (customers/lookup).
+    document.body.addEventListener("change", async (e) => {
+      const input = e.target;
+      if (input.matches?.("select[name=iva_condition]")) input.dataset.chosen = "1";
+      if (!input.matches?.("input[data-lookup]")) return;
+      const form = input.form;
+      const status = form.querySelector("[data-lookup-status]");
+      const cuit = input.value.trim();
+      if (!cuit) return;
+      status.textContent = "Looking it up in ARCA…";
+      let found;
+      try {
+        found = await (await fetch(`customers/lookup?cuit=${encodeURIComponent(cuit)}`)).json();
+      } catch {
+        found = { found: false, message: "Couldn't ask ARCA." };
+      }
+      if (input.value.trim() !== cuit) return; // typed again meanwhile
+      status.textContent = found.message;
+      if (!found.found) return;
+      for (const [field, value] of [["name", found.name], ["address", found.address]]) {
+        const el = form.elements[field];
+        if (el && value && !el.value.trim()) el.value = value;
+      }
+      const iva = form.elements["iva_condition"];
+      if (iva && found.iva_condition && !iva.dataset.chosen) iva.value = found.iva_condition;
+    });
   </script>
 </body>
 </html>

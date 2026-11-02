@@ -67,6 +67,35 @@ def _fault(code: str, message: str) -> bytes:
     )
 
 
+# The fake padrón's people, as A5 answers them: a company that's responsable inscripto, a monotributista, and a
+# CUIT the padrón can't give a constancia for.
+PEOPLE = {
+    CUSTOMER_CUIT: (
+        "<datosGenerales><domicilioFiscal><codPostal>1638</codPostal><descripcionProvincia>BUENOS AIRES"
+        "</descripcionProvincia><direccion>AV DEL LIBERTADOR 500</direccion><localidad>VICENTE LOPEZ</localidad>"
+        "<tipoDomicilio>FISCAL</tipoDomicilio></domicilioFiscal><estadoClave>ACTIVO</estadoClave>"
+        f"<idPersona>{CUSTOMER_CUIT}</idPersona><razonSocial>ACME SOCIEDAD ANONIMA</razonSocial>"
+        "<tipoClave>CUIT</tipoClave><tipoPersona>JURIDICA</tipoPersona></datosGenerales>"
+        "<datosRegimenGeneral><impuesto><descripcionImpuesto>GANANCIAS SOCIEDADES</descripcionImpuesto>"
+        "<idImpuesto>10</idImpuesto></impuesto><impuesto><descripcionImpuesto>IVA</descripcionImpuesto>"
+        "<idImpuesto>30</idImpuesto></impuesto></datosRegimenGeneral>"
+    ),
+    "20111111112": (
+        "<datosGenerales><apellido>PEREZ</apellido><domicilioFiscal><codPostal>1043</codPostal>"
+        "<descripcionProvincia>CIUDAD AUTONOMA BUENOS AIRES</descripcionProvincia>"
+        "<direccion>AV CORRIENTES 1234 Piso:5</direccion></domicilioFiscal><estadoClave>ACTIVO</estadoClave>"
+        "<idPersona>20111111112</idPersona><nombre>JUAN</nombre><tipoPersona>FISICA</tipoPersona></datosGenerales>"
+        "<datosMonotributo><categoriaMonotributo><descripcionCategoria>D LOCACIONES DE SERVICIO"
+        "</descripcionCategoria><idCategoria>4</idCategoria><idImpuesto>20</idImpuesto></categoriaMonotributo>"
+        "<impuesto><idImpuesto>20</idImpuesto></impuesto></datosMonotributo>"
+    ),
+    "30700000008": (
+        "<errorConstancia><apellido>GLOBEX SRL</apellido><error>La CUIT no registra impuestos activos</error>"
+        "<idPersona>30700000008</idPersona></errorConstancia>"
+    ),
+}
+
+
 class FakeArca:
     """WSAA and WSFEv1, as far as the plugin uses them. Switches make the next call fail in each way a real
     one can."""
@@ -81,6 +110,8 @@ class FakeArca:
         self.lose_answer = False  # the next FECAESolicitar is authorized, and its answer lost
         self.lose_request = False  # the next FECAESolicitar is lost on its way
         self.reject = None  # the next FECAESolicitar is rejected with these (code, message)
+        self.tokens: dict[str, str] = {}  # each ticket's token, and the service it's for
+        self.people = dict(PEOPLE)  # the padrón: CUIT -> getPersona_v2's personaReturn
 
     def __call__(self, url: str, action: str, body: bytes) -> bytes:
         envelope = ET.fromstring(body)
@@ -89,10 +120,12 @@ class FakeArca:
         self.calls.append(name)
         if name == "loginCms":
             return self._login(url, operation)
+        if name == "getPersona_v2":
+            return self._padron(url, action, operation)
         assert action == arca.FE + name
         assert url in (u["wsfe"] for u in arca.URLS.values())
         assert operation.findtext("{*}Auth/{*}Cuit") == ISSUER_CUIT
-        assert operation.findtext("{*}Auth/{*}Token").startswith("token-")
+        assert self.tokens[operation.findtext("{*}Auth/{*}Token")] == arca.INVOICES
         return getattr(self, "_" + name)(operation)
 
     def _login(self, url, operation):
@@ -105,11 +138,13 @@ class FakeArca:
         # The request travels inside the signature (nodetach).
         tra = re.search(rb"<\?xml.*</loginTicketRequest>", cms, re.S).group()
         request = ET.fromstring(tra)
-        assert request.findtext("service") == "wsfe"
+        service = request.findtext("service")
+        assert service in (arca.INVOICES, arca.PADRON)
         generated = datetime.fromisoformat(request.findtext("header/generationTime"))
         expires = generated + timedelta(minutes=10, hours=12)
         self.logins.append(url)
         n = len(self.logins)
+        self.tokens[f"token-{n}"] = service
         ticket = (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><loginTicketResponse version="1.0"><header>'
             f"<source>CN=wsaahomo</source><destination>SERIALNUMBER=CUIT {ISSUER_CUIT}</destination>"
@@ -120,6 +155,19 @@ class FakeArca:
         return _soap(
             f'<loginCmsResponse xmlns="{arca.WSAA_NS}"><loginCmsReturn>{escape(ticket)}</loginCmsReturn>'
             "</loginCmsResponse>"
+        )
+
+    def _padron(self, url, action, op):
+        assert action == "" and url in (u["padron"] for u in arca.URLS.values())
+        # Unqualified, as A5's schema has them.
+        assert op.find("token") is not None and self.tokens[op.findtext("token")] == arca.PADRON
+        assert op.findtext("cuitRepresentada") == ISSUER_CUIT
+        person = self.people.get(op.findtext("idPersona"))
+        if person is None:
+            return _fault("soap:Server", "No existe persona con ese Id")
+        return _soap(
+            f'<ns2:getPersona_v2Response xmlns:ns2="{arca.PADRON_NS}"><personaReturn>{person}</personaReturn>'
+            "</ns2:getPersona_v2Response>"
         )
 
     def _FECompUltimoAutorizado(self, op):  # noqa: N802 - named after ARCA's operations

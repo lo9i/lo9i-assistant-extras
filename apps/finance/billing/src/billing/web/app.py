@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
@@ -339,6 +339,13 @@ def _customer_routes(app: FastAPI) -> None:
         with _db() as conn:
             return _page(request, "customers.html", "_customers.html", **_customers_ctx(conn))
 
+    @app.get("/customers/lookup")
+    def lookup(cuit: str) -> JSONResponse:
+        """Who a CUIT is in ARCA's padrón, for the customer form to fill the fields still empty (base.html), and
+        what to say under the CUIT."""
+        with _db() as conn:
+            return JSONResponse(_lookup(conn, cuit))
+
     @app.get("/customers/{id}/edit", response_class=HTMLResponse)
     def edit_customer(request: Request, id: str) -> HTMLResponse:
         with _db() as conn:
@@ -402,6 +409,28 @@ def _customer_routes(app: FastAPI) -> None:
             except BillingError as e:
                 return _render(request, "_customers.html", **_customers_ctx(conn, banner=str(e)))
             return _render(request, "_customers.html", **_customers_ctx(conn))
+
+
+def _lookup(conn: sqlite3.Connection, cuit: str) -> dict[str, Any]:
+    try:
+        found = service.lookup_cuit(conn, cuit, SEND)
+    except service.InvalidError as e:
+        return {"found": False, "message": str(e)[0].upper() + str(e)[1:] + "."}
+    except service.NotReadyError:
+        return {"found": False, "message": "Looking CUITs up in ARCA needs your CUIT and certificate in Settings."}
+    except BillingError as e:
+        return {"found": False, "message": f"Couldn't ask ARCA: {e}"}
+    if not found["found"]:
+        return {"found": False, "message": "ARCA's padrón has no one with this CUIT."}
+    said = f"From ARCA: {found['name']}"
+    if found["iva_condition_label"]:
+        said += f", {found['iva_condition_label']}."
+    else:
+        notes = "; ".join(found["notes"])
+        said += f". It doesn't say an IVA condition{f' ({notes})' if notes else ''}: pick it."
+    if not found["active"]:
+        said += " Its CUIT isn't active."
+    return found | {"message": said}
 
 
 # --- Settings ---

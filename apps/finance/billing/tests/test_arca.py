@@ -5,7 +5,7 @@ from decimal import Decimal
 from xml.etree import ElementTree as ET
 
 import pytest
-from conftest import NOW
+from conftest import NOW, _fault
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import pkcs7
 
@@ -87,6 +87,7 @@ def test_mojibake_is_repaired():
 
 def test_amounts_are_sent_with_two_decimals(fake):
     fake.calls.clear()
+    fake.tokens["token-1"] = arca.INVOICES  # as if WSAA had given it
     client = arca.Wsfe("homologacion", "token-1", "s", "20123456786", fake)
     from datetime import date
 
@@ -112,3 +113,50 @@ def test_amounts_are_sent_with_two_decimals(fake):
     assert fake.issued[(2, 1, 1)]["ImpTotal"] == "121.00"
     assert client.lookup(2, 1, 1).cae == "76000000000001"
     assert client.lookup(2, 1, 2) is None
+
+
+# --- Padrón A5 ---
+
+
+def padron(fake, wanted):
+    fake.tokens["token-p"] = arca.PADRON  # as if WSAA had given it
+    return arca.padron_person("homologacion", "token-p", "s", "20123456786", wanted, fake)
+
+
+def test_the_padron_gives_a_companys_name_address_and_iva(fake):
+    person = padron(fake, "30712345671")
+    assert person.name == "ACME SOCIEDAD ANONIMA"
+    assert person.address == "AV DEL LIBERTADOR 500, VICENTE LOPEZ (1638), BUENOS AIRES"
+    assert person.iva_condition == "responsable_inscripto" and person.active and person.notes == []
+
+
+def test_a_persons_name_is_their_surname_and_name(fake):
+    person = padron(fake, "20111111112")
+    assert person.name == "PEREZ JUAN" and person.iva_condition == "monotributo"
+    assert person.address == "AV CORRIENTES 1234 Piso:5, CP 1043, CIUDAD AUTONOMA BUENOS AIRES"
+
+
+def test_a_cuit_without_a_constancia_says_why(fake):
+    person = padron(fake, "30700000008")
+    assert person.name == "GLOBEX SRL" and person.iva_condition is None and not person.active
+    assert person.notes == ["La CUIT no registra impuestos activos"]
+
+
+def test_a_cuit_the_padron_doesnt_have_is_none(fake):
+    assert padron(fake, "20333333334") is None
+
+
+def test_the_padron_is_asked_with_unqualified_fields():
+    sent = []
+
+    def send(url, action, body):
+        sent.append((url, action, body))
+        return _fault("soap:Server", "Token malformado")
+
+    with pytest.raises(arca.RefusedError, match="Token malformado"):
+        arca.padron_person("produccion", "t", "s", "20123456786", "30712345671", send)
+    url, action, body = sent[0]
+    assert url == "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5" and action == ""
+    operation = ET.fromstring(body).find("{*}Body")[0]
+    assert operation.tag == f"{{{arca.PADRON_NS}}}getPersona_v2"
+    assert [c.tag for c in operation] == ["token", "sign", "cuitRepresentada", "idPersona"]

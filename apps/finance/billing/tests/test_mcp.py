@@ -91,5 +91,21 @@ def test_only_reading_tools_are_read_only():
 
     tools = asyncio.run(run())
     read_only = {t.name for t in tools if t.annotations and t.annotations.read_only_hint}
-    assert read_only == {"check_arca", "list_customers", "prepare_month", "list_invoices", "get_invoice"}
+    assert read_only == {"check_arca", "lookup_cuit", "list_customers", "prepare_month", "list_invoices", "get_invoice"}
     assert {t.name for t in tools} - read_only == {"setup", "add_customer", "update_customer", "create_invoice"}
+
+
+def test_a_customer_from_just_its_cuit(tmp_path, fake):
+    cert, key = make_certificate(tmp_path)
+    _, added, unknown, no_iva = call(
+        ("setup", {"cuit": "20-12345678-6", "certificate_path": str(cert), "key_path": str(key)}),
+        ("add_customer", {"cuit": "30-71234567-1", "monthly_net": 7500000, "email": "pagos@acme.example"}),
+        ("add_customer", {"cuit": "20-33333333-4"}),
+        ("add_customer", {"cuit": "30-70000000-8"}),
+    )
+    customer = payload(added)
+    assert customer["name"] == "ACME SOCIEDAD ANONIMA" and customer["iva_condition"] == "responsable_inscripto"
+    assert customer["address"] == "AV DEL LIBERTADOR 500, VICENTE LOPEZ (1638), BUENOS AIRES"
+    assert unknown.is_error and "give the name" in unknown.content[0].text
+    assert no_iva.is_error and "ask the user for iva_condition" in no_iva.content[0].text
+    assert "no registra impuestos activos" in no_iva.content[0].text

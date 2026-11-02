@@ -24,7 +24,8 @@ and makes their PDF.
   invoices), the paths of the ARCA certificate and its private key. Call it without arguments to see it and
   what's missing; check_arca tries the setup against ARCA.
 - Customers have a monthly net amount with the date it applies from, so a raise is a new amount from a
-  later date.
+  later date. add_customer with only a CUIT takes the name, address and IVA condition from ARCA's padrón
+  (lookup_cuit says them without adding anyone).
 - prepare_month previews a month's two invoices per customer (1st-15th, 16th-end, each half the monthly
   amount) and issues nothing. create_invoice issues one, with the arguments prepare_month gives.
 - create_invoice never issues twice for one customer and period: calling it again returns the invoice
@@ -130,16 +131,19 @@ def list_customers() -> list[dict]:
 
 @mcp.tool()
 def add_customer(
-    name: Annotated[str, Field(description="Razón social")],
     cuit: str,
+    name: Annotated[
+        str | None,
+        Field(description="Razón social; absent: ARCA's padrón gives it, with the address and IVA condition"),
+    ] = None,
     iva_condition: Annotated[
-        str,
+        str | None,
         Field(
             description="responsable_inscripto, monotributo, monotributo_social, exento, consumidor_final"
-            " or no_alcanzado"
+            " or no_alcanzado; absent: the padrón's, or responsable_inscripto when a name is given"
         ),
-    ] = "responsable_inscripto",
-    address: str = "",
+    ] = None,
+    address: Annotated[str | None, Field(description="Absent: the padrón's fiscal address when it's looked up")] = None,
     email: Annotated[str, Field(description="Where invoices are emailed")] = "",
     description: Annotated[
         str, Field(description='The invoice\'s line, followed by the period, like "Servicios de desarrollo"')
@@ -150,20 +154,39 @@ def add_customer(
     ] = None,
     id: Annotated[str | None, Field(description="Slug id; derived from name when absent")] = None,
 ) -> dict:
-    """Add a customer."""
+    """Add a customer. Given only its CUIT, its name, address and IVA condition come from ARCA's padrón."""
     with _db() as conn:
+        found: dict = {}
+        if name is None:
+            found = service.lookup_cuit(conn, cuit, SEND)
+            if not found["found"]:
+                raise service.NotFoundError(f"ARCA's padrón has no one with CUIT {found['cuit']}: give the name")
+            if iva_condition is None and found["iva_condition"] is None:
+                notes = "; ".join(found["notes"])
+                raise service.InvalidError(
+                    f"ARCA's padrón says {found['name']} but no IVA condition{f' ({notes})' if notes else ''}:"
+                    " ask the user for iva_condition"
+                )
         return service.add_customer(
             conn,
-            name,
+            name or found["name"],
             cuit,
-            iva_condition=iva_condition,
-            address=address,
+            iva_condition=iva_condition or found.get("iva_condition") or "responsable_inscripto",
+            address=address if address is not None else found.get("address", ""),
             email=email,
             description=description,
             monthly_net=monthly_net,
             effective_from=effective_from,
             id=id,
         )
+
+
+@mcp.tool(annotations=READ_ONLY)
+def lookup_cuit(cuit: str) -> dict:
+    """Who a CUIT is, from ARCA's padrón: name, fiscal address, IVA condition and whether its CUIT is active.
+    Needs the certificate authorized in ARCA for ws_sr_padron_a5."""
+    with _db() as conn:
+        return service.lookup_cuit(conn, cuit, SEND)
 
 
 @mcp.tool()

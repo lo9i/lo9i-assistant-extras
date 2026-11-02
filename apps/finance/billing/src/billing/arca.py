@@ -1,5 +1,6 @@
-"""ARCA's (ex AFIP) web services: WSAA, which gives a ticket to a certificate, and WSFEv1, which authorizes
-invoices. The SOAP is written by hand: the four calls used don't need a WSDL client.
+"""ARCA's (ex AFIP) web services: WSAA, which gives a ticket to a certificate; WSFEv1, which authorizes invoices;
+and the padrón A5 (constancia de inscripción), which says who a CUIT is. The SOAP is written by hand: the few calls
+used don't need a WSDL client.
 
 Every call goes through a `Post` (url, SOAPAction, body) -> response body, so tests replace ARCA with a fake.
 """
@@ -27,10 +28,12 @@ URLS = {
     "homologacion": {
         "wsaa": "https://wsaahomo.afip.gov.ar/ws/services/LoginCms",
         "wsfe": "https://wswhomo.afip.gov.ar/wsfev1/service.asmx",
+        "padron": "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5",
     },
     "produccion": {
         "wsaa": "https://wsaa.afip.gov.ar/ws/services/LoginCms",
         "wsfe": "https://servicios1.afip.gov.ar/wsfev1/service.asmx",
+        "padron": "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5",
     },
 }
 ENVIRONMENTS = tuple(URLS)
@@ -41,9 +44,14 @@ DOC_CUIT = 80
 IVA_21 = 5  # AlicIva's id for 21%
 PESOS = "PES"
 
+# WSAA's names for the services a ticket is for.
+INVOICES = "wsfe"
+PADRON = "ws_sr_padron_a5"
+
 SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
 WSAA_NS = "http://wsaa.view.sua.dvadac.desein.afip.gov"
 FE = "http://ar.gov.afip.dif.FEV1/"
+PADRON_NS = "http://a5.soap.ws.server.puc.sr/"
 
 # WSFEv1's "no such invoice" in FECompConsultar.
 NOT_FOUND = 602
@@ -85,7 +93,8 @@ class Message:
 _HINTS = {
     "coe.alreadyAuthenticated": "ARCA already gave this certificate a ticket that is still valid, for up to 12"
     " hours, and this plugin doesn't have it: wait until it expires",
-    "coe.notAuthorized": "the certificate isn't associated with the wsfe service: associate it in ARCA",
+    "coe.notAuthorized": "the certificate isn't authorized for this service in ARCA: wsfe issues invoices,"
+    " ws_sr_padron_a5 looks CUITs up",
     "cms.cert.expired": "the certificate expired: create a new one in ARCA",
     "cms.cert.untrusted": "ARCA didn't issue this certificate for this environment: homologación and"
     " producción certificates are different",
@@ -372,3 +381,77 @@ def _parse_datetime(value: str | None) -> datetime | None:
     if not value or value == "NULL":
         return None
     return datetime.strptime(value, "%Y%m%d%H%M%S").replace(tzinfo=AR)
+
+
+# --- Padrón A5 ---
+
+# The padrón's impuestos that say a CUIT's IVA condition.
+IVA_TAX, IVA_EXEMPT_TAX = "30", "32"
+
+
+@dataclass(frozen=True)
+class Person:
+    """Who a CUIT is, as the padrón's constancia de inscripción says."""
+
+    cuit: str
+    name: str
+    address: str
+    # responsable_inscripto, monotributo or exento; None when the padrón says none of them.
+    iva_condition: str | None
+    active: bool
+    notes: list[str]
+
+
+def padron_person(environment: str, token: str, sign: str, cuit: str, wanted: str, send: Post = post) -> Person | None:
+    """`wanted`'s constancia, asked as `cuit` (getPersona_v2); None when the padrón has no one with that CUIT."""
+    body = (
+        f'<a5:getPersona_v2 xmlns:a5="{PADRON_NS}"><token>{escape(token)}</token><sign>{escape(sign)}</sign>'
+        f"<cuitRepresentada>{escape(cuit)}</cuitRepresentada><idPersona>{escape(wanted)}</idPersona></a5:getPersona_v2>"
+    )
+    try:
+        answer = _call(send, URLS[environment]["padron"], "", body)
+    except RefusedError as e:
+        if any("no existe persona" in m.message.lower() for m in e.messages):
+            return None
+        raise
+    found = answer.find("{*}personaReturn")
+    if found is None:
+        raise NoAnswerError("the padrón's answer has no personaReturn")
+    general = found.find("{*}datosGenerales")
+    failed = found.find("{*}errorConstancia")
+    notes = [_text(e.text) for e in found.findall("{*}errorConstancia/{*}error")]
+    if general is None and failed is None:
+        return None
+    who = general if general is not None else failed
+    name = _text(who.findtext("{*}razonSocial")) or " ".join(
+        p for p in (_text(who.findtext("{*}apellido")), _text(who.findtext("{*}nombre"))) if p
+    )
+    return Person(
+        cuit=wanted,
+        name=name,
+        address=_address(general.find("{*}domicilioFiscal")) if general is not None else "",
+        iva_condition=_iva_condition(found),
+        active=general is not None and general.findtext("{*}estadoClave") == "ACTIVO",
+        notes=notes,
+    )
+
+
+def _address(place: ET.Element | None) -> str:
+    """Calle y número, localidad (código postal), provincia; CP and the code when there's no localidad."""
+    if place is None:
+        return ""
+    street, town = _text(place.findtext("{*}direccion")), _text(place.findtext("{*}localidad"))
+    postcode, province = _text(place.findtext("{*}codPostal")), _text(place.findtext("{*}descripcionProvincia"))
+    town = f"{town} ({postcode})" if town and postcode else town or (f"CP {postcode}" if postcode else "")
+    return ", ".join(p for p in (street, town, province) if p)
+
+
+def _iva_condition(found: ET.Element) -> str | None:
+    if found.find("{*}datosMonotributo") is not None:
+        return "monotributo"
+    taxes = {t.findtext("{*}idImpuesto") for t in found.findall("{*}datosRegimenGeneral/{*}impuesto")}
+    if IVA_TAX in taxes:
+        return "responsable_inscripto"
+    if IVA_EXEMPT_TAX in taxes:
+        return "exento"
+    return None

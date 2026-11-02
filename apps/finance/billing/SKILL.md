@@ -9,6 +9,7 @@ The invoices live in the `billing` MCP server; its tools are named `mcp__billing
 
 - **Setup** (`setup`): the issuer (CUIT, razón social, domicilio, IVA condition, which must be responsable inscripto, inicio de actividades, Ingresos Brutos, punto de venta), and for each **environment** the paths of the ARCA certificate and its private key. `homologacion` is ARCA's test environment: its invoices are real-looking but have no fiscal value, and their PDFs say so. `produccion` issues real invoices. `setup` without arguments shows everything and what's `missing`; `check_arca` signs in to ARCA and reads the point of sale's last Factura A, which proves the setup works without issuing anything.
 - **Customers** have a CUIT, IVA condition, address, email, the line their invoices carry (`description`), and a **monthly net amount** with the date it applies from. A raise is `update_customer` with the new `monthly_net` and `effective_from` (a month like `2027-01`): earlier months keep the old amount.
+- **Looking a CUIT up**: `lookup_cuit` asks ARCA's padrón (constancia de inscripción) for a CUIT's name, fiscal address and IVA condition. `add_customer` with only `cuit` (no `name`) fills those in from it, so a new customer needs just the CUIT, the monthly amount and the email; tell the user what ARCA said. If the padrón gives no IVA condition, ask the user. It needs the certificate authorized for `ws_sr_padron_a5` too (see Setting up); until then, ask the user for the name, address and IVA condition.
 - **Invoices** are Factura A for services (concepto 2), 21% IVA, in pesos, with the service period, the payment due date (issue date + `payment_days`), the CAE and its due date, and a PDF (`pdf_path`). Each month is billed in **two halves**: the 1st to the 15th and the 16th to the month's end, each half the monthly net plus IVA. For 7.500.000 a month: 3.750.000 + 787.500 IVA = 4.537.500 per invoice.
 
 ## Issuing
@@ -50,9 +51,9 @@ Approving each `create_invoice` happens on Telegram, where the job's approval re
 
 ## Setting up, for the first time
 
-1. In homologacion: the user creates a key and a certificate for ARCA's testing services (WSASS), associates it with `wsfe`, and gives you the files' paths. Call `setup` with their business details and those paths, then `check_arca`.
+1. In homologacion: the user creates a key and a certificate for ARCA's testing services (WSASS), authorizes it for `wsfe` (invoices) and `ws_sr_padron_a5` (looking CUITs up), and gives you the files' paths. Call `setup` with their business details and those paths, then `check_arca`.
 2. Add the customers (`add_customer`), `prepare_month`, and issue one test invoice to see its PDF.
-3. For produccion: the user creates a production certificate in ARCA (Administración de Certificados Digitales), authorizes it for "Facturación electrónica" (wsfe) in the Administrador de Relaciones de Clave Fiscal, and creates a point of sale of type "RECE para aplicativo y web services". Then `setup` with `environment: produccion`, that certificate and key, and that `point_of_sale`; `check_arca` again. Switching environments switches which invoices `list_invoices` shows: each environment numbers its own.
+3. For produccion: the user creates a production certificate in ARCA (Administración de Certificados Digitales), authorizes it for "Facturación electrónica" (wsfe) and for "Consulta de constancia de inscripción" (ws_sr_padron_a5) in the Administrador de Relaciones de Clave Fiscal, and creates a point of sale of type "RECE para aplicativo y web services". Then `setup` with `environment: produccion`, that certificate and key, and that `point_of_sale`; `check_arca` again. Switching environments switches which invoices `list_invoices` shows: each environment numbers its own.
 
 Only the files' paths are kept; never ask the user to paste a private key into the chat.
 

@@ -94,7 +94,7 @@ def test_without_setup_nothing_can_be_issued(tmp_path, monkeypatch):
     page = TestClient(create_app()).get("/?month=2026-10").text
     assert "Set up billing" in page and 'href="settings">Open Settings' in page
     assert '<li class="done">' in page  # the customer step: Acme has a monthly amount
-    assert "disabled" in page and "iva_condition" not in page
+    assert "disabled" in page and "IVA condition" not in page.split("<script>")[0]
 
 
 def test_a_new_install_shows_the_steps_and_no_zeros(tmp_path, monkeypatch):
@@ -238,3 +238,23 @@ def test_the_socket_is_only_the_users():
             assert stat.S_IMODE(os.stat(Path(d) / "web.sock").st_mode) == 0o600
         finally:
             sock.close()
+
+
+def test_a_cuit_is_looked_up_for_the_form(client, fake):
+    assert "data-lookup" in client.get("/customers").text
+    found = client.get("/customers/lookup", params={"cuit": "20-11111111-2"}).json()
+    assert found["name"] == "PEREZ JUAN" and found["iva_condition"] == "monotributo"
+    assert found["message"] == "From ARCA: PEREZ JUAN, Responsable Monotributo."
+    nobody = client.get("/customers/lookup", params={"cuit": "20333333334"}).json()
+    assert nobody == {"found": False, "message": "ARCA's padrón has no one with this CUIT."}
+    wrong = client.get("/customers/lookup", params={"cuit": "20-12345678-7"}).json()
+    assert not wrong["found"] and "verification digit" in wrong["message"]
+    unsure = client.get("/customers/lookup", params={"cuit": "30700000008"}).json()
+    assert "doesn't say an IVA condition (La CUIT no registra impuestos activos): pick it." in unsure["message"]
+    assert "Its CUIT isn't active." in unsure["message"]
+
+
+def test_a_picked_iva_condition_isnt_replaced(client):
+    # An edited customer's condition counts as picked, so a lookup leaves it.
+    assert 'name="iva_condition" data-chosen' in client.get("/customers/acme/edit").text
+    assert 'name="iva_condition" >' in client.get("/customers").text.split('id="add-customer"')[1]
