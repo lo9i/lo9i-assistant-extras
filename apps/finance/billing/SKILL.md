@@ -1,0 +1,57 @@
+---
+name: billing
+description: Issuing the user's Argentine electronic invoices (Factura A) with ARCA, ex AFIP, through the billing MCP server; preparing each month's invoices, their PDFs, and emailing them. Use it for anything about invoicing customers, facturas, CAE or ARCA.
+---
+
+The invoices live in the `billing` MCP server; its tools are named `mcp__billing__<tool>`. If those tools aren't there, the server is turned off: the user turns it on in MCP servers.
+
+## The model
+
+- **Setup** (`setup`): the issuer (CUIT, razón social, domicilio, IVA condition, which must be responsable inscripto, inicio de actividades, Ingresos Brutos, punto de venta), and for each **environment** the paths of the ARCA certificate and its private key. `homologacion` is ARCA's test environment: its invoices are real-looking but have no fiscal value, and their PDFs say so. `produccion` issues real invoices. `setup` without arguments shows everything and what's `missing`; `check_arca` signs in to ARCA and reads the point of sale's last Factura A, which proves the setup works without issuing anything.
+- **Customers** have a CUIT, IVA condition, address, email, the line their invoices carry (`description`), and a **monthly net amount** with the date it applies from. A raise is `update_customer` with the new `monthly_net` and `effective_from` (a month like `2027-01`): earlier months keep the old amount.
+- **Invoices** are Factura A for services (concepto 2), 21% IVA, in pesos, with the service period, the payment due date (issue date + `payment_days`), the CAE and its due date, and a PDF (`pdf_path`). Each month is billed in **two halves**: the 1st to the 15th and the 16th to the month's end, each half the monthly net plus IVA. For 7.500.000 a month: 3.750.000 + 787.500 IVA = 4.537.500 per invoice.
+
+## Issuing
+
+1. `prepare_month` (a `customer` and a `month`; without them, every customer, last month) previews the invoices: periods, amounts, dates, and each one's `status`. It issues nothing.
+2. Show the user the preview: customer, period, net, IVA and total of each, and the environment.
+3. **In produccion, issue only after the user says yes to that preview** in the conversation. `create_invoice` also asks for approval each time (it's in the plugin's `approve` list), even on a trusted server.
+4. Call `create_invoice` once per invoice, with the `create_invoice` arguments from the preview. It returns the invoice with its number, CAE and `pdf_path`.
+
+`create_invoice` never issues two invoices for one customer and period. Calling it again for a period already issued returns that invoice with `already_issued: true`; a period that overlaps an issued one is refused. So when in doubt whether an invoice went through, call `create_invoice` again with the same arguments: never change the period to "try again".
+
+Errors, and what to do:
+
+- `RejectedError`: ARCA said no and nothing was issued. Its messages (code: text) say why; tell the user, fix what can be fixed (a customer's CUIT or IVA condition, a date) and try again. An issue date earlier than the point of sale's last invoice is rejected; so is one more than 10 days from today.
+- `UnconfirmedError`: it was sent and no answer came back. Don't issue anything else for that customer and period by other means: call `create_invoice` again later with the same arguments; it asks ARCA first and records the invoice if ARCA has it.
+- `AlreadyIssuedError`: that period is already invoiced. An issued invoice can't be changed or deleted; correcting one takes a credit note, which this plugin doesn't issue: the user does it in ARCA.
+- `NotReadyError`: the setup is missing something; ask the user for it and call `setup`.
+- ARCA may require a Factura de Crédito Electrónica MiPyME (FCE) instead of a Factura A for some large customers and amounts. This plugin doesn't issue FCE: if ARCA's rejection says so, tell the user.
+
+Write amounts the Argentine way ($ 4.537.500,00); tools take and return plain numbers in pesos.
+
+## Emailing an invoice
+
+Emailing is done with the assistant's email (`send_email`), never by this plugin, and **only after the user approves sending it**:
+
+1. `get_invoice` gives the invoice, `pdf_path` (made again if it's missing) and the customer's email (`customer_email`).
+2. Show the user who it goes to, the subject and the text, and wait for their yes. A short text in Spanish: "Adjunto la Factura A 00002-00000042 por los servicios del 01/10/2026 al 15/10/2026, por $ 4.537.500,00. Vence el 12/11/2026."
+3. Send it with the PDF attached (`pdf_path`). If `send_email` can't attach files, don't send the email without the invoice: tell the user, and give them the PDF's path to send it themselves.
+
+Never email an invoice from homologacion to a customer: its PDF has no fiscal value.
+
+## Every month
+
+When the user wants it, offer a scheduled job on the 1st of each month at 9:00 (`schedule_job`, schedule `0 9 1 * *`), whose task is:
+
+"Use the billing skill. Run mcp__billing__prepare_month for last month. Send the user on Telegram (send_message) each invoice to issue: customer, period, net, IVA, total and the environment. Then call mcp__billing__create_invoice for each one with the arguments the preview gives; each call asks the user to approve it on Telegram, and one not approved is not issued. Finally send the user on Telegram what was issued (number, CAE, total) or why not, and ask whether to email the invoices to the customers; don't email them in this job."
+
+Approving each `create_invoice` happens on Telegram, where the job's approval requests go. When the user answers that they want the invoices emailed, do it in that conversation as in Emailing an invoice, finding them with `list_invoices` (`month`, `status: authorized`).
+
+## Setting up, for the first time
+
+1. In homologacion: the user creates a key and a certificate for ARCA's testing services (WSASS), associates it with `wsfe`, and gives you the files' paths. Call `setup` with their business details and those paths, then `check_arca`.
+2. Add the customers (`add_customer`), `prepare_month`, and issue one test invoice to see its PDF.
+3. For produccion: the user creates a production certificate in ARCA (Administración de Certificados Digitales), authorizes it for "Facturación electrónica" (wsfe) in the Administrador de Relaciones de Clave Fiscal, and creates a point of sale of type "RECE para aplicativo y web services". Then `setup` with `environment: produccion`, that certificate and key, and that `point_of_sale`; `check_arca` again. Switching environments switches which invoices `list_invoices` shows: each environment numbers its own.
+
+Only the files' paths are kept; never ask the user to paste a private key into the chat.
