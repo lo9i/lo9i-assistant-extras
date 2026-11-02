@@ -31,8 +31,9 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
 
-from .. import arca, db, pdf, service
+from .. import arca, certificate_files, db, pdf, service
 from ..service import BillingError
 
 HERE = Path(__file__).parent
@@ -418,17 +419,12 @@ def _settings_routes(app: FastAPI) -> None:
 
     @app.post("/settings", response_class=HTMLResponse)
     async def save_settings(request: Request) -> HTMLResponse:
-        """The certificates first: one that's wrong saves nothing."""
-        form = dict(await request.form())
+        """The certificates first: one that's wrong saves nothing. A file picked with Browse wins over the path
+        typed beside it, which the page fills with the file's name."""
+        form, picked = await _settings_form(request)
         with _db() as conn:
             try:
-                current = service.settings(conn)
-                for env in arca.ENVIRONMENTS:
-                    cert, key = _opt(form, f"certificate_{env}"), _opt(form, f"key_{env}")
-                    cert = cert if cert != current.get(f"certificate_path.{env}") else None
-                    key = key if key != current.get(f"key_path.{env}") else None
-                    if cert or key:
-                        service.set_certificate(conn, env, cert, key)
+                _save_certificates(conn, form, picked)
                 service.setup(
                     conn,
                     cuit_=_opt(form, "cuit"),
@@ -444,6 +440,8 @@ def _settings_routes(app: FastAPI) -> None:
                 )
             except BillingError as e:
                 return _render(request, "_settings.html", **_settings_ctx(conn, form=form, banner=str(e)))
+            finally:
+                certificate_files.forget_unused(service.settings(conn))
             return _render(request, "_settings.html", **_settings_ctx(conn, saved=True))
 
     @app.post("/settings/check", response_class=HTMLResponse)
@@ -454,6 +452,39 @@ def _settings_routes(app: FastAPI) -> None:
                 return _render(request, "_check.html", result=service.check(conn, SEND))
             except BillingError as e:
                 return _render(request, "_check.html", error=str(e))
+
+
+# The file inputs of each environment's certificate and key, and the path field each fills.
+_PICKS = {
+    f"{kind}_file_{env}": (env, kind, f"{kind}_{env}") for env in arca.ENVIRONMENTS for kind in ("certificate", "key")
+}
+
+
+async def _settings_form(request: Request) -> tuple[dict, dict[str, tuple[str, bytes]]]:
+    """The fields typed, and each file picked by its input's name with its name and content. A picked file's path
+    field, which holds only its name, is left out, so a form shown again shows the path saved."""
+    form = dict(await request.form())
+    picked = {}
+    for name, (_, _, field) in _PICKS.items():
+        upload = form.pop(name, None)
+        if isinstance(upload, UploadFile) and upload.filename:
+            picked[name] = (upload.filename, await upload.read())
+            form.pop(field, None)
+    return form, picked
+
+
+def _save_certificates(conn: sqlite3.Connection, form: dict, picked: dict[str, tuple[str, bytes]]) -> None:
+    current = service.settings(conn)
+    paths = {field: _opt(form, field) for _, _, field in _PICKS.values()}
+    for name, (file_name, content) in picked.items():
+        env, kind, field = _PICKS[name]
+        paths[field] = certificate_files.keep(env, kind, file_name, content)
+    for env in arca.ENVIRONMENTS:
+        cert, key = paths[f"certificate_{env}"], paths[f"key_{env}"]
+        cert = cert if cert != current.get(f"certificate_path.{env}") else None
+        key = key if key != current.get(f"key_path.{env}") else None
+        if cert or key:
+            service.set_certificate(conn, env, cert, key)
 
 
 # --- Serving under lo9i ---

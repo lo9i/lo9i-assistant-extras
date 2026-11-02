@@ -113,6 +113,13 @@ def invoices_dir() -> Path:
     raise MissingDatabaseError("BILLING_DB must point at the database file")
 
 
+def data_dir() -> Path:
+    """The folder of the database, lo9i's data folder for the plugin, which updates leave alone."""
+    if path := os.environ.get("BILLING_DB"):
+        return Path(path).parent
+    raise MissingDatabaseError("BILLING_DB must point at the database file")
+
+
 _issuing = threading.Lock()
 
 

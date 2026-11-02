@@ -1,10 +1,19 @@
-{# The issuer, the environment, and each environment's certificate. Only the files' paths are kept. #}
+{# The issuer, the environment, and each environment's certificate: a path typed, or a file picked with Browse,
+   which is kept in the plugin's data folder (certificate_files.py) and fills the field with its name until saved. #}
+{# A file's path, and Browse to pick the file instead: its name shows in the field until it's saved. #}
+{% macro pick(name, saved, accept) -%}
+<span class="pick">
+  <input name="{{ name }}" value="{{ (form or {}).get(name) or saved or '' }}" spellcheck="false">
+  <button type="button" class="small" onclick="this.nextElementSibling.click()">Browse…</button>
+  <input type="file" name="{{ name.replace('_', '_file_', 1) }}" accept="{{ accept }}" hidden onchange="this.parentElement.querySelector('input:not([type=file])').value = this.files.length ? this.files[0].name : ''">
+</span>
+{%- endmacro %}
 {% set v = form or issuer %}
 {% set env = v.environment or issuer.environment %}
 <section id="settings" class="narrow">
   {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
   {% if saved %}<p class="notice">Saved.{% if issuer.ready %} Check it with ARCA below.{% else %} Issuing still needs {{ issuer.missing | map('field') | join(', ') }}.{% endif %}</p>{% endif %}
-  <form class="stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML">
+  <form class="stack" hx-post="settings" hx-target="#settings" hx-swap="outerHTML" hx-encoding="multipart/form-data">
     <div class="card section">
       <header>
         <h2>Your details</h2>
@@ -25,7 +34,7 @@
     <div class="card section" id="arca">
       <header>
         <h2>ARCA</h2>
-        <p class="muted small">Where invoices are issued, and the certificate ARCA gave you for each place. The files stay where they are: only their paths are kept.</p>
+        <p class="muted small">Where invoices are issued, and the certificate ARCA gave you for each place. Browse to pick the files, which billing keeps a copy of, or type where they are.</p>
       </header>
       <div class="choices">
         {% for key, name in ENVIRONMENTS.items() %}
@@ -47,8 +56,8 @@
           {% else %}<span class="chip">Not set</span>{% endif %}
         </div>
         <div class="form-grid">
-          <label><span>Certificate</span><input name="certificate_{{ key }}" value="{{ (form or {}).get('certificate_' ~ key) or cert.certificate_path or '' }}" spellcheck="false"><small class="hint">Full path of the .crt from ARCA{{ ' (WSASS)' if key == 'homologacion' }}, like /Users/you/arca/arca_{{ key[:4] }}.crt.</small></label>
-          <label><span>Private key</span><input name="key_{{ key }}" value="{{ (form or {}).get('key_' ~ key) or cert.key_path or '' }}" spellcheck="false"><small class="hint">Full path of the key you made it with.</small></label>
+          <label><span>Certificate</span>{{ pick('certificate_' ~ key, cert.certificate_path, '.crt,.pem,.cer') }}<small class="hint">The .crt from ARCA{{ ' (WSASS)' if key == 'homologacion' }}, or its full path, like /Users/you/arca/arca_{{ key[:4] }}.crt.</small></label>
+          <label><span>Private key</span>{{ pick('key_' ~ key, cert.key_path, '.key,.pem') }}<small class="hint">The key you made it with, or its full path.</small></label>
         </div>
         {% if cert.error %}<p class="error">{{ cert.error }}</p>
         {% elif cert.subject and cert.cuit %}<p class="muted small">For CUIT {{ cert.cuit }}.</p>{% endif %}

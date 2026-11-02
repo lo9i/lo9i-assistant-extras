@@ -175,6 +175,49 @@ def test_produccion_gets_its_certificate_without_switching(client, tmp_path):
     )
 
 
+def test_a_certificate_and_key_picked_with_browse_are_kept_only_for_the_user(client, tmp_path, path):
+    cert, key = make_certificate(tmp_path, "picked")
+    assert "Browse…" in client.get("/settings").text
+    files = {
+        "certificate_file_produccion": ("arca.crt", cert.read_bytes()),
+        "key_file_produccion": ("arca.key", key.read_bytes()),
+    }
+    # The fields hold the files' names, as the page fills them; the files win.
+    data = {"certificate_produccion": "arca.crt", "key_produccion": "arca.key"}
+    page = client.post("/settings", headers=HX, data=data, files=files).text
+    assert "Saved." in page
+    kept = service.issuer(db.connect())["certificates"]["produccion"]
+    folder = Path(path).parent / "certificates"
+    assert Path(kept["certificate_path"]).parent == folder and kept["subject"]
+    assert Path(kept["key_path"]).read_bytes() == key.read_bytes()
+    assert stat.S_IMODE(os.stat(folder).st_mode) == 0o700
+    assert stat.S_IMODE(os.stat(kept["key_path"]).st_mode) == 0o600
+    assert f'value="{kept["key_path"]}"' in page
+
+
+def test_a_picked_key_of_another_certificate_saves_nothing_and_isnt_kept(client, tmp_path, path):
+    _, other = make_certificate(tmp_path, "other")
+    files = {"key_file_homologacion": ("other.key", other.read_bytes())}
+    page = client.post("/settings", headers=HX, data={"key_homologacion": "other.key"}, files=files).text
+    assert "isn&#39;t the certificate&#39;s" in page and 'value="other.key"' not in page
+    assert list((Path(path).parent / "certificates").iterdir()) == []
+    # Replacing a kept one removes it.
+    cert, key = make_certificate(tmp_path, "first")
+    first = {
+        "certificate_file_produccion": ("a.crt", cert.read_bytes()),
+        "key_file_produccion": ("a.key", key.read_bytes()),
+    }
+    client.post("/settings", headers=HX, files=first)
+    cert, key = make_certificate(tmp_path, "second")
+    second = {
+        "certificate_file_produccion": ("b.crt", cert.read_bytes()),
+        "key_file_produccion": ("b.key", key.read_bytes()),
+    }
+    client.post("/settings", headers=HX, files=second)
+    kept = sorted(p.read_bytes() for p in (Path(path).parent / "certificates").iterdir())
+    assert kept == sorted([cert.read_bytes(), key.read_bytes()])
+
+
 def test_check_with_arca(client, fake):
     fake.last[(2, 1)] = 7
     assert "last Factura A is 7; the next is 8" in client.post("/settings/check", headers=HX).text
