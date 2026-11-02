@@ -1,7 +1,12 @@
 """SQLite connection and schema."""
 
+import fcntl
 import os
 import sqlite3
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 SCHEMA = """
 -- The issuer's setup, one row per setting (service.SETTINGS).
@@ -97,3 +102,27 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
     return conn
+
+
+def invoices_dir() -> Path:
+    """Where the PDFs go: BILLING_INVOICES, or an invoices folder next to the database."""
+    if folder := os.environ.get("BILLING_INVOICES"):
+        return Path(folder)
+    if path := os.environ.get("BILLING_DB"):
+        return Path(path).parent / "invoices"
+    raise MissingDatabaseError("BILLING_DB must point at the database file")
+
+
+_issuing = threading.Lock()
+
+
+@contextmanager
+def issuing(path: str | None = None) -> Iterator[None]:
+    """One invoice issued at a time, by the MCP server or the page (two processes): issuing asks ARCA for the
+    last number and then sends the next, and two at once would ask for the same."""
+    path = path or os.environ.get("BILLING_DB")
+    if not path:
+        raise MissingDatabaseError("BILLING_DB must point at the database file")
+    with _issuing, open(path + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield

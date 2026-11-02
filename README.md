@@ -42,8 +42,9 @@ newer version later.
   monthly net amount that can change from a given month; each month is billed in two halves (1st to 15th, 16th to
   the end), previewed first and issued one by one, each asking you, and never twice for the same period. It signs in
   to ARCA's web services (WSAA, WSFEv1) with your certificate, homologación (tests) or producción, and keeps only the
-  certificate's and key's paths. The skill tells the assistant how to email the PDF (asking you first) and how to
-  schedule the monthly run, approved on Telegram. It needs an ARCA certificate for web services, associated with
+  certificate's and key's paths. A **Billing** page in the web app shows each month's invoices (issue one, open
+  its PDF), the customers and their monthly amounts, and the setup, which it checks with ARCA. The skill tells the
+  assistant how to email the PDF (asking you first) and how to schedule the monthly run, approved on Telegram. It needs an ARCA certificate for web services, associated with
   `wsfe`. Needs lo9i with `approve` (plugin format 7).
 - **watchlist** (`apps/media/watchlist`): the movies and TV shows you want to watch or are watching,
   and the YouTube channels you follow. Movies and shows come from TMDB, with posters, release dates

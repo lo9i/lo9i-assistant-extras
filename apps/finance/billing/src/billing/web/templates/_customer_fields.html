@@ -1,0 +1,10 @@
+<div class="grid">
+  <label>Razón social <input name="name" value="{{ v.name or '' }}" required></label>
+  <label>CUIT <input name="cuit" value="{{ v.cuit or '' }}" placeholder="30-71234567-1" required></label>
+  <label>IVA condition
+    <select name="iva_condition">{% for k, label in IVA_CONDITIONS.items() %}<option value="{{ k }}" {{ 'selected' if (v.iva_condition or 'responsable_inscripto') == k }}>{{ label }}</option>{% endfor %}</select>
+  </label>
+  <label><span>Email <span class="hint">where invoices go</span></span><input type="email" name="email" value="{{ v.email or '' }}"></label>
+  <label class="wide">Address <input name="address" value="{{ v.address or '' }}"></label>
+  <label class="wide"><span>Invoice line <span class="hint">followed by the period</span></span><input name="description" value="{{ v.description or 'Servicios' }}"></label>
+</div>

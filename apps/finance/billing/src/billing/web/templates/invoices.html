@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block main %}{% include "_invoices.html" %}
+{% if focus %}
+<script>
+  // Opened at one invoice (invoices/<id>): it's picked out, in view.
+  document.getElementById("invoice-{{ focus }}")?.scrollIntoView({ block: "center" });
+</script>
+{% endif %}{% endblock %}

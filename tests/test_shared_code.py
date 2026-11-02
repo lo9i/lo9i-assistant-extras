@@ -143,6 +143,7 @@ def test_every_accepted_difference_is_still_there():
 THEME_SCRIPTS = [
     "connectivity/remote/hosts/src/hosts/web/static/theme.js",
     "apps/finance/expenses/src/expenses/web/static/theme.js",
+    "apps/finance/billing/src/billing/web/static/theme.js",
     "apps/media/watchlist/src/watchlist/web/static/theme.js",
     "software/factory/factory/src/lo9i_factory/web/static/theme.js",
 ]

@@ -1,0 +1,13 @@
+<div class="group-head editing" id="customer-{{ customer.id }}">
+  <form class="stack" hx-post="customers/{{ customer.id }}" hx-target="#customers" hx-swap="outerHTML">
+    {% set v = form or customer %}
+    {% include "_customer_fields.html" %}
+    <p class="muted small">Invoices already issued keep the customer as it was.</p>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons">
+      <span class="spacer"></span>
+      <button type="button" class="ghost" hx-get="customers" hx-target="#customers" hx-swap="outerHTML">Cancel</button>
+      <button class="primary">Save</button>
+    </div>
+  </form>
+</div>

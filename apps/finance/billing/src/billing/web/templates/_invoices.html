@@ -1,0 +1,98 @@
+{# The month's invoices: a card per customer with its two halves (app.py's _invoices_ctx), then any other invoice
+   of the month. The busy indicator shows while ARCA answers an issue. #}
+{% set env = issuer.environment %}
+<section id="invoices">
+  <div class="month-bar">
+    <div class="month-nav">
+      <button class="ghost small" hx-get="./?month={{ previous }}" hx-target="#invoices" hx-swap="outerHTML" hx-push-url="true" title="Previous month">‹</button>
+      <form hx-get="./" hx-trigger="change" hx-target="#invoices" hx-swap="outerHTML" hx-push-url="true">
+        <input type="month" name="month" value="{{ month }}" aria-label="Month">
+      </form>
+      <button class="ghost small" hx-get="./?month={{ next }}" hx-target="#invoices" hx-swap="outerHTML" hx-push-url="true" title="Next month">›</button>
+    </div>
+    <span class="env-tag {{ env }}">{{ ENVIRONMENTS[env] }}{% if env == 'homologacion' %} · tests, no fiscal value{% endif %}</span>
+  </div>
+
+  {% if issuer.missing %}
+  <p class="banner">Billing isn't set up for {{ ENVIRONMENTS[env] }} yet: it needs {{ issuer.missing | join(', ') }}. <a href="settings">Settings</a></p>
+  {% endif %}
+  {% if banner %}<p class="banner">{{ banner }}</p>{% endif %}
+  {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+  {% if elsewhere %}
+  <p class="banner">Invoice {{ elsewhere.full_number or elsewhere.id }} is in {{ ENVIRONMENTS[elsewhere.environment] }}, and this page shows {{ ENVIRONMENTS[env] }}.
+    {% if elsewhere.status == 'authorized' %}<a href="invoices/{{ elsewhere.id }}/pdf" target="_blank" rel="noopener">Its PDF</a>{% endif %}</p>
+  {% endif %}
+
+  <div class="tiles">
+    <div class="tile"><span>{{ month | month_name }}: issued</span><strong class="ok">{{ issued_total | money }}</strong><span>{{ issued_count }} invoice{{ 's' if issued_count != 1 }}</span></div>
+    <div class="tile"><span>To issue</span><strong class="{{ 'warn' if to_issue_count }}">{{ to_issue_total | money }}</strong><span>{{ to_issue_count }} invoice{{ 's' if to_issue_count != 1 }}</span></div>
+    <div class="tile"><span>Factura A</span><strong>Point of sale {{ '%05d' % issuer.point_of_sale if issuer.point_of_sale else '—' }}</strong><span>Services, 21% IVA, pesos</span></div>
+  </div>
+
+  <div class="cards">
+    {% for c in cards %}
+    <article class="card bill-card" id="card-{{ c.customer.id }}">
+      <header class="card-head">
+        <div class="main">
+          <div class="title">{{ c.customer.name }}</div>
+          <div class="muted small">CUIT {{ c.customer.cuit }}{% if c.customer.email %} · {{ c.customer.email }}{% endif %}</div>
+        </div>
+      </header>
+      <div class="list">
+        {% for h in c.halves %}
+        {% set inv = h.invoice %}
+        <div class="row bill {{ h.status | replace(' ', '-') | replace("'", '') }}{{ ' focused' if inv and inv.id == focus }}" {% if inv %}id="invoice-{{ inv.id }}"{% endif %}>
+          {% if h.status == 'authorized' %}
+          <div class="title"><span class="status-dot authorized" title="Authorized"></span>Factura A {{ inv.full_number }}</div>
+          <div class="amount">{{ inv.total | money }}</div>
+          <div class="muted small meta">{{ inv.period_from | day }} to {{ inv.period_to | day }} · issued {{ inv.issue_date | day }} · due {{ inv.due_date | day }} · CAE {{ inv.cae }}</div>
+          <div class="actions">
+            <a class="button ghost small" href="invoices/{{ inv.id }}/pdf" target="_blank" rel="noopener">PDF</a>
+          </div>
+          {% elif h.status == "can't prepare" %}
+          <div class="title"><span class="status-dot" title="Can't prepare"></span>{{ h.period_from | day }} to {{ h.period_to | day }}</div>
+          <div class="amount muted">—</div>
+          <div class="muted small meta">{{ h.error }}</div>
+          {% else %}
+          <div class="title"><span class="status-dot {{ h.status | replace(' ', '-') }}" title="{{ h.status | capitalize }}"></span>{{ h.period_from | day }} to {{ h.period_to | day }}
+            {% if h.status == 'rejected' %}<span class="due-tag">Rejected</span>{% elif h.status == 'sent' %}<span class="due-tag">No answer yet</span>{% endif %}</div>
+          <div class="amount">{{ h.total | money }}</div>
+          <div class="muted small meta">{{ h.net | money }} + IVA {{ h.iva | money }} · issued {{ h.issue_date | day }} · due {{ h.due_date | day }}</div>
+          {% if h.last_errors %}<p class="error">{% for e in h.last_errors %}{{ e.code }}: {{ e.message }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
+          {% if h.note %}<div class="muted small meta">ARCA didn't answer when it was sent: issuing asks ARCA first, and never issues it twice.</div>{% endif %}
+          <div class="actions">
+            <button class="primary small" {{ 'disabled' if issuer.missing }}
+              hx-post="invoices" hx-target="#invoices" hx-swap="outerHTML" hx-disabled-elt="this"
+              hx-vals='{"customer": "{{ c.customer.id }}", "period_from": "{{ h.period_from }}", "period_to": "{{ h.period_to }}", "month": "{{ month }}"}'
+              hx-confirm="Issue a Factura A to {{ c.customer.name }} for {{ h.period_from | day }} to {{ h.period_to | day }}, {{ h.total | money }}, in {{ ENVIRONMENTS[env] }}?{{ " This is a real invoice and it can't be undone." if env == "produccion" else " It's a test, with no fiscal value." }}">
+              <span class="idle">{{ 'Check with ARCA' if h.status == 'sent' else ('Issue again' if h.status == 'rejected' else 'Issue') }}</span><span class="busy">Asking ARCA…</span>
+            </button>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+    {% else %}
+    <p class="card empty">No customer has a monthly amount. <a href="customers">Add one</a>.</p>
+    {% endfor %}
+  </div>
+  {% if without_amount %}<p class="muted small">Without a monthly amount, so not here: {{ without_amount | join(', ') }}.</p>{% endif %}
+
+  {% if others %}
+  <article class="card list-card">
+    <h3>Other invoices of {{ month | month_name }}</h3>
+    <div class="list">
+      {% for inv in others %}
+      <div class="row bill {{ inv.status }}{{ ' focused' if inv.id == focus }}" id="invoice-{{ inv.id }}">
+        <div class="title"><span class="status-dot {{ inv.status }}" title="{{ inv.status | capitalize }}"></span>{{ inv.customer_name }}{% if inv.full_number %} · Factura A {{ inv.full_number }}{% endif %}
+          {% if inv.status != 'authorized' %}<span class="due-tag">{{ inv.status | capitalize }}</span>{% endif %}</div>
+        <div class="amount">{{ inv.total | money }}</div>
+        <div class="muted small meta">{{ inv.period_from | day }} to {{ inv.period_to | day }}{% if inv.cae %} · CAE {{ inv.cae }}{% endif %}</div>
+        {% if inv.status == 'authorized' %}<div class="actions"><a class="button ghost small" href="invoices/{{ inv.id }}/pdf" target="_blank" rel="noopener">PDF</a></div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+  {% endif %}
+</section>

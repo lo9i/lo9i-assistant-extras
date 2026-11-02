@@ -215,23 +215,43 @@ def setup(
     if sale_condition is not None:
         changes["sale_condition"] = _required(sale_condition, "sale_condition")
     env = changes.get("environment", current["environment"])
-    if certificate_path is not None or key_path is not None:
-        cert = _path(certificate_path) if certificate_path is not None else current.get(f"certificate_path.{env}")
-        key = _path(key_path) if key_path is not None else current.get(f"key_path.{env}")
-        if cert and key:
-            _check_pair(cert, key)
-        elif cert:
-            _read_certificate(cert)
-        elif key:
-            _read_key(key)
-        changes[f"certificate_path.{env}"] = cert or ""
-        changes[f"key_path.{env}"] = key or ""
+    changes |= _certificate(current, env, certificate_path, key_path)
     with _transaction(conn):
         conn.executemany(
             "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
             list(changes.items()),
         )
     return issuer(conn)
+
+
+def set_certificate(
+    conn: sqlite3.Connection, environment: str, certificate_path: str | None, key_path: str | None
+) -> dict:
+    """The certificate and key of `environment`, without switching to it."""
+    if environment not in arca.ENVIRONMENTS:
+        raise InvalidError(f"environment must be {' or '.join(arca.ENVIRONMENTS)}")
+    changes = _certificate(settings(conn), environment, certificate_path, key_path)
+    with _transaction(conn):
+        conn.executemany(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            list(changes.items()),
+        )
+    return issuer(conn)
+
+
+def _certificate(current: dict[str, str], env: str, certificate_path: str | None, key_path: str | None) -> dict:
+    """The settings for `env`'s certificate and key, checked; the one not given stays as it is."""
+    if certificate_path is None and key_path is None:
+        return {}
+    cert = _path(certificate_path) if certificate_path is not None else current.get(f"certificate_path.{env}")
+    key = _path(key_path) if key_path is not None else current.get(f"key_path.{env}")
+    if cert and key:
+        _check_pair(cert, key)
+    elif cert:
+        _read_certificate(cert)
+    elif key:
+        _read_key(key)
+    return {f"certificate_path.{env}": cert or "", f"key_path.{env}": key or ""}
 
 
 def _path(value: str) -> str:
@@ -280,7 +300,7 @@ def _certificate_info(path: str, now: datetime) -> dict:
         return {"error": str(e)}
     serial = cert.subject.get_attributes_for_oid(NameOID.SERIAL_NUMBER)
     return {
-        "subject": cert.subject.rfc4514_string(),
+        "subject": cert.subject.rfc4514_string({NameOID.SERIAL_NUMBER: "serialNumber"}),
         "cuit": re.sub(r"\D", "", str(serial[0].value)) if serial else None,
         "valid_until": cert.not_valid_after_utc.astimezone(arca.AR).isoformat(timespec="minutes"),
         "expired": cert.not_valid_after_utc < now,
@@ -472,6 +492,19 @@ def _price(monthly_net: float, effective_from: str | None, default: str) -> tupl
     return start, str(money(monthly_net, "monthly_net"))
 
 
+def remove_price(conn: sqlite3.Connection, ref: str, effective_from: str | None) -> dict:
+    """Remove the monthly amount from `effective_from` (None: the one from the start). Issued invoices keep
+    their amounts."""
+    row = find_customer(conn, ref)
+    start = _price(1, effective_from, "")[0] if effective_from else ""
+    removed = conn.execute(
+        "DELETE FROM prices WHERE customer_id = ? AND effective_from = ?", (row["id"], start)
+    ).rowcount
+    if not removed:
+        raise NotFoundError(f"{row['name']} has no monthly amount from {start or 'the start'}")
+    return _customer(conn, row)
+
+
 def price_on(conn: sqlite3.Connection, customer_id: str, day: date) -> Decimal | None:
     """The monthly net amount in effect on `day`."""
     row = conn.execute(
@@ -643,8 +676,8 @@ def prepare_month(
             }
             if existing is not None and existing["status"] == "sent":
                 entry["note"] = "sent before without an answer: create_invoice checks with ARCA first"
-            elif existing is not None and existing["errors"] != "[]":
-                entry["last_errors"] = json.loads(existing["errors"])
+            elif existing is not None and existing["status"] == "rejected":
+                entry["last_errors"] = json.loads(existing["errors"]) + json.loads(existing["observations"])
             out.append(entry)
     return {
         "month": month,

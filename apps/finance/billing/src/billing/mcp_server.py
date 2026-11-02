@@ -4,13 +4,9 @@ BILLING_INVOICES set:
     BILLING_DB=/path/billing.db BILLING_INVOICES=/path/invoices billing-mcp
 """
 
-import fcntl
-import os
 import sqlite3
-import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
@@ -44,8 +40,6 @@ READ_ONLY = ToolAnnotations(read_only_hint=True)
 # How ARCA is reached; tests put a fake here.
 SEND: arca.Post = arca.post
 
-_issuing = threading.Lock()
-
 
 @contextmanager
 def _db() -> Iterator[sqlite3.Connection]:
@@ -59,16 +53,9 @@ def _db() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-@contextmanager
-def _one_at_a_time() -> Iterator[None]:
-    """Issuing asks ARCA for the last number and then sends the next: two at once would ask for the same."""
-    with _issuing, open(os.environ["BILLING_DB"] + ".lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        yield
-
-
-def _pdf_dir() -> Path:
-    return Path(os.environ.get("BILLING_INVOICES") or Path(os.environ["BILLING_DB"]).parent / "invoices")
+def _linked(invoice: dict) -> dict:
+    """With where it is on the plugin's web page, which lo9i's Home links an item to."""
+    return invoice | {"page_path": f"invoices/{invoice['id']}"}
 
 
 @mcp.tool()
@@ -244,18 +231,20 @@ def create_invoice(
 ) -> dict:
     """Issue a Factura A with ARCA for services in the period, and make its PDF. If one was already issued
     for this customer and period it's returned (already_issued: true) and nothing is issued."""
-    with _one_at_a_time(), _db() as conn:
-        return service.create_invoice(
-            conn,
-            customer,
-            period_from,
-            period_to,
-            net_amount=net_amount,
-            issue_date=issue_date,
-            due_date=due_date,
-            description=description,
-            pdf_dir=_pdf_dir(),
-            send=SEND,
+    with db.issuing(), _db() as conn:
+        return _linked(
+            service.create_invoice(
+                conn,
+                customer,
+                period_from,
+                period_to,
+                net_amount=net_amount,
+                issue_date=issue_date,
+                due_date=due_date,
+                description=description,
+                pdf_dir=db.invoices_dir(),
+                send=SEND,
+            )
         )
 
 
@@ -268,14 +257,14 @@ def list_invoices(
 ) -> list[dict]:
     """Invoices, ordered by period."""
     with _db() as conn:
-        return service.list_invoices(conn, customer, month, status, environment)
+        return [_linked(i) for i in service.list_invoices(conn, customer, month, status, environment)]
 
 
 @mcp.tool(annotations=READ_ONLY)
 def get_invoice(id: int) -> dict:
     """One invoice, with the path of its PDF (made again if it's missing)."""
     with _db() as conn:
-        return service.get_invoice(conn, id, _pdf_dir())
+        return _linked(service.get_invoice(conn, id, db.invoices_dir()))
 
 
 def main() -> None:

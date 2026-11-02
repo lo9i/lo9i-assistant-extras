@@ -1,0 +1,13 @@
+<details id="add-customer" class="card" {{ 'open' if open or not customers }}>
+  <summary>+ Add customer</summary>
+  <form class="stack" hx-post="customers" hx-target="#customers" hx-swap="outerHTML">
+    {% set v = form or {} %}
+    {% include "_customer_fields.html" %}
+    <div class="grid">
+      <label><span>Monthly net amount <span class="hint">before IVA; optional</span></span><input name="monthly_net" inputmode="decimal" placeholder="7.500.000" value="{{ v.monthly_net or '' }}"></label>
+      <label><span>From <span class="hint">empty: from the start</span></span><input type="month" name="effective_from" value="{{ v.effective_from or '' }}"></label>
+    </div>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <div class="buttons"><button class="primary">Add</button></div>
+  </form>
+</details>
