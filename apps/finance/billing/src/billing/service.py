@@ -45,7 +45,12 @@ FACTURA_A_RECEIVERS = ("responsable_inscripto", "monotributo", "monotributo_soci
 
 # What issuing needs, besides a certificate and key for the environment.
 REQUIRED = ("cuit", "business_name", "address", "iva_condition", "activity_start", "iibb", "point_of_sale")
-DEFAULTS = {"environment": "homologacion", "payment_days": "10", "sale_condition": "Cuenta corriente"}
+DEFAULTS = {
+    "environment": "homologacion",
+    "iva_condition": "responsable_inscripto",  # the only one that issues a Factura A
+    "payment_days": "10",
+    "sale_condition": "Cuenta corriente",
+}
 
 TICKET_MARGIN = timedelta(minutes=5)
 

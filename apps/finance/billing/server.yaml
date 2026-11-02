@@ -4,7 +4,7 @@
 # listens.
 name: billing
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.2.0
+version: 0.2.1
 # The plugin format (lo9i's core/repositories/formats.py): 7 for `approve`.
 format: 7
 description: Argentine electronic invoices (Factura A) authorized by ARCA, with their PDF

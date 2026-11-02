@@ -92,8 +92,16 @@ def test_without_setup_nothing_can_be_issued(tmp_path, monkeypatch):
     service.add_customer(conn, "Acme", CUSTOMER_CUIT, monthly_net=100)
     conn.close()
     page = TestClient(create_app()).get("/?month=2026-10").text
-    assert "Billing isn't set up for Homologación yet: it needs cuit" in page
-    assert "disabled" in page
+    assert "Set up billing" in page and 'href="settings">Open Settings' in page
+    assert '<li class="done">' in page  # the customer step: Acme has a monthly amount
+    assert "disabled" in page and "iva_condition" not in page
+
+
+def test_a_new_install_shows_the_steps_and_no_zeros(tmp_path, monkeypatch):
+    monkeypatch.setenv("BILLING_DB", str(tmp_path / "new.db"))
+    page = TestClient(create_app()).get("/").text
+    assert page.count('<span class="step-mark">') == 3 and "done" not in page
+    assert "$ 0,00" not in page and "isn't set up" not in page
 
 
 # --- Customers ---
@@ -145,8 +153,7 @@ def test_editing_a_customer(client):
 
 def test_settings_show_the_certificate(client):
     page = client.get("/settings").text
-    assert 'value="20123456786"' in page and "CUIT 20123456786" in page and "valid until 31/12/2027" in page
-    assert "serialNumber=CUIT 20123456786" in page
+    assert 'value="20123456786"' in page and "For CUIT 20123456786." in page and "Valid until 31/12/2027" in page
 
 
 def test_a_key_of_another_certificate_saves_nothing(client, tmp_path):
