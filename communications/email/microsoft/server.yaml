@@ -3,7 +3,7 @@
 # servers, and they're added in this plugin's details once it's installed.
 name: microsoft
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.1.0
+version: 1.2.0
 description: Send and read Outlook.com and Microsoft 365 mail
 email:
   - id: microsoft
@@ -12,23 +12,22 @@ email:
     port: 587
     imap_host: outlook.office365.com
     oauth: microsoft
-    # Markdown: the steps as a numbered list, each link where it's done.
+    # Markdown: the steps as a numbered list, each link where it's done. lo9i signs in with its own app, so these
+    # are only for using one's own instead (lo9i shows them under "Use your own Microsoft app").
     password_help: |-
-      Microsoft only allows signing in, with an app registration of your own:
+      Only if your organization blocks apps it hasn't approved, sign in with an app of your own:
 
       1. In [Microsoft Entra](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade), register an app for personal and work accounts.
-      2. Add the redirect URI below to it as a Web redirect.
-      3. Create a client secret.
-      4. Paste the app's client ID and the secret below.
+      2. Add the redirect URI below to it: as a Web redirect with a client secret, or as a Mobile and desktop redirect without one.
+      3. Paste the app's client ID below, and its secret if it has one.
 translations:
   es:
     description: Envía y lee correo de Outlook.com y Microsoft 365
     email:
       microsoft:
         password_help: |-
-          Microsoft solo permite iniciar sesión, con un registro de app propio:
+          Solo si tu organización bloquea las apps que no aprobó, inicia sesión con una app propia:
 
           1. En [Microsoft Entra](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade), registra una app para cuentas personales y de trabajo.
-          2. Agrégale la URI de redirección de abajo como redirección Web.
-          3. Crea un secreto de cliente.
-          4. Pega abajo el ID de cliente de la app y el secreto.
+          2. Agrégale la URI de redirección de abajo: como redirección Web con un secreto de cliente, o como redirección de Móvil y escritorio sin él.
+          3. Pega abajo el ID de cliente de la app, y su secreto si tiene uno.
