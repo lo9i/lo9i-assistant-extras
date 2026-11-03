@@ -1,13 +1,21 @@
 """A relay on this computer between Claude Code and Copilot, for one task. Claude Code sends its Anthropic
 API requests here (ANTHROPIC_BASE_URL); the relay signs them with a current Copilot token, adds the
 headers Copilot needs, uses Copilot's model ids, says how Copilot should count each request, and streams
-the answers back. Only Claude Code, holding the relay's own random key, can use it."""
+the answers back. Only Claude Code, holding the relay's own random key, can use it.
+
+A computer that sleeps counts timeouts only while it's awake, and a connection open across a sleep is usually
+dead on waking without anything saying so: a request waiting on it would see its 600s read timeout only after
+600s awake, hours on a laptop. On 2026-11-03 Claude Code retried a request that way for four hours, and the relay
+then waited for the last one before the task could end, while what the user sent it went unread. So connections
+to Copilot are probed with TCP keepalive and fail within about a minute awake once dead, and the relay stops
+without waiting for requests nobody will read."""
 
 import asyncio
 import contextlib
 import secrets
 import socket
-from collections.abc import AsyncIterator
+import sys
+from collections.abc import AsyncIterator, Iterator
 
 import httpx
 import uvicorn
@@ -23,6 +31,14 @@ from claude_code_tasks import copilot
 _PASSED = ("content-type", "accept", "anthropic-version", "anthropic-beta")
 # Answers can stream for minutes; connecting shouldn't take long.
 _UPSTREAM_TIMEOUT = httpx.Timeout(600, connect=30)
+# Probes once a connection to Copilot has been idle this long, every _PROBE_SECONDS, _PROBES times.
+_IDLE_SECONDS = 30
+_PROBE_SECONDS = 10
+_PROBES = 3
+# Linux and macOS name the idle time before the first probe differently.
+_IDLE_OPTION = socket.TCP_KEEPALIVE if sys.platform == "darwin" else socket.TCP_KEEPIDLE
+# Once Claude Code is done, the requests it left are given this long before they're cancelled: nobody reads them.
+_STOP_SECONDS = 2
 
 
 class Relay:
@@ -50,7 +66,8 @@ class Relay:
     @contextlib.asynccontextmanager
     async def running(self) -> AsyncIterator["Relay"]:
         """Serves until the block ends. Raises CopilotError when GitHub gives no Copilot token."""
-        async with httpx.AsyncClient(timeout=_UPSTREAM_TIMEOUT, transport=self._transport) as http:
+        transport = self._transport or httpx.AsyncHTTPTransport(socket_options=_keepalive())
+        async with httpx.AsyncClient(timeout=_UPSTREAM_TIMEOUT, transport=transport) as http:
             self._http = http
             self._tokens = copilot.CopilotTokens(self._github_token, http)
             self.models = await copilot.claude_models(http, await self._tokens.current())
@@ -65,7 +82,8 @@ class Relay:
         listener.listen()
         self.port = listener.getsockname()[1]
         app = Starlette(routes=[Route("/{path:path}", self._relay, methods=["GET", "POST"])])
-        server = uvicorn.Server(uvicorn.Config(app, log_level="warning", lifespan="off"))
+        config = uvicorn.Config(app, log_level="warning", lifespan="off", timeout_graceful_shutdown=_STOP_SECONDS)
+        server = _Server(config)
         task = asyncio.create_task(server.serve(sockets=[listener]))
         try:
             yield
@@ -105,6 +123,24 @@ class Relay:
         }
         url = f"{token.api}/{request.path_params['path']}"
         return self._http.build_request(request.method, url, params=request.query_params, headers=headers, content=body)
+
+
+class _Server(uvicorn.Server):
+    """Leaves the worker's signals alone: lo9i stops a task with SIGTERM, which must end the worker at once.
+    uvicorn's own handling would only start a graceful shutdown, and hold the signal until it ended."""
+
+    @contextlib.contextmanager
+    def capture_signals(self) -> Iterator[None]:
+        yield
+
+
+def _keepalive() -> list[tuple[int, int, int]]:
+    return [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.IPPROTO_TCP, _IDLE_OPTION, _IDLE_SECONDS),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, _PROBE_SECONDS),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPCNT, _PROBES),
+    ]
 
 
 def _key_of(request: Request) -> str:

@@ -1,11 +1,14 @@
 """Claude Code on the user's Copilot plan: the relay with a fake GitHub and Copilot behind it."""
 
+import asyncio
 import json
+import signal
 
 import httpx
 import pytest
 
 from claude_code_tasks import copilot
+from claude_code_tasks import relay as relays
 from claude_code_tasks.relay import Relay
 
 MODELS = ["claude-opus-5.5", "claude-opus-5", "claude-sonnet-5.5", "claude-haiku-4.5"]
@@ -83,6 +86,31 @@ async def test_a_rejected_token_is_exchanged_again_once():
         answer = await _post(relay, _user("hi"))
     assert answer.status_code == 200 and fake.exchanges == 2
     assert [m.headers["authorization"] for m in fake.messages] == ["Bearer copilot-1", "Bearer copilot-2"]
+
+
+async def test_the_relay_stops_without_waiting_for_a_request_copilot_never_answers(monkeypatch):
+    """A connection that died while the computer slept: the request on it would wait hours awake to time out."""
+    monkeypatch.setattr(relays, "_STOP_SECONDS", 0.1)
+    fake, asked, never = FakeCopilot(), asyncio.Event(), asyncio.Event()
+
+    async def hanging(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/messages":
+            asked.set()
+            await never.wait()
+        return fake(request)
+
+    async with asyncio.timeout(5):
+        async with Relay("ghu_x", httpx.MockTransport(hanging)).running() as relay:
+            left = asyncio.create_task(_post(relay, _user("hi")))
+            await asked.wait()
+    left.cancel()
+
+
+async def test_serving_leaves_sigterm_to_end_the_worker():
+    before = signal.getsignal(signal.SIGTERM)
+    async with Relay("ghu_x", httpx.MockTransport(FakeCopilot())).running() as relay:
+        await _post(relay, _user("hi"))
+        assert signal.getsignal(signal.SIGTERM) == before
 
 
 def test_continuing_after_tool_results_counts_as_the_agents():
