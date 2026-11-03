@@ -6,7 +6,7 @@ from mcp.types import CallToolResult, TextContent
 from lo9i_calendar import mcp_server, service
 from lo9i_calendar.model import Calendar, CalendarError, Event
 
-READ = {"list_calendars", "list_events", "get_event", "free_busy"}
+READ = {"list_calendars", "list_events", "get_event", "free_busy", "today"}
 WRITE = {"create_event", "update_event", "delete_event"}
 
 

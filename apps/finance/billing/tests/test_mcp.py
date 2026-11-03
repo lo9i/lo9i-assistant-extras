@@ -100,6 +100,7 @@ def test_only_reading_tools_are_read_only():
         "prepare_month",
         "list_invoices",
         "get_invoice",
+        "today",
     }
     assert {t.name for t in tools} - read_only == {"setup", "add_customer", "update_customer", "create_invoice"}
 

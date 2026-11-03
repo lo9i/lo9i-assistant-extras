@@ -2,7 +2,7 @@
 # in lo9i's core/mcp/install.py. {bin} is the scripts of its own environment (built from its uv.lock).
 name: calendar
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.0.2
+version: 1.1.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Read and manage your calendars, in the Calendar app on your Mac and on a CalDAV server (iCloud, Fastmail, Nextcloud)
@@ -22,6 +22,10 @@ steps:
   - "For calendars the Mac doesn't have, or on Linux, enter a CalDAV account: its server, your username and an app password, which you create in your provider's account settings (not your usual password). iCloud: https://caldav.icloud.com with your Apple ID. Fastmail: https://caldav.fastmail.com. Nextcloud: https://your-server/remote.php/dav. Don't enter an account the Calendar app already has, or its events show twice."
   - "Google Calendar: add your Google account to the Mac in System Settings → Internet Accounts. Google's own CalDAV needs a Google sign-in this plugin doesn't do."
 trusted: false
+# lo9i lists the day's events in the morning briefing and on Home with this tool, called by lo9i itself, never
+# offered to the assistant (lo9i's docs/today-lists.md).
+today:
+  tool: today
 
 # Reading is marked read-only; adding, changing and deleting events isn't, so lo9i asks the user before each
 # one unless they trust the plugin. lo9i gives the server the user's time zone as TZ.

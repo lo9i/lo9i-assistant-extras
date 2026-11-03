@@ -4,7 +4,7 @@
 # listens.
 name: billing
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.5.1
+version: 0.6.0
 # The plugin format (lo9i's core/repositories/formats.py): 7 for `approve`.
 format: 7
 description: Argentine electronic invoices (Factura A) authorized by ARCA, with their PDF
@@ -15,6 +15,10 @@ env:
   BILLING_DB: "{data}/billing.db"
   BILLING_INVOICES: "{data}/invoices"
 trusted: false
+# lo9i lists the invoices ready to issue in the morning briefing with this tool, called by lo9i itself, never
+# offered to the assistant (lo9i's docs/today-lists.md).
+today:
+  tool: today
 # Issuing an invoice can't be undone (only a credit note cancels it): it asks the user every time, even
 # once the server is trusted.
 approve: [create_invoice]

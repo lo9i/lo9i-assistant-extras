@@ -7,6 +7,7 @@ BILLING_INVOICES set:
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import date
 from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
@@ -15,6 +16,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import arca, db, service
+from . import today as today_list
 
 INSTRUCTIONS = """\
 Issues Argentine electronic invoices (Factura A, services, 21% IVA, in pesos) authorized by ARCA (ex AFIP),
@@ -247,6 +249,17 @@ def update_customer(
 
 
 # --- Invoices ---
+
+
+@mcp.tool(annotations=READ_ONLY)
+def today(
+    day: Annotated[str, Field(description="The user's day, YYYY-MM-DD")],
+    language: Annotated[str, Field(description="en or es")] = "en",
+) -> dict:
+    """For lo9i, which calls it itself (server.yaml's today:): the invoices of the halves of a month that ended and
+    aren't issued yet, in lo9i's list format (its docs/today-lists.md)."""
+    with _db() as conn:
+        return today_list.listed(conn, date.fromisoformat(day), language)
 
 
 @mcp.tool(annotations=READ_ONLY)

@@ -16,6 +16,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from lo9i_calendar import service, times
+from lo9i_calendar import today as today_list
 from lo9i_calendar.model import CalendarError, Event
 
 INSTRUCTIONS = """\
@@ -81,6 +82,16 @@ async def list_events(
     if listing.problems:
         result["problems"] = listing.problems
     return result
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def today(
+    day: Annotated[str, Field(description="The user's day, YYYY-MM-DD")],
+    language: Annotated[str, Field(description="en or es")] = "en",
+) -> dict:
+    """For lo9i, which calls it itself (server.yaml's today:): the day's events from every calendar, in time order,
+    in lo9i's list format (its docs/today-lists.md)."""
+    return await _run(lambda: today_list.listed(day, language))
 
 
 @mcp.tool(annotations=READ_ONLY)

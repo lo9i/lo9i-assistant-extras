@@ -87,6 +87,7 @@ def test_only_read_tools_are_read_only():
         "list_obligations",
         "list_bills",
         "get_bill",
+        "today",
     }
 
 

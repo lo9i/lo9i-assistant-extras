@@ -17,6 +17,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import currency, db, recurring, service
+from . import today as today_list
 from .service import UNSET
 
 INSTRUCTIONS = """\
@@ -78,6 +79,17 @@ def _bills(bills: list) -> list[dict]:
 
 
 # --- Overview ---
+
+
+@mcp.tool(annotations=READ_ONLY)
+def today(
+    day: Annotated[str, Field(description="The user's day, YYYY-MM-DD")],
+    language: Annotated[str, Field(description="en or es")] = "en",
+) -> dict:
+    """For lo9i, which calls it itself (server.yaml's today:): the unpaid bills overdue or due within a week, the
+    oldest due first, in lo9i's list format (its docs/today-lists.md)."""
+    with _db() as conn:
+        return today_list.listed(conn, date.fromisoformat(day), language)
 
 
 @mcp.tool(annotations=READ_ONLY)
