@@ -5,7 +5,7 @@ assistant installs from this repository, so its core stays small.
 
 Plugins live in their category's folder, `<group>/<category>/<name>/`, which groups them in the app's
 Plugins page. The categories are a fixed list in lo9i (`core/repositories/categories.py`):
-`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/news`, `media/video`, `productivity/calendar`, `productivity/documents`, `productivity/maps`, `software/factory` and `other/general`.
+`apps/finance`, `apps/media`, `assistant/agents`, `assistant/modes`, `communications/chat`, `communications/contacts`, `communications/email`, `communications/phone`, `connectivity/remote`, `media/news`, `media/video`, `productivity/calendar`, `productivity/documents`, `productivity/maps`, `software/factory`, `web/browser` and `other/general`.
 
 A plugin folder holds one of:
 
@@ -156,6 +156,13 @@ newer version later.
   there. Its tools, a **Factory** page in the web app (the tasks as a board, each debate as a chat, the
   diff, the costs, and Settings), and a skill. It asks for an Anthropic or an OpenAI API key, or uses
   the assistant's Copilot sign-in. How it's built: [`software/factory/SPEC.md`](software/factory/SPEC.md).
+- **browser** (`web/browser/browser`): a browser of the assistant's own, with a profile apart from yours that keeps
+  what you sign in to, so it reads pages only your account sees (your YouTube home, a site's account page), scheduled
+  jobs too. It runs without a window; to sign in to a site, ask the assistant to show its window, sign in there and
+  close it. It opens pages and reads them as text with their links, scrolls feeds, takes screenshots and lists its
+  tabs without asking; clicking, typing and pressing keys ask you every time. It's Google Chrome when it's installed,
+  else a Chromium it downloads the first time (Playwright), never your own browser's profile. The window needs lo9i
+  running in your login session (not started at boot). Needs lo9i with `approve` (plugin format 7).
 
 ## Versions
 

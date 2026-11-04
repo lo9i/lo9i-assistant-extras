@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><title>Test home</title></head>
+<body>
+  <h1>Welcome   to   the   test</h1>
+  <p id="said">Nothing clicked yet.</p>
+  <button onclick="document.getElementById('said').textContent = 'The button was clicked.'">Press me</button>
+  <a href="/other.html">Other page</a>
+  <a href="/other.html" target="_blank">Other in a new tab</a>
+  <a href="javascript:void(0)">Not a page</a>
+  <a href="/hidden.html" style="display:none">Hidden link</a>
+  <form onsubmit="event.preventDefault(); document.getElementById('said').textContent = 'Searched ' + this.q.value;">
+    <label for="q">Search</label> <input id="q" name="q" placeholder="What to look for">
+  </form>
+  <div style="height: 4000px"></div>
+  <p>The end of the page.</p>
+</body></html>
