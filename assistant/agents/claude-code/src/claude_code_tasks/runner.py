@@ -5,8 +5,9 @@ import asyncio
 import os
 import sys
 import time
-from collections.abc import Callable
-from dataclasses import replace
+import uuid
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, replace
 from typing import Any
 
 from claude_agent_sdk import (
@@ -139,21 +140,35 @@ class Gauge:
             self._asking.cancel()
 
 
+@dataclass(frozen=True)
+class _Sent:
+    """A message sent to Claude Code: its text, its id in the inbox ("" for the task's) and the uuid Claude Code
+    keeps it under in its queue until it takes it."""
+
+    text: str
+    id: str
+    uuid: str
+
+
 class Session:
     """Claude Code's session for the task, kept open so the user can steer it while it works. A message
     from the inbox goes to it at once, and it takes it between its steps, echoing it back as it does
-    (`replay-user-messages`); an interrupt stops the step in progress, and the session waits for the
-    user's next message. It ends once Claude Code has answered every message, with its last result."""
+    (`replay-user-messages`); until then the user can withdraw it, which drops it from Claude Code's queue.
+    An interrupt stops the step in progress, and the session waits for the user's next message. It ends
+    once Claude Code has answered every message, with its last result."""
 
     def __init__(self, client: ClaudeSDKClient, progress: Progress, inbox: Inbox, gauge: Gauge) -> None:
         self._client, self._progress, self._inbox, self._gauge = client, progress, inbox, gauge
         self._steps = Steps()
-        # The messages sent that Claude Code hasn't taken yet, with their ids in the inbox ("" for the task's).
-        self._untaken: list[tuple[str, str]] = []
+        # The messages sent that Claude Code hasn't taken yet.
+        self._untaken: list[_Sent] = []
         # Interrupted: it waits for the user's next message.
         self._paused = False
         # A turn is in progress: there's something to interrupt.
         self._working = False
+        # Its last result, and whether it took nothing since: what's left waiting then is all it has to answer.
+        self._result: ResultMessage | None = None
+        self._turn_over = False
 
     async def answer(self, prompt: str) -> ResultMessage | None:
         await self._say(prompt)
@@ -166,11 +181,11 @@ class Session:
             answering.cancel()
             self._gauge.stop()
         if listening in done:
-            listening.result()  # it only ends with an error
+            listening.result()
+            return self._result
         return answering.result()
 
     async def _answers(self) -> ResultMessage | None:
-        result = None
         async for message in self._client.receive_messages():
             for step in self._steps.of(message):
                 self._progress(self._shown(step))
@@ -178,25 +193,33 @@ class Session:
                 self._gauge.stepped()
             self._taken(message)
             if isinstance(message, ResultMessage):
-                result = message
+                self._result, self._turn_over = message, True
                 self._working = bool(self._untaken)
                 if await self._answered_all():
-                    return result
-        return result
+                    return message
+        return self._result
 
     async def _answered_all(self) -> bool:
         """It took every message, none waits in the inbox, and it isn't waiting for the user's next one."""
         await self._pass_on(self._inbox.take())
+        return self._nothing_left()
+
+    def _nothing_left(self) -> bool:
         return not self._untaken and not self._paused
 
     async def _listen(self) -> None:
+        """Ends with an error, or once the user withdrew the last message it had left to answer after its turn."""
         while True:
             await self._pass_on(await self._inbox.next())
+            if self._turn_over and self._nothing_left():
+                return
 
     async def _pass_on(self, messages: list[Message]) -> None:
         for message in messages:
             if message.kind == "interrupt":
                 await self._interrupt()
+            elif message.kind == "withdraw":
+                await self._withdraw(message.withdrawn)
             else:
                 # Claude Code takes it once it's done with the turn in progress: `_taken` says when.
                 self._progress(Step("user", message.text, id=message.id, waiting=True))
@@ -204,9 +227,18 @@ class Session:
                 await self._say(message.text, message.id)
 
     async def _say(self, text: str, message_id: str = "") -> None:
-        self._untaken.append((text.strip(), message_id))
+        sent = _Sent(text.strip(), message_id, str(uuid.uuid4()))
+        self._untaken.append(sent)
         self._working = True
-        await self._client.query(text)
+        await self._client.query(_user_message(text, sent.uuid))
+
+    async def _withdraw(self, message_id: str) -> None:
+        """Drops the message from Claude Code's queue, unless it took it already: its `taken` step says so then."""
+        sent = next((s for s in self._untaken if s.id == message_id), None)
+        if sent is None or not await _cancel_queued(self._client, sent.uuid):
+            return
+        self._untaken.remove(sent)
+        self._progress(Step("withdrawn", id=message_id))
 
     async def _interrupt(self) -> None:
         """Once is enough: interrupted, it does nothing until the user's next message."""
@@ -225,12 +257,33 @@ class Session:
         """Claude Code echoes each message it takes; its subagents' prompts come with the call they're in."""
         if isinstance(message, UserMessage) and isinstance(message.content, str) and not message.parent_tool_use_id:
             text = message.content.strip()
-            taken = next((sent for sent in self._untaken if sent[0] == text), None)
+            taken = next((sent for sent in self._untaken if sent.text == text), None)
             if taken is None:
                 return
             self._untaken.remove(taken)
-            if taken[1]:
-                self._progress(Step("taken", id=taken[1]))
+            self._turn_over = False
+            if taken.id:
+                self._progress(Step("taken", id=taken.id))
+
+
+async def _user_message(text: str, message_uuid: str) -> AsyncIterator[dict[str, Any]]:
+    """A user message for Claude Code's input, under `message_uuid`, which taking it back names."""
+    yield {
+        "type": "user",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+        "uuid": message_uuid,
+    }
+
+
+async def _cancel_queued(client: ClaudeSDKClient, message_uuid: str) -> bool:
+    """Whether Claude Code dropped the message from its queue: it answers False once it has taken it. The SDK has no
+    method for Claude Code's `cancel_async_message` request yet, so it goes through the SDK's control channel."""
+    query = client._query
+    if query is None:
+        return False
+    answer = await query._send_control_request({"subtype": "cancel_async_message", "message_uuid": message_uuid})
+    return answer.get("cancelled") is True
 
 
 def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:

@@ -16,7 +16,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-Kind = Literal["note", "text", "thinking", "tool", "result", "text_delta", "thinking_delta", "user", "taken"]
+Kind = Literal[
+    "note", "text", "thinking", "tool", "result", "text_delta", "thinking_delta", "user", "taken", "withdrawn"
+]
 
 
 @dataclass(frozen=True)
@@ -59,7 +61,8 @@ class Step:
     whole of it comes as a `text` or `thinking` step. `user` is a message the user sent while it worked,
     passed on to the agent (`id` the message's, from the inbox), `waiting` until the agent gets to it, which
     a `taken` step with its `id` says: lo9i sends the ones it hadn't got to again when the user stops the
-    task. `id` is a tool call's id, `within` the id of the call whose subagent took the step."""
+    task. `withdrawn` is one of those the user took back before the agent got to it, by its `id`. `id` is a
+    tool call's id, `within` the id of the call whose subagent took the step."""
 
     kind: Kind
     text: str = ""
@@ -79,18 +82,21 @@ def note(text: str) -> Step:
 
 @dataclass(frozen=True)
 class Message:
-    """What the user sent while the task worked: a message (`text`), or `interrupt` to stop the step in
-    progress and wait for their next message. `id` names it in the inbox."""
+    """What the user sent while the task worked: a message (`text`), `interrupt` to stop the step in
+    progress and wait for their next message, or `withdraw` to take back the message named `withdrawn`
+    before the agent gets to it. `id` names it in the inbox."""
 
     id: str
-    kind: Literal["message", "interrupt"]
+    kind: Literal["message", "interrupt", "withdraw"]
     text: str = ""
+    withdrawn: str = ""
 
 
 class Inbox:
     """lo9i writes each message as a JSON file in inbox/, named so they sort in the order they were sent,
     and signals the worker with SIGUSR1. The worker makes the folder once it listens for the signal, which
-    tells lo9i it takes messages: before that, the signal would end it."""
+    tells lo9i it takes messages: before that, the signal would end it. `withdraws` beside it tells lo9i it
+    takes back a message the user withdraws (Session)."""
 
     def __init__(self, folder: Path) -> None:
         self._folder = folder / "inbox"
@@ -100,6 +106,7 @@ class Inbox:
     def open(self) -> None:
         asyncio.get_running_loop().add_signal_handler(signal.SIGUSR1, self._arrived.set)
         self._folder.mkdir(exist_ok=True)
+        (self._folder.parent / "withdraws").write_text("")
 
     def close(self) -> None:
         asyncio.get_running_loop().remove_signal_handler(signal.SIGUSR1)
@@ -121,6 +128,8 @@ class Inbox:
 
 def _message(path: Path) -> Message:
     data = json.loads(path.read_text())
+    if data.get("kind") == "withdraw":
+        return Message(path.stem, "withdraw", withdrawn=str(data.get("id", "")))
     kind = "interrupt" if data.get("kind") == "interrupt" else "message"
     return Message(path.stem, kind, str(data.get("text", "")))
 

@@ -46,6 +46,10 @@ class FakeClient:
         self._out: asyncio.Queue = asyncio.Queue()
         self.sent: list[str] = []
         self.interrupts = 0
+        # The messages it holds in its queue until its turn ends, by uuid (Busy), which taking one back drops.
+        self.held: dict[str, str] = {}
+        # Its control channel, which the SDK has no method for taking a message back on.
+        self._query = self
 
     async def __aenter__(self):
         return self
@@ -53,10 +57,18 @@ class FakeClient:
     async def __aexit__(self, *exc):
         return False
 
-    async def query(self, text):
+    async def query(self, prompt):
+        text, _ = await _said(prompt)
         self.sent.append(text)
+        self._answer(text)
+
+    def _answer(self, text):
         for message in [UserMessage(text), *self._replies(text)]:
             self._out.put_nowait(message)
+
+    async def _send_control_request(self, request):
+        assert request["subtype"] == "cancel_async_message"
+        return {"cancelled": self.held.pop(request["message_uuid"], None) is not None}
 
     async def interrupt(self):
         self.interrupts += 1
@@ -72,6 +84,26 @@ class FakeClient:
         if self._context is None:
             raise Exception("Unknown control request: get_context_usage")
         return self._context
+
+
+class Busy(FakeClient):
+    """Holds every message after the task's in its queue: its first turn goes on, or ends without taking them."""
+
+    async def query(self, prompt):
+        text, message_uuid = await _said(prompt)
+        self.sent.append(text)
+        if len(self.sent) == 1:
+            self._answer(text)
+        else:
+            self.held[message_uuid] = text
+
+
+async def _said(prompt):
+    """The text of what the session sent, and the uuid it sent it under."""
+    if isinstance(prompt, str):
+        return prompt, ""
+    [message] = [m async for m in prompt]
+    return message["message"]["content"], message["uuid"]
 
 
 @pytest.fixture
@@ -288,13 +320,6 @@ async def test_a_message_claude_code_hasnt_got_to_stays_waiting(monkeypatch, inb
     """Claude Code takes a message once it's done with the turn in progress: until it echoes it, there's no `taken`
     step, so lo9i sends it again if the user stops the task."""
 
-    class Busy(FakeClient):
-        async def query(self, text):
-            if text == "fix the tests":
-                await super().query(text)
-            else:
-                self.sent.append(text)  # held until its turn ends, which it never does
-
     def client(options):
         return Busy(lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "sleep 600"})], "c")])
 
@@ -313,6 +338,81 @@ async def test_a_message_claude_code_hasnt_got_to_stays_waiting(monkeypatch, inb
         Step("tool", tool="Bash", detail="sleep 600", id="1"),
         Step("user", "and update the docs", id="0001", waiting=True),
     ]
+
+
+def _busy(monkeypatch, replies):
+    seen = {}
+
+    def client(options):
+        seen["client"] = Busy(replies)
+        return seen["client"]
+
+    monkeypatch.setattr(runner, "ClaudeSDKClient", client)
+    monkeypatch.setenv(runner.TOKEN_ENV, "sk-ant-api03-x")
+    return seen
+
+
+async def test_a_message_withdrawn_before_claude_code_got_to_it_is_dropped_from_its_queue(monkeypatch, inbox, tmp_path):
+    seen = _busy(
+        monkeypatch, lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "sleep 600"})], "c")]
+    )
+    steps = []
+
+    def progress(step):
+        steps.append(step)
+        if step.kind == "tool":
+            _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
+        elif step.kind == "user":
+            _send(tmp_path, "0002", {"kind": "withdraw", "id": "0001"})
+
+    with pytest.raises(TimeoutError):  # its turn goes on
+        await asyncio.wait_for(runner.run(_task(), progress, inbox, _unmeasured), 0.3)
+    assert seen["client"].held == {}
+    assert steps == [
+        Step("tool", tool="Bash", detail="sleep 600", id="1"),
+        Step("user", "and update the docs", id="0001", waiting=True),
+        Step("withdrawn", id="0001"),
+    ]
+    assert (tmp_path / "withdraws").is_file()  # what tells lo9i it takes messages back
+
+
+async def test_withdrawing_the_last_message_left_after_its_turn_ends_the_task(monkeypatch, inbox, tmp_path):
+    _busy(
+        monkeypatch, lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c"), _result()]
+    )
+    steps = []
+
+    def progress(step):
+        steps.append(step)
+        if step.kind == "tool":
+            _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
+        elif step.kind == "user":
+            # Once its turn's result is in, with the message still in its queue.
+            asyncio.get_running_loop().call_later(0.05, _send, tmp_path, "0002", {"kind": "withdraw", "id": "0001"})
+
+    outcome = await asyncio.wait_for(runner.run(_task(), progress, inbox, _unmeasured), 2)
+    assert outcome.ok and outcome.text == "Fixed 2 tests."
+    assert steps[-1] == Step("withdrawn", id="0001")
+
+
+async def test_a_message_claude_code_took_already_isnt_withdrawn(monkeypatch, inbox, tmp_path):
+    def replies(text):
+        if text == "fix the tests":
+            return [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c")]
+        return [AssistantMessage([TextBlock("Docs updated.")], "c"), _result(text="Docs too.")]
+
+    _fake(monkeypatch, replies)
+    steps = []
+
+    def progress(step):
+        steps.append(step)
+        if step.kind == "tool":
+            _send(tmp_path, "0001", {"kind": "message", "text": "and update the docs"})
+        elif step.kind == "taken":
+            _send(tmp_path, "0002", {"kind": "withdraw", "id": "0001"})
+
+    outcome = await asyncio.wait_for(runner.run(_task(), progress, inbox, _unmeasured), 2)
+    assert outcome.text == "Docs too." and Step("withdrawn", id="0001") not in steps
 
 
 async def test_an_interrupt_stops_the_step_and_it_waits_for_the_next_message(monkeypatch, inbox, tmp_path):
