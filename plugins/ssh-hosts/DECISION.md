@@ -116,7 +116,7 @@ not from this repo's comments:
    decides it, and by running it once.
 2. That code reads the hint from the annotations registered through MCP `list_tools`, not from a name list or any other field.
 3. Whether MCP elicitation exists in lo9i, and whether a tool could use it for its own per-call prompt.
-4. That `other/general` is in `core/repositories/categories.py`, and that `python -m assistant.core.repositories.check` accepts the new folder.
+4. That `other/general` is in `core/repositories/categories.py`, and that `python -m lo9i.core.repositories.check` accepts the new folder.
 5. Whether "trusted" can be turned on by the user later, and what it skips (all prompts, or only some).
 
 **Fallback, stated plainly.** If PB-1 cannot run (no lo9i checkout), or its item 1 or item 2 is unconfirmed, or the prompt is

@@ -49,7 +49,7 @@ _MESSAGE_BYTES = 64 * 1024 * 1024
 # its reply, and stopping the daemon cancels that run, which stops this task with everything it started.
 _UNDER_LO9I = (
     "lo9i, the user's assistant, started this session, and its daemon waits for your reply. Never stop or "
-    "kill the daemon's process (`assistant.daemon`, `stop_daemon` in lo9i's scripts): that ends this session "
+    "kill the daemon's process (`lo9i.daemon`, `stop_daemon` in lo9i's scripts): that ends this session "
     "before you reply, and any daemon you start from it. To restart it, for example so lo9i code changes "
     "take effect, run `curl -s -X POST --unix-socket ~/.lo9i/daemon.sock -H 'X-Lo9i-Client: claude-code' "
     "http://lo9i/system/restart`: it restarts once your reply is in, so tell the user the change applies "

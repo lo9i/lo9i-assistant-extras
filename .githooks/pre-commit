@@ -12,4 +12,4 @@ if [ ! -f "$lo9i/pyproject.toml" ]; then
 fi
 # Plugins carry their own copies of shared code; they must still agree (tests/test_shared_code.py).
 uv run --quiet --no-project --python 3.12 --with pytest pytest -q -p no:cacheprovider "$root/tests" || exit 1
-exec uv run --quiet --project "$lo9i" python -m assistant.core.repositories.check "$root"
+exec uv run --quiet --project "$lo9i" python -m lo9i.core.repositories.check "$root"
