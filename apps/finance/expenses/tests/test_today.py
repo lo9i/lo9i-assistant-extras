@@ -61,3 +61,25 @@ def test_the_tool_answers_the_list_as_json(tmp_path, monkeypatch):
 
     result = asyncio.run(run())
     assert not result.is_error and json.loads(result.content[0].text)["heading"] == "Bills"
+
+
+def test_the_badge_counts_the_unpaid_bills_due_that_day(conn):
+    _bill(conn, 61000, "2026-11-03", "Luz")
+    _bill(conn, 900, "2026-11-03", "Gas")
+    _bill(conn, 7, "2026-11-03", "Paid", status="paid")
+    _bill(conn, 100, "2026-11-02", "Overdue")
+    _bill(conn, 5, "2026-11-04", "Tomorrow")
+    assert today.due_today(conn, DAY, "en") == {"count": 2, "label": "2 bills due today"}
+    assert today.due_today(conn, date(2026, 11, 4), "es") == {"count": 1, "label": "1 factura vence hoy"}
+    assert today.due_today(conn, date(2026, 11, 5), "en")["count"] == 0
+
+
+def test_the_badge_tool_answers_the_count_as_json(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPENSES_DB", str(tmp_path / "test.db"))
+
+    async def run():
+        async with Client(mcp) as client:
+            return await client.call_tool("badge", {"day": "2026-11-03", "language": "en"})
+
+    result = asyncio.run(run())
+    assert not result.is_error and json.loads(result.content[0].text) == {"count": 0, "label": "0 bills due today"}

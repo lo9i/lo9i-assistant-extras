@@ -93,6 +93,17 @@ def today(
 
 
 @mcp.tool(annotations=READ_ONLY)
+def badge(
+    day: Annotated[str, Field(description="The user's day, YYYY-MM-DD")],
+    language: Annotated[str, Field(description="en or es")] = "en",
+) -> dict:
+    """For lo9i, which calls it itself (server.yaml's badge:): how many unpaid bills are due on `day`, the count beside
+    the Expenses page in its sidebar (its docs/plugin-badges.md)."""
+    with _db() as conn:
+        return today_list.due_today(conn, date.fromisoformat(day), language)
+
+
+@mcp.tool(annotations=READ_ONLY)
 def month_summary() -> dict:
     """This month's bills plus unpaid ones from earlier months, with totals
     overall, by category and by asset."""

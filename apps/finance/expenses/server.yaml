@@ -4,7 +4,7 @@
 # listens.
 name: expenses
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 0.5.0
+version: 0.6.0
 # The plugin format (lo9i's core/repositories/formats.py): 2 for {bin}.
 format: 2
 description: Assets, recurring obligations and bills, in your country's currency
@@ -18,6 +18,10 @@ trusted: false
 # offered to the assistant (lo9i's docs/today-lists.md).
 today:
   tool: today
+# The count beside its page in lo9i's sidebar, the unpaid bills due today, with this tool, also called by lo9i itself
+# and never offered to the assistant (lo9i's docs/plugin-badges.md).
+badge:
+  tool: badge
 
 # The page lo9i shows as Expenses in its web app. It gets the env above and listens on {socket};
 # lo9i signs the user in and serves it under /expenses/ (X-Forwarded-Prefix).

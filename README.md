@@ -35,8 +35,8 @@ newer version later.
 ## What's here
 
 - **expenses** (`apps/finance/expenses`): assets, recurring obligations and bills, in one currency
-  you choose. Its tools, an **Expenses** page in the web app, and a skill that tells the assistant how
-  to use them.
+  you choose. Its tools, an **Expenses** page in the web app whose sidebar item counts the bills due today
+  and unpaid, and a skill that tells the assistant how to use them.
 - **billing** (`apps/finance/billing`): Argentine electronic invoices authorized by ARCA (ex AFIP): Factura A
   for services, 21% IVA, in pesos, with its CAE and a PDF in ARCA's layout with the RG 4291 QR. Customers have a
   monthly net amount that can change from a given month; each month is billed in two halves (1st to 15th, 16th to

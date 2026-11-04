@@ -1,6 +1,7 @@
 """The bills coming due, for lo9i's list of the user's day (`today:` in server.yaml; lo9i's docs/today-lists.md): the
 unpaid ones overdue or due within WEEK days, the oldest due first. One due within SOON days, or overdue, says it
-needs paying, which lo9i keeps as an open loop until the bill is paid and leaves the list."""
+needs paying, which lo9i keeps as an open loop until the bill is paid and leaves the list. And the count beside the
+Expenses page in lo9i's sidebar (`badge:`; lo9i's docs/plugin-badges.md): the unpaid bills due that day."""
 
 import sqlite3
 from datetime import date, timedelta
@@ -20,6 +21,8 @@ _TEXTS = {
         "pay_overdue": "Pay {name} ({amount}), overdue since {due}",
         "day": "{month} {day}",
         "months": "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
+        "due_today": "{count} bill due today",
+        "due_today_many": "{count} bills due today",
     },
     "es": {
         "heading": "Facturas",
@@ -29,6 +32,8 @@ _TEXTS = {
         "pay_overdue": "Pagar {name} ({amount}), vencida desde el {due}",
         "day": "{day} de {month}",
         "months": "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre",
+        "due_today": "{count} factura vence hoy",
+        "due_today_many": "{count} facturas vencen hoy",
     },
 }
 
@@ -48,6 +53,13 @@ def listed(conn: sqlite3.Connection, day: date, language: str) -> dict[str, Any]
         "items": items,
         "note": "" if items else texts["none"],
     }
+
+
+def due_today(conn: sqlite3.Connection, day: date, language: str) -> dict[str, Any]:
+    """The unpaid bills due on `day`, for the badge: a count and what it is."""
+    texts = _TEXTS.get(language, _TEXTS["en"])
+    count = sum(1 for b in service.list_bills(conn, status="pending") if b.due_date == day.isoformat())
+    return {"count": count, "label": texts["due_today" if count == 1 else "due_today_many"].format(count=count)}
 
 
 def _item(
