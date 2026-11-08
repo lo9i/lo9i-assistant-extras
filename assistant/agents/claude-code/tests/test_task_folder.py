@@ -6,13 +6,14 @@ import os
 import signal
 import subprocess
 import sys
+from datetime import datetime
 
 from claude_code_tasks.task_folder import Context, Inbox, Message, Outcome, Step, Task, _write_outcome, note, run
 
 _TASK = Task("t1", "/repo", "fix it", "s1", "", "2026-10-08T00:00:00+00:00")
 
 
-async def test_steps_are_json_lines_and_the_outcome_says_when_it_ended(tmp_path):
+async def test_steps_are_json_lines_each_with_when_it_was_written_and_the_outcome_says_when_it_ended(tmp_path):
     async def runner(task, progress, inbox, measured):
         progress(note("Using Claude on your GitHub Copilot plan"))
         progress(Step("tool", tool="Bash", detail="pytest", id="1"))
@@ -20,6 +21,7 @@ async def test_steps_are_json_lines_and_the_outcome_says_when_it_ended(tmp_path)
 
     outcome = await run(tmp_path, _TASK, runner)
     lines = [json.loads(line) for line in (tmp_path / "progress.log").read_text().splitlines()]
+    assert all(datetime.fromisoformat(line.pop("at")).tzinfo for line in lines)
     assert lines == [
         {"kind": "note", "text": "Using Claude on your GitHub Copilot plan"},
         {"kind": "tool", "tool": "Bash", "detail": "pytest", "id": "1"},

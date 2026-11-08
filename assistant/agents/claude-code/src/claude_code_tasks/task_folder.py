@@ -64,7 +64,8 @@ class Step:
     passed on to the agent (`id` the message's, from the inbox), `waiting` until the agent gets to it, which
     a `taken` step with its `id` says: lo9i sends the ones it hadn't got to again when the user stops the
     task. `withdrawn` is one of those the user took back before the agent got to it, by its `id`. `id` is a
-    tool call's id, `within` the id of the call whose subagent took the step."""
+    tool call's id, `within` the id of the call whose subagent took the step. Each line says when it was
+    written (`at`), which lo9i shows a tool call with."""
 
     kind: Kind
     text: str = ""
@@ -74,8 +75,9 @@ class Step:
     within: str = ""
     waiting: bool = False
 
-    def to_json(self) -> str:
-        return json.dumps({k: v for k, v in asdict(self).items() if v}, ensure_ascii=False)
+    def to_json(self, at: datetime) -> str:
+        fields = {k: v for k, v in asdict(self).items() if v}
+        return json.dumps(fields | {"at": at.isoformat(timespec="seconds")}, ensure_ascii=False)
 
 
 def note(text: str) -> Step:
@@ -159,7 +161,7 @@ def main(runner: Runner) -> None:
 async def run(folder: Path, task: Task, runner: Runner) -> Outcome:
     def progress(step: Step) -> None:
         with (folder / "progress.log").open("a", encoding="utf-8") as log:
-            log.write(step.to_json() + "\n")
+            log.write(step.to_json(datetime.now(UTC)) + "\n")
 
     def measured(context: Context) -> None:
         try:

@@ -3,13 +3,14 @@
 import json
 import subprocess
 import sys
+from datetime import datetime
 
 from copilot_tasks.task_folder import Outcome, Step, Task, note, run
 
 _TASK = Task("t1", "/repo", "fix it", "s1", "", "2026-10-08T00:00:00+00:00")
 
 
-async def test_steps_are_json_lines_and_the_outcome_says_when_it_ended(tmp_path):
+async def test_steps_are_json_lines_each_with_when_it_was_written_and_the_outcome_says_when_it_ended(tmp_path):
     async def runner(task, progress):
         progress(note("Downloading the Copilot CLI"))
         progress(Step("tool", tool="Bash", detail="pytest", id="1"))
@@ -17,6 +18,7 @@ async def test_steps_are_json_lines_and_the_outcome_says_when_it_ended(tmp_path)
 
     outcome = await run(tmp_path, _TASK, runner)
     lines = [json.loads(line) for line in (tmp_path / "progress.log").read_text().splitlines()]
+    assert all(datetime.fromisoformat(line.pop("at")).tzinfo for line in lines)
     assert lines == [
         {"kind": "note", "text": "Downloading the Copilot CLI"},
         {"kind": "tool", "tool": "Bash", "detail": "pytest", "id": "1"},

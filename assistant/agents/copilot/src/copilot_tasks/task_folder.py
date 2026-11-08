@@ -57,7 +57,8 @@ class Step:
     name, `detail` what it's about) or a tool call's result (`tool` the call it ends, `text` its output).
     `text_delta` and `thinking_delta` are the words of a text or thinking as they're written, before the
     whole of it comes as a `text` or `thinking` step. `id` is a tool call's id, `within` the id of the call
-    whose subagent took the step. `waiting` is for a `user` step: this worker takes no messages while it works."""
+    whose subagent took the step. `waiting` is for a `user` step: this worker takes no messages while it works.
+    Each line says when it was written (`at`), which lo9i shows a tool call with."""
 
     kind: Kind
     text: str = ""
@@ -67,8 +68,9 @@ class Step:
     within: str = ""
     waiting: bool = False
 
-    def to_json(self) -> str:
-        return json.dumps({k: v for k, v in asdict(self).items() if v}, ensure_ascii=False)
+    def to_json(self, at: datetime) -> str:
+        fields = {k: v for k, v in asdict(self).items() if v}
+        return json.dumps(fields | {"at": at.isoformat(timespec="seconds")}, ensure_ascii=False)
 
 
 def note(text: str) -> Step:
@@ -95,7 +97,7 @@ def main(runner: Runner) -> None:
 async def run(folder: Path, task: Task, runner: Runner) -> Outcome:
     def progress(step: Step) -> None:
         with (folder / "progress.log").open("a", encoding="utf-8") as log:
-            log.write(step.to_json() + "\n")
+            log.write(step.to_json(datetime.now(UTC)) + "\n")
 
     try:
         outcome = await runner(task, progress)
