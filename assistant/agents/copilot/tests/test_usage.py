@@ -31,13 +31,15 @@ def _copilot(
 async def test_the_last_calls_input_is_measured_against_the_models_window(tmp_path):
     (tmp_path / "usage.json").write_text(json.dumps(_USAGE))
     seen: list[httpx.Request] = []
-    assert await usage.context(tmp_path / "usage.json", "github_pat_x", _copilot(seen=seen)) == Context(41250, 272000)
+    assert await usage.context(tmp_path / "usage.json", "github_pat_x", _copilot(seen=seen)) == Context(
+        41250, 272000, "gpt-5.6-sol"
+    )
     assert len(seen) == 2 and all(r.headers["Authorization"] == "Bearer github_pat_x" for r in seen)
 
 
 async def test_the_model_is_the_last_one_used_when_it_names_none(tmp_path):
     (tmp_path / "usage.json").write_text(json.dumps({"lastCallInputTokens": 9, "modelMetrics": {"gpt-5.6-sol": {}}}))
-    assert await usage.context(tmp_path / "usage.json", "t", _copilot()) == Context(9, 272000)
+    assert await usage.context(tmp_path / "usage.json", "t", _copilot()) == Context(9, 272000, "gpt-5.6-sol")
 
 
 async def test_without_usage_or_a_window_there_is_no_context(tmp_path):

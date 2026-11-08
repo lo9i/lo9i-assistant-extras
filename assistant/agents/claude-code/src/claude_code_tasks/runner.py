@@ -100,7 +100,7 @@ async def _context(client: ClaudeSDKClient) -> Context | None:
     except Exception as e:
         print(f"Couldn't read Claude Code's context use: {type(e).__name__}: {e}", file=sys.stderr)
         return None
-    return Context(tokens=usage["totalTokens"], window=usage["rawMaxTokens"])
+    return Context(tokens=usage["totalTokens"], window=usage["rawMaxTokens"], model=usage.get("model") or "")
 
 
 class Gauge:

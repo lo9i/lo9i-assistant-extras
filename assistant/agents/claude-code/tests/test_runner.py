@@ -223,15 +223,15 @@ async def test_a_run_reports_the_result_and_keeps_the_token_out_of_the_environme
 
 
 async def test_the_outcome_says_how_full_its_context_is_once_it_answered(monkeypatch, inbox):
-    usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5}
+    usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5, "model": "opus"}
     _fake(monkeypatch, lambda text: [_result()], context=usage)
     outcome = await runner.run(_task(), lambda _: None, inbox, _unmeasured)
-    assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000)
+    assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000, model="opus")
 
 
 async def test_it_says_how_full_its_context_is_while_it_works(monkeypatch, inbox):
     """Before its answer ends: after a message of Claude Code's, while it goes on working."""
-    usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5}
+    usage = {"totalTokens": 61_000, "maxTokens": 167_000, "rawMaxTokens": 200_000, "percentage": 30.5, "model": "opus"}
     seen = _fake(
         monkeypatch, lambda text: [AssistantMessage([ToolUseBlock("1", "Bash", {"command": "pytest"})], "c")], usage
     )
@@ -242,8 +242,10 @@ async def test_it_says_how_full_its_context_is_while_it_works(monkeypatch, inbox
         seen["client"]._out.put_nowait(_result())  # it answers only once it said
 
     outcome = await runner.run(_task(), lambda _: None, inbox, measured)
-    assert told == [Context(tokens=61_000, window=200_000)]  # the result came under 15s later: not asked again
-    assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000)
+    assert told == [
+        Context(tokens=61_000, window=200_000, model="opus")
+    ]  # the result came under 15s later: not asked again
+    assert outcome.ok and outcome.context == Context(tokens=61_000, window=200_000, model="opus")
 
 
 async def test_its_context_is_asked_at_most_every_few_seconds_and_not_again_once_it_cant_say():

@@ -31,10 +31,12 @@ class Task:
 
 @dataclass(frozen=True)
 class Context:
-    """How full the agent's context is: `tokens` in it, of the model's `window`."""
+    """How full the agent's context is: `tokens` in it, of the model's `window`; the `model` it runs on, "" when
+    it can't say."""
 
     tokens: int
     window: int
+    model: str = ""
 
 
 @dataclass(frozen=True)

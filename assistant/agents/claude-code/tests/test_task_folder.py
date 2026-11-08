@@ -38,8 +38,10 @@ async def test_an_error_ends_the_task_as_failed(tmp_path):
 def test_the_context_goes_in_a_file_of_its_own_so_an_older_lo9i_still_reads_the_result(tmp_path):
     answered, failed = tmp_path / "answered", tmp_path / "failed"
     answered.mkdir(), failed.mkdir()
-    _write_outcome(answered, Outcome(ok=True, text="Fixed.", finished_at="now", context=Context(42_000, 200_000)))
-    assert json.loads((answered / "context.json").read_text()) == {"tokens": 42_000, "window": 200_000}
+    _write_outcome(
+        answered, Outcome(ok=True, text="Fixed.", finished_at="now", context=Context(42_000, 200_000, "opus"))
+    )
+    assert json.loads((answered / "context.json").read_text()) == {"tokens": 42_000, "window": 200_000, "model": "opus"}
     result = json.loads((answered / "result.json").read_text())
     assert result == {"ok": True, "text": "Fixed.", "finished_at": "now", "cost_usd": None}
     _write_outcome(failed, Outcome(ok=False, text="no login"))
@@ -58,7 +60,7 @@ async def test_how_full_the_context_is_is_written_whole_as_it_works_and_a_failur
         return Outcome(ok=True, text="Fixed.")
 
     outcome = await run(tmp_path, _TASK, runner)
-    assert written == [{"tokens": 42_000, "window": 200_000}] and not (tmp_path / "context.json").exists()
+    assert written == [{"tokens": 42_000, "window": 200_000, "model": ""}] and not (tmp_path / "context.json").exists()
     assert outcome.ok and "Couldn't write how full the context is" in capsys.readouterr().err
 
 

@@ -32,7 +32,7 @@ async def context(usage_file: Path, token: str, transport: httpx.AsyncBaseTransp
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as e:
         print(f"Couldn't read the context window of {model}: {type(e).__name__}: {e}", file=sys.stderr)
         return None
-    return Context(tokens=tokens, window=window) if window else None
+    return Context(tokens=tokens, window=window, model=model) if window else None
 
 
 async def context_window(model: str, token: str, transport: httpx.AsyncBaseTransport | None = None) -> int | None:
