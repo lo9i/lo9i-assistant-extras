@@ -131,6 +131,21 @@ def _host(h: Host, probe: Probe | None) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=READ_ONLY)
+async def ssh_hosts(name: str = "") -> dict[str, Any]:
+    """Only lo9i calls this (`ssh_hosts:` in server.yaml); the assistant never gets it. Without a name, the hosts
+    shown on the Hosts page and their addresses; with one, how to connect to it, to move lo9i there: an ssh config
+    with the list's hosts (so one it jumps through is there too) and its password. Keys are only their files'
+    paths there."""
+    try:
+        if not name:
+            return {"hosts": [{"name": h.name, "address": str(h.address or "")} for h in await service.shown_hosts()]}
+        config, password = await service.ssh_config((await _shown(name)).name)
+    except _PROBLEMS as e:
+        raise ToolError(str(e)) from None
+    return {"config": config, "password": password}
+
+
+@mcp.tool(annotations=READ_ONLY)
 async def list_tunnels(
     host: Annotated[str | None, Field(description="Only this host's (a name from list_hosts)")] = None,
 ) -> list[dict[str, Any]]:

@@ -249,3 +249,23 @@ async def test_the_assistant_deletes_a_tunnel_stopping_it_first(page, spawn: Fak
     assert [t["name"] for t in (await call("list_tunnels", {})).structured_content["result"]] == ["Proxy"]
     result = await call("delete_tunnel", {"host": "pi", "tunnel": "Database"})
     assert result.is_error and "Its tunnels are: Proxy." in result.content[0].text
+
+
+async def test_lo9i_gets_the_hosts_and_how_to_sign_in_to_one(config):
+    from hosts import service
+    from hosts.details import Details
+
+    await service.add_host("box", Details("box.local", "me", 22, password="its password"))
+    conn = db.connect()
+    db.set_hidden(conn, "nas", True)
+    conn.close()
+
+    listed = payload(await call("ssh_hosts", {}))
+    signed_in = payload(await call("ssh_hosts", {"name": "box"}))
+
+    assert listed == {
+        "hosts": [{"name": "box", "address": "me@box.local"}, {"name": "pi", "address": "lo9i@lo9i-pi.local"}]
+    }
+    assert "Host box\n  HostName box.local\n  User me\n" in signed_in["config"]
+    assert signed_in["password"] == "its password" and "its password" not in signed_in["config"]
+    assert (await call("ssh_hosts", {"name": "nas"})).is_error
