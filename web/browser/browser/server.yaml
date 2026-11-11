@@ -3,7 +3,7 @@
 # of its own environment (built from its uv.lock).
 name: browser
 # Shown in the Plugins page; raise it with every change worth updating to.
-version: 1.1.0
+version: 1.1.1
 # The plugin format (lo9i's core/repositories/formats.py): 7 for `approve`.
 format: 7
 description: A browser of the assistant's own, with a profile that keeps what you sign in to, so it reads pages that need your login (your YouTube home) and uses them when you approve
@@ -20,10 +20,13 @@ env:
 login_session: true
 # The page lo9i shows as Browser in its web app: on a computer without a screen (a Linux server), the browser
 # shows live there to sign in, instead of in a window. It gets the env above and listens on {socket}; lo9i signs
-# the user in and serves it under /browser/ (X-Forwarded-Prefix), its WebSocket too.
+# the user in and serves it under /browser/ (X-Forwarded-Prefix), its WebSocket too. Only there: where there's a
+# screen the window shows instead, so lo9i neither runs nor lists it (shown: without_screen, lo9i's
+# core/mcp/page_shown.py, the same rule as places.py's).
 page:
   command: "{bin}/browser-web"
   args: [--socket, "{socket}"]
+  shown: without_screen
 # Trusted: opening, reading, scrolling and screenshots only read pages, and showing the window, closing a
 # tab or the window only change the browser itself, so lo9i doesn't ask before each.
 trusted: true
