@@ -18,7 +18,7 @@ For "check my YouTube home": open youtube.com, scroll once, read it, and list th
 
 ## Signing in
 
-When a site shows it isn't signed in (a Sign in button where the user's account should be, a login page), don't try to sign in yourself and never ask for their password. Call `show_window` with the site's address: the window opens on the user's screen. Tell them to sign in there and close the window when done. When they close it you're told; when they say they're done instead, call `hide_window`. Then read the page again. The sign-in stays for later, scheduled jobs included. If `show_window` says the window can't show (lo9i runs from boot), tell the user why.
+When a site shows it isn't signed in (a Sign in button where the user's account should be, a login page), don't try to sign in yourself and never ask for their password. Call `show_window` with the site's address: the window opens on the user's screen. Tell them to sign in there and close the window when done. On a computer without a screen (a Linux server), `show_window` says the browser shows in lo9i's web app instead: tell them to open Browser in its sidebar, sign in there and press Done. When they close it or press Done you're told; when they say they're done instead, call `hide_window`. Then read the page again. The sign-in stays for later, scheduled jobs included. If `show_window` says the window can't show (lo9i runs from boot), tell the user why.
 
 ## Acting on a site
 

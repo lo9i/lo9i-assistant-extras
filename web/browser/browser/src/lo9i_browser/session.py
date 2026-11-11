@@ -1,6 +1,8 @@
 """The browser: one profile in the plugin's data folder, which keeps what the user signed in to, run by
 Playwright without a window (headless) until the user needs to see it, to sign in to a site. Showing or
-hiding the window starts the browser again on the same profile and opens the same tabs there.
+hiding the window starts the browser again on the same profile and opens the same tabs there. A computer
+without a screen (Linux without DISPLAY or WAYLAND_DISPLAY) never shows one: there the browser stays
+headless, and showing it means the user sees it live in lo9i's web app (live.py).
 
 Tabs have numbers that stay while the browser runs; the last one used is the current one, which a tool
 uses when it's given none."""
@@ -16,6 +18,7 @@ from playwright.async_api import BrowserContext, Page, Playwright, ViewportSize,
 from playwright.async_api import Error as PlaywrightError
 
 from lo9i_browser import engines
+from lo9i_browser.places import has_screen
 
 log = logging.getLogger(__name__)
 
@@ -38,11 +41,12 @@ class BrowserError(Exception):
 
 
 class Browser:
-    def __init__(self, data: Path, chrome: bool | None = None) -> None:
+    def __init__(self, data: Path, chrome: bool | None = None, screen: bool | None = None) -> None:
         """`data` holds the profile and the browser downloaded; `chrome` whether Google Chrome is
-        installed, found on this system when not given."""
+        installed, `screen` whether a window can show, both found on this system when not given."""
         self._data = data
         self._chrome = engines.chrome_installed() if chrome is None else chrome
+        self.screen = has_screen() if screen is None else screen
         self._lock = asyncio.Lock()
         self._playwright: Playwright | None = None
         self._context: BrowserContext | None = None
@@ -60,6 +64,10 @@ class Browser:
     def visible(self) -> bool:
         return self._context is not None and self._visible
 
+    @property
+    def context(self) -> BrowserContext | None:
+        return self._context
+
     def prepare(self) -> asyncio.Task[str]:
         """Picks the browser and downloads Chromium if it's the one and isn't there yet; the server starts
         it as it starts, so the first page doesn't wait for the download."""
@@ -68,7 +76,7 @@ class Browser:
         return self._ready
 
     async def _prepared(self) -> str:
-        engine = engines.chosen(self._data, self._chrome)
+        engine = engines.chosen(self._data, self._chrome, engines.system_chromium() is not None)
         if engine == engines.CHROMIUM:
             await engines.install_chromium(self._data)
         return engine
@@ -125,16 +133,27 @@ class Browser:
         return self._current, page
 
     async def show(self) -> None:
-        """Shows the browser's window, with the tabs it had."""
+        """Shows the browser's window, with the tabs it had; without a screen, it's only shown live, so it
+        stays as it runs."""
         async with self._lock:
-            if not self.visible:
-                await self._start(visible=True, tabs=await self._stop())
+            if self.visible:
+                return
+            if not self.screen:
+                if self._context is None:
+                    await self._start(visible=False, tabs=[])
+                self._visible = True
+                return
+            await self._start(visible=True, tabs=await self._stop())
 
     async def hide(self) -> None:
         """Goes on without a window, with the tabs it had."""
         async with self._lock:
-            if self._context is not None and self._visible:
-                await self._start(visible=False, tabs=await self._stop())
+            if self._context is None or not self._visible:
+                return
+            if not self.screen:
+                self._visible = False
+                return
+            await self._start(visible=False, tabs=await self._stop())
 
     async def close(self) -> None:
         async with self._lock:
@@ -164,7 +183,7 @@ class Browser:
         try:
             context = await self._playwright.chromium.launch_persistent_context(
                 self._data / "profile",
-                channel=engine,
+                **engines.launching(engine),
                 headless=not visible,
                 args=_ARGS,
                 ignore_default_args=["--enable-automation"],
@@ -213,7 +232,7 @@ class Browser:
         differently, and a session that seems to change browsers can be signed out."""
         if not self._user_agent:
             assert self._playwright is not None
-            browser = await self._playwright.chromium.launch(channel=engine, headless=True)
+            browser = await self._playwright.chromium.launch(**engines.launching(engine), headless=True)
             try:
                 page = await browser.new_page()
                 agent = await page.evaluate("navigator.userAgent")

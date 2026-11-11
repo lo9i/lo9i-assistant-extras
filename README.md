@@ -159,10 +159,13 @@ newer version later.
 - **browser** (`web/browser/browser`): a browser of the assistant's own, with a profile apart from yours that keeps
   what you sign in to, so it reads pages only your account sees (your YouTube home, a site's account page), scheduled
   jobs too. It runs without a window; to sign in to a site, ask the assistant to show its window, sign in there and
-  close it. It opens pages and reads them as text with their links, scrolls feeds, takes screenshots and lists its
-  tabs without asking; clicking, typing and pressing keys ask you every time. It's Google Chrome when it's installed,
-  else a Chromium it downloads the first time (Playwright), never your own browser's profile. The window needs lo9i
-  running in your login session (not started at boot). Needs lo9i with `approve` (plugin format 7).
+  close it. On a computer without a screen (a Linux server), the browser shows live in the web app instead (Browser in
+  the sidebar), where you click and type in it, sign in and press Done. It opens pages and reads them as text with
+  their links, scrolls feeds, takes screenshots and lists its tabs without asking; clicking, typing and pressing keys
+  ask you every time. It's Google Chrome when it's installed, else the system's Chromium on Linux
+  (`/usr/bin/chromium`), else a Chromium it downloads the first time (Playwright), never your own browser's profile.
+  On a Mac the window needs lo9i running in your login session (not started at boot). Needs lo9i with `approve`
+  (plugin format 7).
 
 ## Versions
 

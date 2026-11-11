@@ -1,0 +1,86 @@
+/* The assistant's web app look (lo9i's clients/web/src/app.css, its dark and light themes), the parts this page
+   uses, written out here since the page is its own origin and can't load the app's styles. */
+
+:root {
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.85rem;
+  --font-size-md: 1rem;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --color-bg-card-hover: rgba(31, 30, 33, 0.82);
+  --color-border: rgba(255, 255, 255, 0.14);
+  --color-text-primary: #ffffff;
+  --color-text-muted: #b6b9c0;
+  --color-text-faint: #84878f;
+  --color-accent: #30d158;
+  --color-action-primary: #ffffff;
+  --color-action-on-primary: #0a0a0a;
+  --surface-glass-bg: rgba(26, 25, 27, 0.58);
+  --surface-glass-border: rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+}
+
+/* The app's light theme, when the app says so (static/theme.js). */
+:root[data-theme="light"] {
+  --color-bg-card-hover: rgba(255, 255, 255, 0.98);
+  --color-border: rgba(15, 23, 42, 0.1);
+  --color-text-primary: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-faint: #94a3b8;
+  --color-accent: #16a34a;
+  --color-action-primary: #0f172a;
+  --color-action-on-primary: #ffffff;
+  --surface-glass-bg: rgba(255, 255, 255, 0.62);
+  --surface-glass-border: rgba(15, 23, 42, 0.1);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: transparent; }
+body { color: var(--color-text-primary); font-family: var(--font-family); font-size: var(--font-size-sm); line-height: 1.5; }
+h1, p { margin: 0; }
+button, input, textarea { font: inherit; color: inherit; margin: 0; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; background: none;
+  font-size: var(--font-size-xs); padding: 7px 12px;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn--primary { background: var(--color-action-primary); border-color: var(--color-action-primary); color: var(--color-action-on-primary); }
+.btn--primary:hover:not(:disabled) { filter: brightness(0.92); }
+.btn--ghost { color: var(--color-text-muted); font-size: var(--font-size-md); padding: 4px 10px; }
+.btn--ghost:hover:not(:disabled) { background: var(--color-bg-card-hover); color: var(--color-text-primary); }
+.input {
+  width: 100%; min-height: 34px; padding: 7px 12px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm); line-height: 1.25;
+  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+.input:focus { outline: none; border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border)); }
+.input:disabled { color: var(--color-text-faint); }
+.surface--glass {
+  background: var(--surface-glass-bg);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.05);
+}
+
+/* The address bar on top, the browser's tab under it, as large as fits. */
+.live { display: flex; flex-direction: column; gap: 10px; height: 100vh; max-width: 1600px; margin: 0 auto; padding: 10px 16px 16px; }
+.bar { flex: none; display: flex; align-items: center; gap: 8px; }
+.address { flex: 1; min-width: 0; }
+.screen { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.screen img { display: block; max-width: 100%; max-height: 100%; user-select: none; -webkit-user-drag: none; }
+/* Over the picture, unseen: where the pointer and the keys go. */
+.screen textarea {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; resize: none; border: 0; padding: 0;
+  cursor: default; caret-color: transparent; touch-action: none;
+}
+.screen:focus-within { outline: 2px solid color-mix(in srgb, var(--color-accent) 45%, transparent); outline-offset: -2px; }
+.note { max-width: 26rem; padding: 24px; text-align: center; }
+.note h1 { font-size: var(--font-size-md); font-weight: 600; margin-bottom: 6px; }
+.note p { color: var(--color-text-muted); }

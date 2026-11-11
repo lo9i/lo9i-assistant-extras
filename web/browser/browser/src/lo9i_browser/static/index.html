@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Links are relative to where lo9i serves this (X-Forwarded-Prefix, see web.py). -->
+  <base href="{base}">
+  <title>Browser</title>
+  <script src="{theme.js}"></script>
+  <link rel="stylesheet" href="{live.css}">
+</head>
+<!-- No header of its own: lo9i's sidebar names the page. -->
+<body data-screen="{screen}">
+  <main class="live">
+    <header class="bar">
+      <button id="back" class="btn btn--ghost btn--sm" title="Back" aria-label="Back" disabled>←</button>
+      <form id="go" class="address">
+        <input id="url" class="input" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+               aria-label="Address" placeholder="Address" disabled>
+      </form>
+      <button id="done" class="btn btn--primary btn--sm" title="Done signing in: the browser goes on without a window" disabled>Done</button>
+    </header>
+    <section id="screen" class="screen surface--glass">
+      <img id="frame" alt="" hidden>
+      <!-- Takes the keyboard (a phone's too) and the pointer for the browser. -->
+      <textarea id="keys" aria-label="The browser" autocapitalize="off" autocomplete="off" spellcheck="false" hidden></textarea>
+      <div id="note" class="note" role="status">
+        <h1 id="note-title">Connecting…</h1>
+        <p id="note-text"></p>
+      </div>
+    </section>
+  </main>
+  <script src="{live.js}"></script>
+</body>
+</html>

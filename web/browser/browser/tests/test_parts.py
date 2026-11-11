@@ -1,6 +1,6 @@
 import json
 
-from lo9i_browser import engines, lo9i, reading
+from lo9i_browser import engines, lo9i, places, reading
 
 
 def test_text_is_tidied():
@@ -25,6 +25,33 @@ def test_the_profile_keeps_the_browser_it_was_made_with(tmp_path):
 def test_without_chrome_the_profile_is_chromiums(tmp_path):
     (tmp_path / "engine.json").write_text("not json")
     assert engines.chosen(tmp_path, chrome=False) == engines.CHROMIUM
+
+
+def test_without_chrome_the_systems_chromium_comes_before_a_download(tmp_path):
+    assert engines.chosen(tmp_path, chrome=False, system=True) == engines.SYSTEM
+    # Kept while it's there, Chrome installed later too; Playwright's once it's gone.
+    assert engines.chosen(tmp_path, chrome=True, system=True) == engines.SYSTEM
+    assert engines.chosen(tmp_path, chrome=False, system=False) == engines.CHROMIUM
+    assert engines.chosen(tmp_path / "chrome", chrome=True, system=True) == engines.CHROME
+
+
+def test_the_systems_chromium_launches_by_its_path(monkeypatch, tmp_path):
+    chromium = tmp_path / "chromium"
+    chromium.touch()
+    monkeypatch.setitem(engines.SYSTEM_CHROMIUM_PATHS, "linux", chromium)
+    monkeypatch.setattr(engines.sys, "platform", "linux")
+    assert engines.launching(engines.SYSTEM) == {"executable_path": str(chromium)}
+    assert engines.launching(engines.CHROME) == {"channel": "chrome"}
+    assert engines.system_chromium("darwin") is None
+
+
+def test_only_linux_without_a_display_has_no_screen(monkeypatch):
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    assert not places.has_screen("linux")
+    assert places.has_screen("darwin")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    assert places.has_screen("linux")
 
 
 class _Session:
