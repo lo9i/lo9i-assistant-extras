@@ -1,17 +1,19 @@
 [project]
 name = "lo9i-browser"
-version = "1.0.0"
+version = "1.1.0"
 description = "A browser of its own with a persistent profile, for lo9i to read and use pages the user signed in to"
 requires-python = ">=3.12"
-dependencies = ["mcp>=2.3.0", "playwright>=1.64"]
+dependencies = ["mcp>=2.3.0", "playwright>=1.64", "starlette>=1.10.0", "uvicorn>=0.54.0", "websockets>=17.4"]
 
 [project.scripts]
 browser-mcp = "lo9i_browser.mcp_server:main"
+browser-web = "lo9i_browser.web:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=1.4.0",
+    "httpx>=0.28.1",
     "pyyaml>=6.0.3",
 ]
 

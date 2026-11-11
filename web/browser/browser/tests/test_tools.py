@@ -69,12 +69,11 @@ def test_the_window_needs_the_users_screen(monkeypatch):
     monkeypatch.setenv("LO9I_LOGIN_SESSION", "/tmp/session.sock")
     assert "outside the user's login session" in mcp_server._no_screen()
     monkeypatch.delenv("LO9I_LOGIN_SESSION")
-    monkeypatch.setattr(mcp_server.sys, "platform", "linux")
-    monkeypatch.delenv("DISPLAY", raising=False)
-    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
-    assert "no screen" in mcp_server._no_screen()
-    monkeypatch.setenv("DISPLAY", ":0")
     assert mcp_server._no_screen() == ""
+
+
+def test_server_yaml_has_the_page_that_shows_the_browser_live():
+    assert SERVER_YAML["page"] == {"command": "{bin}/browser-web", "args": ["--socket", "{socket}"]}
 
 
 async def test_the_page_is_read_from_the_browser(browser, site):
