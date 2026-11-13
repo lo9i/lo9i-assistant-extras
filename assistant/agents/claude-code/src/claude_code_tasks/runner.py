@@ -1,5 +1,5 @@
-"""Runs a task with Claude Code through the Claude Agent SDK, which ships the Claude Code CLI, so nothing
-else needs installing."""
+"""Runs a task with Claude Code through the Claude Agent SDK: the user's installed CLI when there is one, else
+the one the SDK ships, so nothing else needs installing (claude_cli.py)."""
 
 import asyncio
 import os
@@ -24,6 +24,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import ThinkingConfig
 
+from claude_code_tasks import claude_cli
 from claude_code_tasks.relay import Relay
 from claude_code_tasks.task_folder import Context, Inbox, Measured, Message, Outcome, Progress, Step, Task, note
 
@@ -293,6 +294,7 @@ def options(task: Task, env: dict[str, str]) -> ClaudeAgentOptions:
     follow_up = bool(task.follow_up_of)
     return ClaudeAgentOptions(
         cwd=task.repository,
+        cli_path=claude_cli.installed(),
         permission_mode="bypassPermissions",
         system_prompt={"type": "preset", "preset": "claude_code", "append": _UNDER_LO9I},
         setting_sources=["user", "project", "local"],
